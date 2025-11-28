@@ -7,10 +7,6 @@ const API_KEY = null;
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-if (typeof window !== 'undefined') {
-    window.gapiLoadedCallback = () => {};
-}
-
 // --- STYLES ---
 const INPUT_CLASS = "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white";
 const LABEL_CLASS = "block text-sm font-bold text-gray-700 mb-1";
@@ -248,7 +244,7 @@ const calculateItem = (item) => {
         if (outingRegion === 'North') {
             const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || city.includes('(北部出發)');
             if (isRemote) {
-                if (count < 25) error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+                if (count < 25) error = `北部遠程外派(${city.replace(/\(.*?\)/, '')})最低出課人數為 25 人`;
                 else if (count >= 35) { discountRate = 0.9; isDiscountApplied = true; }
             } else {
                 if (count >= 20) { discountRate = 0.9; isDiscountApplied = true; }
@@ -412,7 +408,7 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                             {(item.calc.transportFee > 0) && (
                                 <tr className="bg-green-50 text-xs text-green-900 print:bg-transparent print:text-black">
                                     <td colSpan="3" className="p-2 pl-4 text-right">
-                                        車馬費 ({item.city.replace(/\(.*\)/, '')}{item.area})
+                                        車馬費 ({item.city.replace(/\(.*?\)/, '')}{item.area})
                                     </td>
                                     <td className="p-2 text-right font-bold">${item.calc.transportFee.toLocaleString()}</td>
                                 </tr>
@@ -614,7 +610,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
                         </div>
                     </div>
                     <div className="border p-4 rounded-lg border-orange-200 bg-orange-50">
-                        <h4 className="font-bold mb-3 flex items-center text-orange-800"><Plus className="w-4 h-4 mr-2"/> 2. 追加款項 (Additional)</h4>
+                        <h4 className="font-bold mb-3 flex items-center"><Plus className="w-4 h-4 mr-2"/> 2. 追加款項 (Additional)</h4>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className={LABEL_CLASS}>金額</label>
@@ -1604,35 +1600,46 @@ const App = () => {
         localStorage.setItem('hbh_quotes', JSON.stringify(quotes));
     }, [quotes]);
 
+    // Google API Initialization (Dynamic Loading)
     useEffect(() => {
-        window.gapiLoadedCallback = () => {
+        const script = document.createElement('script');
+        script.src = "https://apis.google.com/js/api.js";
+        script.async = true;
+        script.defer = true;
+        
+        const initClient = () => {
+            window.gapi.load('client:auth2', () => {
+                window.gapi.client.init({
+                    clientId: CLIENT_ID,
+                    apiKey: API_KEY,
+                    scope: SCOPES,
+                    discoveryDocs: DISCOVERY_DOCS
+                }).then(() => {
+                    setGapiReady(true);
+                    const authInstance = window.gapi.auth2.getAuthInstance();
+                    console.log('Google API 初始化成功。');
+                    if (authInstance) {
+                        setIsSignedIn(authInstance.isSignedIn.get());
+                        authInstance.isSignedIn.listen(setIsSignedIn);
+                    }
+                }, (error) => {
+                    console.error('Error initializing Google API client:', error);
+                });
+            });
+        };
+
+        script.onload = () => {
             if (window.gapi) {
-                window.gapi.load('client:auth2', initClient);
+                initClient();
             }
         };
-        if (typeof window.gapi !== 'undefined' && window.gapi.client) {
-            window.gapi.load('client:auth2', initClient);
-        }
-    }, []);
 
-    const initClient = () => {
-        window.gapi.client.init({
-            clientId: CLIENT_ID,
-            apiKey: API_KEY,
-            scope: SCOPES,
-            discoveryDocs: DISCOVERY_DOCS
-        }).then(() => {
-            setGapiReady(true);
-            const authInstance = window.gapi.auth2.getAuthInstance();
-            console.log('Google API 初始化成功。');
-            if (authInstance) {
-                setIsSignedIn(authInstance.isSignedIn.get());
-                authInstance.isSignedIn.listen(setIsSignedIn);
-            }
-        }, (error) => {
-            console.error('Error initializing Google API client:', error);
-        });
-    };
+        document.body.appendChild(script);
+
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
 
     const saveToGoogleDrive = async () => {
         if (!gapiReady) {
