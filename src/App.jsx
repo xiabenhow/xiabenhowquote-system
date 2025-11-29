@@ -503,25 +503,13 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
 
 const PreviewModal = ({ quote, onClose }) => {
     const handlePrint = () => {
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        printWindow.document.write('<html><head><title>報價單預覽</title>');
-        printWindow.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-        printWindow.document.write('<style>@page { size: A4; margin: 10mm; }</style>');
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(document.getElementById('modal-preview-area').innerHTML);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 500);
+        window.print();
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 print:hidden">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-[900px] p-6 overflow-auto max-h-[95vh]">
-                <div className="flex justify-between items-center mb-6 border-b pb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[900px] p-6 overflow-auto max-h-[95vh] printable-area">
+                <div className="flex justify-between items-center mb-6 border-b pb-4 print:hidden">
                     <h2 className="text-xl font-bold text-gray-800">報價單預覽 ({quote.clientInfo.companyName})</h2>
                     <div className='flex gap-2'>
                         <button onClick={handlePrint} className="bg-gray-800 text-white px-4 py-2 rounded shadow hover:bg-gray-700 flex items-center gap-2 font-bold text-sm">
@@ -530,7 +518,7 @@ const PreviewModal = ({ quote, onClose }) => {
                         <button onClick={onClose} className='p-2'><X className="w-6 h-6 text-gray-500" /></button>
                     </div>
                 </div>
-                <div id="modal-preview-area" className='transform scale-[0.8] origin-top mx-auto min-h-[700px] w-[125%]'>
+                <div id="modal-preview-area" className='transform scale-[0.8] origin-top mx-auto min-h-[700px] w-[125%] print:scale-100 print:w-full print:min-h-0 print:max-w-none print:mx-0 print:p-0'>
                     <QuotePreview
                         clientInfo={quote.clientInfo}
                         items={quote.items}

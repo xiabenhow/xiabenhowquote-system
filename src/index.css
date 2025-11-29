@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  /* 當觸發列印時，預設隱藏所有 body 的直接子元素 */
+  body > * {
+    visibility: hidden;
+  }
+  /* 只顯示被標記為 .printable-area 的元素及其所有子元素 */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  /* 將 .printable-area 放到頁面最上層，並佔滿整個頁面 */
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 1rem; /* 留一點邊界 */
+  }
+}
