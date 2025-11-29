@@ -31,9 +31,13 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
 
-      - name: Deploy to Firebase Hosting 🚀
-        uses: firebase-actions/deploy-hosting@v0
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_XIABENHOW_QUOTE }}'
-          projectId: xiabenhow-quote
+          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_XIABENHOW_QUOTE }}'
+
+      - name: Set up Firebase Tools
+        run: npm install -g firebase-tools
+
+      - name: Deploy to Firebase Hosting 🚀
+        run: firebase deploy --only hosting --project xiabenhow-quote --non-interactive
