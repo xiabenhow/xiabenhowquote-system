@@ -573,7 +573,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
     const handleSave = () => {
         let newStatus = quote.status;
-        let closedAt = quote.closedAt;
+        let closedAt = quote.closedAt || null;
 
         if (remaining === 0) {
             if (confirm("款項已全數結清，確認將此案件結案 (Closed)？")) {
