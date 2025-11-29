@@ -31,12 +31,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
 
-      - name: Debug Build Output
-        run: |
-          echo "--- Listing files in dist/assets ---"
-          ls -l dist/assets
-          echo "--- CSS file content ---"
-          cat dist/assets/*.css
+      
 
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v2
