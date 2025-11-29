@@ -32,7 +32,7 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
 
       - name: Deploy to Firebase Hosting 🚀
-        uses: firebase-tools/action-hosting-deploy@v0
+        uses: firebase-actions/deploy-hosting@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_XIABENHOW_QUOTE }}'
