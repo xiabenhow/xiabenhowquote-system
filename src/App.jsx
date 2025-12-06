@@ -1,12 +1,56 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Calendar, FileText, Check, DollarSign, Printer, Search, Folder, ChevronDown, ChevronRight, ChevronLeft, Save, Trash2, X, Edit, AlertCircle, Eye, EyeOff, Download, MapPin, Clock, Filter, Menu, ArrowDown, BarChart3, TrendingUp, PieChart, Upload, FileJson } from 'lucide-react';
+import { Plus, Calendar, FileText, Check, DollarSign, Printer, Search, Folder, ChevronDown, ChevronRight, ChevronLeft, Save, Trash2, X, Edit, AlertCircle, Eye, EyeOff, Download, MapPin, Clock, Filter, Menu, ArrowDown, BarChart3, TrendingUp, PieChart, Upload, FileJson, UploadCloud, Loader2, Cloud, PenTool } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
-// --- 1. 樣式常數 (Styles) ---
+// === FIREBASE IMPORTS ===
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  serverTimestamp 
+} from "firebase/firestore";
+
+// === FIREBASE CONFIGURATION ===
+// 使用您提供的環境變數設定
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// Initialize Firebase
+// 加上 try-catch 避免在沒有設定 env 的環境下直接 crash，方便您除錯
+let app, db, analytics;
+try {
+  app = initializeApp(firebaseConfig);
+  analytics = getAnalytics(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error("Firebase 初始化失敗，請檢查 .env 檔案設定", error);
+}
+
+// --- 0. 設定與常數 ---
+
+// ★★★ 請在此處替換您的印章圖片網址 ★★★
+const STAMP_URL = "https://i.imgur.com/39k1kK2.png"; 
+
 const INPUT_CLASS = "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white";
 const LABEL_CLASS = "block text-sm font-bold text-gray-700 mb-1";
 const SECTION_CLASS = "bg-white p-6 rounded-lg shadow-sm border border-gray-200";
 
-// --- 2. 靜態資料 (Data Models) ---
+// --- 1. 靜態資料 (Data Models) - 完整展開 ---
 
 const COURSE_DATA = {
   "平板課程": [
@@ -239,7 +283,6 @@ const TRANSPORT_FEES = {
   }
 };
 
-// --- Helper: Get Available Cities for Region ---
 const getAvailableCities = (region) => {
     const allCities = Object.keys(TRANSPORT_FEES);
     
@@ -266,14 +309,21 @@ const getAvailableCities = (region) => {
     return [];
 };
 
-// --- 3. 核心計算邏輯 (Business Logic) ---
+const formatDate = (dateStr) => {
+    if(!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString('zh-TW');
+}
+
+// --- 2. 核心計算邏輯 ---
 
 const calculateItem = (item) => {
   const { 
     price, peopleCount, locationMode, 
     outingRegion, city, area, 
-    hasInvoice, customDiscount, extraFee,
-    enableDiscount90 // New field
+    hasInvoice, customDiscount, 
+    extraFees, // Array of fees: [{id, description, amount, isEnabled}]
+    extraFee, // Legacy single field (for compatibility)
+    enableDiscount90 
   } = item;
 
   let error = null;
@@ -285,9 +335,16 @@ const calculateItem = (item) => {
   const count = parseInt(peopleCount) || 0;
   const unitPrice = parseInt(price) || 0;
   const cDiscount = parseInt(customDiscount) || 0;
-  const eFee = parseInt(extraFee) || 0;
+  
+  // --- UPDATED EXTRA FEE LOGIC: Only sum enabled fees ---
+  let totalExtraFee = parseInt(extraFee) || 0; // Legacy
+  if (extraFees && Array.isArray(extraFees)) {
+      totalExtraFee += extraFees
+          .filter(f => f.isEnabled) // Only include enabled fees
+          .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
+  }
 
-  // --- CHANGED: Logic for minimum people counts kept, but automatic discount removed ---
+  // --- Logic for minimum people counts ---
   if (locationMode === 'outing') {
     if (outingRegion === 'North') {
         const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || city.includes('(北部出發)');
@@ -321,7 +378,7 @@ const calculateItem = (item) => {
     }
   }
 
-  // --- NEW: Manual 90% Discount Logic ---
+  // --- Manual 90% Discount Logic ---
   if (enableDiscount90) {
       discountRate = 0.9;
       isDiscountApplied = true;
@@ -343,17 +400,12 @@ const calculateItem = (item) => {
   const discountAmount = subTotal - discountedSubTotal;
   const taxableAmount = discountedSubTotal - cDiscount;
   const tax = hasInvoice ? Math.round(taxableAmount * 0.05) : 0;
-  const finalTotal = (taxableAmount + tax) + transportFee + teacherFee + eFee;
+  const finalTotal = (taxableAmount + tax) + transportFee + teacherFee + totalExtraFee;
 
-  return { subTotal, discountAmount, isDiscountApplied, tax, transportFee, teacherFee, finalTotal, error };
+  return { subTotal, discountAmount, isDiscountApplied, tax, transportFee, teacherFee, finalTotal, totalExtraFee, error };
 };
 
-const formatDate = (dateStr) => {
-    if(!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString('zh-TW');
-}
-
-// --- 4. UI Components ---
+// --- 3. UI Components ---
 
 const StatusSelector = ({ status, onChange }) => {
     const options = [
@@ -385,9 +437,9 @@ const StatusSelector = ({ status, onChange }) => {
 };
 
 // --- QuotePreview Component ---
-const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
+const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned }) => {
     return (
-        <div id="printable-area" className="bg-white w-full min-h-[600px] shadow-lg p-8 text-sm scale-100 origin-top mx-auto max-w-[210mm] print:shadow-none print:w-full print:max-w-none print:p-0 print:m-0 print:text-black">
+        <div id="printable-area" className="bg-white w-[210mm] min-h-[297mm] shadow-none p-10 text-sm mx-auto relative print:p-0 print:m-0 print:w-full">
             {/* Header */}
             <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
                 <div>
@@ -399,7 +451,7 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                 </div>
             </div>
             {/* Client */}
-            <div className="mb-8 bg-gray-50 p-4 rounded border border-gray-100 print:bg-white print:border-gray-300">
+            <div className="mb-8 bg-gray-50 p-4 rounded border border-gray-100">
                 <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">客戶資料</h2>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                     <p><span className="text-gray-500 mr-2">名稱:</span> {clientInfo.companyName || '-'}</p>
@@ -412,11 +464,11 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
             {/* Table */}
             <table className="w-full mb-6 border-collapse">
                 <thead>
-                    <tr className="bg-gray-800 text-white print:bg-gray-200 print:text-black">
-                        <th className="p-3 text-left rounded-l print:rounded-none">項目</th>
+                    <tr className="bg-gray-800 text-white">
+                        <th className="p-3 text-left rounded-l">項目</th>
                         <th className="p-3 text-right">單價</th>
                         <th className="p-3 text-right">數量</th>
-                        <th className="p-3 text-right rounded-r print:rounded-none">小計</th>
+                        <th className="p-3 text-right rounded-r">小計</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -426,21 +478,17 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                                 <td className="p-3">
                                     <div className="font-bold text-gray-800">{item.courseName}</div>
                                     {item.itemNote && (
-                                        <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100 print:bg-transparent print:border-gray-400">
+                                        <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
                                             備註: {item.itemNote}
                                         </div>
                                     )}
                                     <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
-                                        {(item.eventDate || item.eventTime) && (
+                                        {(item.eventDate || item.startTime) && (
                                             <div>
-                                                時間：{item.eventDate} {item.eventTime}
+                                                時間：{item.eventDate} {item.startTime} {item.endTime ? `- ${item.endTime}` : ''}
                                             </div>
                                         )}
-                                        {item.address && (
-                                            <div>
-                                                地點：{item.address}
-                                            </div>
-                                        )}
+                                        {item.address && <div>地點：{item.address}</div>}
                                     </div>
                                 </td>
                                 <td className="p-3 text-right text-gray-600">${item.price.toLocaleString()}</td>
@@ -449,17 +497,17 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                             </tr>
                             {/* Detail Rows */}
                             {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
-                                <tr className="bg-red-50 text-xs print:bg-transparent">
-                                    <td colSpan="3" className="p-2 pl-4 text-right text-red-600 print:text-black">
+                                <tr className="bg-red-50 text-xs">
+                                    <td colSpan="3" className="p-2 pl-4 text-right text-red-600">
                                         折扣優惠 {item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}
                                     </td>
-                                    <td className="p-2 text-right text-red-600 font-bold print:text-black">
+                                    <td className="p-2 text-right text-red-600 font-bold">
                                         -${((item.calc.discountAmount || 0) + parseInt(item.customDiscount || 0)).toLocaleString()}
                                     </td>
                                 </tr>
                             )}
                             {(item.calc.transportFee > 0) && (
-                                <tr className="bg-green-50 text-xs text-green-900 print:bg-transparent print:text-black">
+                                <tr className="bg-green-50 text-xs text-green-900">
                                     <td colSpan="3" className="p-2 pl-4 text-right">
                                         車馬費 ({item.city.replace(/\(.*\)/, '')}{item.area})
                                     </td>
@@ -467,26 +515,39 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                                 </tr>
                             )}
                             {(item.calc.teacherFee > 0) && (
-                                <tr className="bg-green-50 text-xs text-green-900 print:bg-transparent print:text-black">
+                                <tr className="bg-green-50 text-xs text-green-900">
                                     <td colSpan="3" className="p-2 pl-4 text-right">師資費</td>
                                     <td className="p-2 text-right font-bold">+${item.calc.teacherFee.toLocaleString()}</td>
                                 </tr>
                             )}
+                            
+                            {/* Single Legacy Extra Fee (Backward Compatibility) */}
                             {(item.extraFee > 0) && (
-                                <tr className="bg-green-50 text-xs text-green-900 print:bg-transparent print:text-black">
+                                <tr className="bg-green-50 text-xs text-green-900">
                                     <td colSpan="3" className="p-2 pl-4 text-right">
                                         額外加價 {item.extraFeeDesc ? `(${item.extraFeeDesc})` : ''}
                                     </td>
                                     <td className="p-2 text-right font-bold">+${parseInt(item.extraFee).toLocaleString()}</td>
                                 </tr>
                             )}
+                            
+                            {/* New Multiple Extra Fees (Only Enabled) */}
+                            {item.extraFees && item.extraFees.filter(f => f.isEnabled).map(fee => (
+                                <tr key={fee.id} className="bg-green-50 text-xs text-green-900">
+                                    <td colSpan="3" className="p-2 pl-4 text-right">
+                                        額外加價 ({fee.description || '未說明'})
+                                    </td>
+                                    <td className="p-2 text-right font-bold">+${parseInt(fee.amount).toLocaleString()}</td>
+                                </tr>
+                            ))}
+
                             {(item.hasInvoice) && (
-                                <tr className="bg-green-50 text-xs text-green-900 print:bg-transparent print:text-black">
+                                <tr className="bg-green-50 text-xs text-green-900">
                                     <td colSpan="3" className="p-2 pl-4 text-right">營業稅 (5%)</td>
                                     <td className="p-2 text-right font-bold">+${item.calc.tax.toLocaleString()}</td>
                                 </tr>
                             )}
-                            <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 print:bg-gray-50">
+                            <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300">
                                 <td colSpan="3" className="p-2 text-right">項目總計</td>
                                 <td className="p-2 text-right">${item.calc.finalTotal.toLocaleString()}</td>
                             </tr>
@@ -496,8 +557,8 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
             </table>
             {/* Total */}
             <div className="flex justify-end mt-8">
-                <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200 print:w-2/3 print:bg-white print:border-gray-800">
-                    <div className="flex justify-between items-center text-2xl font-bold text-blue-900 print:text-black">
+                <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200">
+                    <div className="flex justify-between items-center text-2xl font-bold text-blue-900">
                         <span>總金額</span>
                         <span>${totalAmount.toLocaleString()}</span>
                     </div>
@@ -516,15 +577,22 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, idStr }) => {
                     <li className="text-red-600 font-bold">付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。</li>
                     <li>已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。</li>
                 </ol>
-                <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300 print:bg-transparent print:border-gray-800">
+                <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
                     <p className="font-bold text-sm">銀行：玉山銀行 永安分行 808 &nbsp;&nbsp;&nbsp; 戶名：下班文化國際有限公司 &nbsp;&nbsp;&nbsp; 帳號：1115-940-021201</p>
                 </div>
             </div>
 
             {/* Footer Sign */}
-            <div className="mt-12 pt-8 border-t border-gray-300 flex justify-between text-sm">
-                <div>
-                    <p>下班隨手作代表：_________________</p>
+            <div className="mt-12 pt-8 border-t border-gray-300 flex justify-between text-sm items-end relative">
+                <div className="relative">
+                    <p className="z-10 relative">下班隨手作代表：_________________</p>
+                    {isSigned && (
+                        <img 
+                            src={STAMP_URL} 
+                            alt="Company Stamp" 
+                            className="absolute -top-10 left-20 w-32 opacity-80 rotate-[-5deg] mix-blend-multiply pointer-events-none"
+                        />
+                    )}
                 </div>
                 <div>
                     <p>客戶確認簽章：_________________</p>
@@ -696,7 +764,7 @@ const StatsView = ({ quotes }) => {
         const months = new Set();
         quotes.forEach(q => {
             if (q.status !== 'draft') {
-                const date = new Date(q.createdAt);
+                const date = q.createdAt ? new Date(q.createdAt.seconds * 1000) : new Date(); // Firebase timestamp check
                 const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 months.add(key);
             }
@@ -734,8 +802,8 @@ const StatsView = ({ quotes }) => {
         if (!selectedMonth) return result;
 
         quotes.forEach(q => {
-            const qDate = new Date(q.createdAt);
-            const qMonth = `${qDate.getFullYear()}-${String(qDate.getMonth() + 1).padStart(2, '0')}`;
+            const date = q.createdAt ? new Date(q.createdAt.seconds * 1000) : new Date();
+            const qMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             
             if (q.status !== 'draft' && qMonth === selectedMonth) {
                 // Region
@@ -866,7 +934,7 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
     const groupedQuotes = useMemo(() => {
         const groups = {};
         quotes.forEach(q => {
-            const date = new Date(q.createdAt);
+            const date = q.createdAt ? new Date(q.createdAt.seconds * 1000) : new Date();
             const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}`;
             if (!groups[key]) groups[key] = [];
             groups[key].push(q);
@@ -885,16 +953,6 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
                      <button onClick={onExport} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
                         <FileText className="w-4 h-4 mr-2"/> 匯出報表 (CSV)
                      </button>
-                     
-                     {/* Backup Buttons */}
-                     <button onClick={onExportBackup} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
-                        <Download className="w-4 h-4 mr-2"/> 備份資料 (JSON)
-                     </button>
-                     <button onClick={() => importRef.current.click()} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
-                        <Upload className="w-4 h-4 mr-2"/> 還原資料 (JSON)
-                     </button>
-                     <input type="file" ref={importRef} onChange={onImportBackup} className="hidden" accept=".json" />
-
                      <button onClick={onCreate} className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm">新增</button>
                 </div>
             </div>
@@ -949,7 +1007,7 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
             <div className="space-y-6">
                 {filteredMonths.map(month => {
                     const monthQuotes = groupedQuotes[month].filter(q => {
-                        const matchesSearch = q.clientInfo.companyName.includes(searchTerm) || q.clientInfo.phone.includes(searchTerm);
+                        const matchesSearch = q.clientInfo?.companyName?.includes(searchTerm) || q.clientInfo?.phone?.includes(searchTerm);
                         const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
                         return matchesSearch && matchesStatus;
                     });
@@ -979,7 +1037,7 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
                                                 <span>課程: {quote.items[0]?.courseName} {quote.items.length > 1 ? `(+${quote.items.length - 1})` : ''}</span>
                                             </div>
                                             <div className="text-xs text-gray-400 mt-1">
-                                                建立於: {formatDate(quote.createdAt)}
+                                                建立於: {formatDate(quote.createdAt ? quote.createdAt.seconds * 1000 : new Date())}
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-2 min-w-[150px]">
@@ -1019,33 +1077,56 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const [clientInfo, setClientInfo] = useState(initialData?.clientInfo || {
         companyName: '', taxId: '', contactPerson: '', phone: '', email: '', address: ''
     });
-    const [status, setStatus] = useState(initialData?.status || 'draft');
-    const [dueDate, setDueDate] = useState(initialData?.paymentDueDate || '');
-    const [adminNotes, setAdminNotes] = useState(initialData?.adminNotes || '');
-    const [showPreviewMobile, setShowPreviewMobile] = useState(false); 
-
-    const [items, setItems] = useState(initialData?.items || [{
-        id: Date.now(),
-        courseSeries: '水晶系列',
-        courseName: '手作輕寶石水晶手鍊',
-        price: 980,
-        peopleCount: 1,
-        locationMode: 'store', 
-        regionType: 'North', 
-        outingRegion: 'North', 
-        city: '台北市',
-        area: '',
-        eventDate: '',
-        eventTime: '',
-        hasInvoice: false,
-        enableDiscount90: false, // NEW DEFAULT
-        customDiscount: 0,
-        customDiscountDesc: '', 
-        extraFee: 0,
-        extraFeeDesc: '', 
-        address: '',
-        itemNote: ''
-    }]);
+    // Removed UI for status, but kept state for data integrity
+    const [status] = useState(initialData?.status || 'draft');
+    
+    // --- Items Initialization ---
+    const [items, setItems] = useState(() => {
+        if (initialData?.items) {
+            // Check if we need to migrate old single extraFee to new array
+            return initialData.items.map(item => {
+                const newItem = { ...item };
+                if (!newItem.extraFees) newItem.extraFees = [];
+                // If old fee exists and not yet in array, add it (simple migration check)
+                if (newItem.extraFee > 0 && newItem.extraFees.length === 0) {
+                     newItem.extraFees.push({
+                         id: Date.now(),
+                         description: newItem.extraFeeDesc || '額外加價',
+                         amount: newItem.extraFee,
+                         isEnabled: true // Default to enabled for legacy
+                     });
+                     // Clear old so we don't double count if we edit and save again
+                     newItem.extraFee = 0; 
+                     newItem.extraFeeDesc = '';
+                }
+                return newItem;
+            });
+        }
+        return [{
+            id: Date.now(),
+            courseSeries: '水晶系列',
+            courseName: '手作輕寶石水晶手鍊',
+            price: 980,
+            peopleCount: 1,
+            locationMode: 'store', 
+            regionType: 'North', 
+            outingRegion: 'North', 
+            city: '台北市',
+            area: '',
+            eventDate: '',
+            startTime: '', // New
+            endTime: '',   // New
+            hasInvoice: false,
+            enableDiscount90: false, 
+            customDiscount: 0,
+            customDiscountDesc: '', 
+            extraFees: [], // New array for multiple fees
+            extraFee: 0, // Legacy support (hidden)
+            extraFeeDesc: '', 
+            address: '',
+            itemNote: ''
+        }];
+    });
 
     const calculatedItems = useMemo(() => {
         return items.map(item => ({
@@ -1085,8 +1166,32 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         setItems(newItems);
     };
 
+    // --- Extra Fee Handlers ---
+    const addExtraFee = (index) => {
+        const newItems = [...items];
+        if(!newItems[index].extraFees) newItems[index].extraFees = [];
+        // Default enabled when adding
+        newItems[index].extraFees.push({ id: Date.now(), description: '', amount: 0, isEnabled: true });
+        setItems(newItems);
+    }
+
+    const removeExtraFee = (itemIndex, feeId) => {
+        const newItems = [...items];
+        newItems[itemIndex].extraFees = newItems[itemIndex].extraFees.filter(f => f.id !== feeId);
+        setItems(newItems);
+    }
+
+    const updateExtraFee = (itemIndex, feeId, field, value) => {
+        const newItems = [...items];
+        const feeIndex = newItems[itemIndex].extraFees.findIndex(f => f.id === feeId);
+        if(feeIndex > -1) {
+            newItems[itemIndex].extraFees[feeIndex][field] = value;
+            setItems(newItems);
+        }
+    }
+
     const addItem = () => {
-        setItems([...items, { ...items[items.length-1], id: Date.now(), itemNote: '', enableDiscount90: false }]);
+        setItems([...items, { ...items[items.length-1], id: Date.now(), itemNote: '', enableDiscount90: false, extraFees: [], extraFee: 0 }]);
     };
 
     const removeItem = (index) => {
@@ -1105,13 +1210,31 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             items: calculatedItems, 
             totalAmount,
             status,
-            paymentDueDate: dueDate,
-            adminNotes
         });
     };
 
-    const handlePrint = () => {
-        window.print();
+    // --- Preview Modal State ---
+    const [showPreview, setShowPreview] = useState(false);
+    const [isSigned, setIsSigned] = useState(false);
+
+    const handleDownload = () => {
+        const element = document.getElementById('printable-area');
+        if (!element) return;
+        const dateStr = new Date().toISOString().slice(0,10);
+        const filename = `${clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
+
+        if (typeof html2pdf !== 'undefined') {
+            const opt = {
+                margin: 0,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(element).set(opt).save();
+        } else {
+            alert("請確認專案中已安裝 html2pdf.js 套件");
+        }
     };
 
     return (
@@ -1189,19 +1312,24 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                                     <input type="date" className={INPUT_CLASS} value={item.eventDate} onChange={e => updateItem(idx, 'eventDate', e.target.value)} />
                                 </div>
                                 <div>
-                                    <label className={LABEL_CLASS}>時間 (24h)</label>
-                                    <input type="time" className={INPUT_CLASS} value={item.eventTime} onChange={e => updateItem(idx, 'eventTime', e.target.value)} />
+                                    <label className={LABEL_CLASS}>開始時間</label>
+                                    <input type="time" className={INPUT_CLASS} value={item.startTime} onChange={e => updateItem(idx, 'startTime', e.target.value)} />
                                 </div>
-                                <div className="flex flex-col gap-2 pt-6">
-                                    <label className="flex items-center cursor-pointer select-none p-1.5 bg-yellow-50 rounded border border-yellow-100 w-full">
-                                        <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={e => updateItem(idx, 'hasInvoice', e.target.checked)} />
-                                        <span className="text-sm font-medium text-gray-700">是否開立發票? (5%)</span>
-                                    </label>
-                                    {/* NEW: Manual 90% Discount Checkbox */}
-                                    <label className="flex items-center cursor-pointer select-none p-1.5 bg-red-50 rounded border border-red-100 w-full">
-                                        <input type="checkbox" className="mr-2 w-4 h-4" checked={item.enableDiscount90 || false} onChange={e => updateItem(idx, 'enableDiscount90', e.target.checked)} />
-                                        <span className="text-sm font-medium text-red-700">套用九折優惠 (10% Off)</span>
-                                    </label>
+                                <div>
+                                    <label className={LABEL_CLASS}>結束時間</label>
+                                    <input type="time" className={INPUT_CLASS} value={item.endTime} onChange={e => updateItem(idx, 'endTime', e.target.value)} />
+                                </div>
+                                <div className="flex flex-col gap-2 pt-6 md:col-span-4">
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
+                                            <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={e => updateItem(idx, 'hasInvoice', e.target.checked)} />
+                                            <span className="text-sm font-medium text-gray-700">是否開立發票? (5%)</span>
+                                        </label>
+                                        <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
+                                            <input type="checkbox" className="mr-2 w-4 h-4" checked={item.enableDiscount90 || false} onChange={e => updateItem(idx, 'enableDiscount90', e.target.checked)} />
+                                            <span className="text-sm font-medium text-red-700">套用九折優惠 (10% Off)</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1305,15 +1433,50 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                                         <input type="text" className={INPUT_CLASS} placeholder="折扣說明 (如: 老客戶優惠)" value={item.customDiscountDesc || ''} onChange={e => updateItem(idx, 'customDiscountDesc', e.target.value)} />
                                     </div>
                                 </div>
-                                {/* Extra Fee Section */}
+                                {/* Extra Fee Section (Multiple + Checkbox) */}
                                 <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                                    <label className={LABEL_CLASS + " text-blue-800"}>額外加價 (加項)</label>
-                                    <div className="flex flex-col gap-2">
-                                        <div className="relative">
-                                        <span className="absolute left-3 top-2 text-gray-500 font-bold">+</span>
-                                        <input type="number" className={INPUT_CLASS + " pl-6"} placeholder="金額" value={item.extraFee} onChange={e => updateItem(idx, 'extraFee', e.target.value)} />
-                                        </div>
-                                        <input type="text" className={INPUT_CLASS} placeholder="加價說明 (如: 指定花材)" value={item.extraFeeDesc || ''} onChange={e => updateItem(idx, 'extraFeeDesc', e.target.value)} />
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className={LABEL_CLASS + " text-blue-800 mb-0"}>額外加價 (加項)</label>
+                                        <button onClick={() => addExtraFee(idx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center">
+                                            <Plus className="w-3 h-3 mr-1"/> 新增項目
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        {(!item.extraFees || item.extraFees.length === 0) && (
+                                            <div className="text-sm text-gray-400 italic text-center py-2">無額外加價</div>
+                                        )}
+                                        {item.extraFees && item.extraFees.map(fee => (
+                                            <div key={fee.id} className="flex gap-2 items-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-5 h-5 cursor-pointer accent-blue-600"
+                                                    title="是否啟用此加價"
+                                                    checked={fee.isEnabled}
+                                                    onChange={e => updateExtraFee(idx, fee.id, 'isEnabled', e.target.checked)}
+                                                />
+                                                <input 
+                                                    type="text" 
+                                                    className={INPUT_CLASS + " flex-1 " + (!fee.isEnabled ? "opacity-50" : "")} 
+                                                    placeholder="加價說明" 
+                                                    value={fee.description} 
+                                                    onChange={e => updateExtraFee(idx, fee.id, 'description', e.target.value)} 
+                                                    disabled={!fee.isEnabled}
+                                                />
+                                                <div className="relative w-32">
+                                                    <span className="absolute left-2 top-2 text-gray-500 font-bold">+</span>
+                                                    <input 
+                                                        type="number" 
+                                                        className={INPUT_CLASS + " pl-5 " + (!fee.isEnabled ? "opacity-50" : "")} 
+                                                        placeholder="金額" 
+                                                        value={fee.amount} 
+                                                        onChange={e => updateExtraFee(idx, fee.id, 'amount', e.target.value)} 
+                                                        disabled={!fee.isEnabled}
+                                                    />
+                                                </div>
+                                                <button onClick={() => removeExtraFee(idx, fee.id)} className="text-red-400 hover:text-red-600 p-2"><X className="w-4 h-4"/></button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
@@ -1333,60 +1496,27 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 </button>
             </div>
 
-            {/* 3. Final Settings (Status & Notes) */}
-            <div className="print:hidden">
-                <section className={SECTION_CLASS}>
-                     <div className="grid grid-cols-2 gap-4">
-                         <div>
-                             <label className={LABEL_CLASS}>狀態</label>
-                             <select className={INPUT_CLASS} value={status} onChange={e => setStatus(e.target.value)}>
-                                 <option value="draft">草稿</option>
-                                 <option value="pending">報價中</option>
-                                 <option value="confirmed">已回簽</option>
-                                 <option value="paid">已付訂</option>
-                                 <option value="closed">已結案</option>
-                             </select>
-                         </div>
-                         <div>
-                             <label className={LABEL_CLASS}>付款期限</label>
-                             <input type="date" className={INPUT_CLASS} value={dueDate} onChange={e => setDueDate(e.target.value)} />
-                         </div>
-                         <div className="col-span-2">
-                             <label className={LABEL_CLASS}>內部備註</label>
-                             <textarea className={INPUT_CLASS} rows="3" placeholder="僅供內部查看..." value={adminNotes} onChange={e => setAdminNotes(e.target.value)} />
-                         </div>
-                     </div>
-                </section>
-            </div>
-
             {/* 4. Action Buttons */}
             <div className="flex justify-end gap-4 pt-4 print:hidden">
                 <button onClick={onCancel} className="px-6 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 font-bold">取消</button>
+                <button onClick={() => setShowPreview(true)} className="px-6 py-3 bg-purple-600 text-white rounded font-bold hover:bg-purple-700 shadow-lg flex items-center">
+                    <Eye className="w-5 h-5 mr-2" /> 預覽 / 下載 / 蓋章
+                </button>
                 <button onClick={handleSave} className="px-8 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow-lg flex items-center">
                     <Save className="w-5 h-5 mr-2" /> 儲存報價單
                 </button>
             </div>
 
-            {/* 5. Preview Section (Moved to Bottom) */}
-            <div className="mt-8 border-t-4 border-gray-800 pt-8">
-                <div className="flex justify-between items-center mb-6 print:hidden">
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                        <FileText className="w-6 h-6 mr-2" /> 報價單即時預覽 (Live Preview)
-                    </h2>
-                    <button onClick={handlePrint} className="bg-gray-800 text-white px-6 py-2 rounded shadow hover:bg-gray-700 flex items-center gap-2 font-bold">
-                        <Download className="w-4 h-4" /> 下載/列印 PDF
-                    </button>
-                </div>
-                
-                {/* Reused Preview Component */}
-                <QuotePreview 
-                    clientInfo={clientInfo}
-                    items={calculatedItems}
-                    totalAmount={totalAmount}
-                    dateStr={new Date().toLocaleDateString('zh-TW')}
-                    idStr="PREVIEW"
+            {/* 5. Preview Modal */}
+            {showPreview && (
+                <PreviewModal 
+                    quote={{ clientInfo, items: calculatedItems, totalAmount, createdAt: new Date().toISOString() }}
+                    onClose={() => setShowPreview(false)}
+                    onDownload={handleDownload}
+                    isSigned={isSigned}
+                    toggleSign={() => setIsSigned(!isSigned)}
                 />
-            </div>
+            )}
         </div>
     );
 };
@@ -1518,7 +1648,7 @@ const CalendarView = ({ quotes }) => {
                                      const region = q.items[0]?.outingRegion || 'North';
                                      return (
                                          <div key={q.id} className={`text-xs p-1 rounded border truncate ${regionColors[region]}`} title={`${q.clientInfo.companyName}`}>
-                                             {q.items[0]?.eventTime?.slice(0,5)} {q.clientInfo.companyName}
+                                             {q.items[0]?.startTime?.slice(0,5)} {q.clientInfo.companyName}
                                          </div>
                                      );
                                  })}
@@ -1553,7 +1683,7 @@ const CalendarView = ({ quotes }) => {
                                 const region = q.items[0]?.outingRegion || 'North';
                                 return (
                                     <div key={q.id} className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}>
-                                        <div className="font-bold">{q.items[0]?.eventTime?.slice(0,5)}</div>
+                                        <div className="font-bold">{q.items[0]?.startTime?.slice(0,5)}</div>
                                         <div>{q.clientInfo.companyName}</div>
                                         <div className="text-[10px] mt-1 opacity-75">{q.items[0]?.courseName}</div>
                                     </div>
@@ -1567,7 +1697,7 @@ const CalendarView = ({ quotes }) => {
     };
 
     const renderDayView = () => {
-        const events = getEventsForDay(currentDate).sort((a,b) => (a.items[0]?.eventTime || '').localeCompare(b.items[0]?.eventTime || ''));
+        const events = getEventsForDay(currentDate).sort((a,b) => (a.items[0]?.startTime || '').localeCompare(b.items[0]?.startTime || ''));
         return (
             <div className="border rounded-lg bg-white min-h-[500px] p-6">
                 <h3 className="text-xl font-bold mb-6 border-b pb-4">行程列表</h3>
@@ -1580,7 +1710,7 @@ const CalendarView = ({ quotes }) => {
                             return (
                                 <div key={q.id} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${region.includes('North') ? 'border-l-blue-500' : region.includes('Central') ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
                                     <div className="mr-6 text-center min-w-[80px]">
-                                        <div className="text-xl font-bold text-gray-800">{q.items[0]?.eventTime}</div>
+                                        <div className="text-xl font-bold text-gray-800">{q.items[0]?.startTime}</div>
                                         <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}>
                                             {region === 'North' ? '北部' : region === 'Central' ? '中部' : '南部'}
                                         </div>
@@ -1620,27 +1750,32 @@ const CalendarView = ({ quotes }) => {
     );
 };
 
-// --- Main App Component ---
-
+// --- App Container ---
 const App = () => {
   const [activeTab, setActiveTab] = useState('list'); 
   const [quotes, setQuotes] = useState([]);
   const [editingQuote, setEditingQuote] = useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedQuoteForPayment, setSelectedQuoteForPayment] = useState(null);
   const [selectedQuoteForPreview, setSelectedQuoteForPreview] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
+  // --- FIREBASE SYNC ---
   useEffect(() => {
-    const saved = localStorage.getItem('hbh_quotes');
-    if (saved) {
-        setQuotes(JSON.parse(saved));
-    }
+    // 實時監聽 (Real-time listener)
+    if (!db) return; // 如果 db 初始化失敗則跳過
+    
+    const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const quotesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setQuotes(quotesData);
+    });
+
+    return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('hbh_quotes', JSON.stringify(quotes));
-  }, [quotes]);
 
   const handleCreateNew = () => {
     setEditingQuote(null);
@@ -1652,23 +1787,40 @@ const App = () => {
     setActiveTab('create');
   };
 
-  const handleSaveQuote = (quoteData) => {
-      if (editingQuote) {
-          setQuotes(quotes.map(q => q.id === editingQuote.id ? { ...quoteData, id: q.id } : q));
-      } else {
-          setQuotes([...quotes, { 
-              ...quoteData, 
-              id: Date.now().toString(), 
-              createdAt: new Date().toISOString(), 
-              status: quoteData.status || 'draft' 
-          }]);
+  const handleSaveQuote = async (quoteData) => {
+      if (!db) {
+          alert("資料庫連線失敗，無法儲存");
+          return;
       }
-      setActiveTab('list');
+      try {
+          if (editingQuote) {
+              await updateDoc(doc(db, "quotes", editingQuote.id), {
+                  ...quoteData,
+                  updatedAt: serverTimestamp()
+              });
+          } else {
+              await addDoc(collection(db, "quotes"), { 
+                  ...quoteData, 
+                  createdAt: serverTimestamp(), 
+                  status: 'draft' 
+              });
+          }
+          setActiveTab('list');
+      } catch (error) {
+          console.error("Error saving document: ", error);
+          alert("儲存失敗，請檢查網路連線");
+      }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+      if (!db) return;
       if (confirm("確定要刪除此報價單嗎？")) {
-          setQuotes(quotes.filter(q => q.id !== id));
+          try {
+              await deleteDoc(doc(db, "quotes", id));
+          } catch (error) {
+              console.error("Error removing document: ", error);
+              alert("刪除失敗");
+          }
       }
   };
 
@@ -1682,112 +1834,90 @@ const App = () => {
       setShowPreviewModal(true);
   }
 
-  const handleUpdatePayment = (id, updates) => {
-      setQuotes(quotes.map(q => q.id === id ? { ...q, ...updates } : q));
+  const handleUpdatePayment = async (id, updates) => {
+      if (!db) return;
+      try {
+          await updateDoc(doc(db, "quotes", id), updates);
+      } catch (error) {
+          console.error("Error updating payment: ", error);
+          alert("更新失敗");
+      }
   };
 
-  const handleStatusChange = (id, newStatus) => {
-      setQuotes(quotes.map(q => q.id === id ? { ...q, status: newStatus } : q));
-  }
+  const handleStatusChange = async (id, newStatus) => {
+      if (!db) return;
+      try {
+          await updateDoc(doc(db, "quotes", id), { status: newStatus });
+      } catch (error) {
+          console.error("Error updating status: ", error);
+          alert("狀態更新失敗");
+      }
+  };
 
+  // Improved CSV Export: Flattens all details
   const exportCSV = () => {
-      const headers = ["ID", "狀態", "客戶名稱", "聯絡人", "電話", "總金額", "建立日期"];
-      const rows = quotes.map(q => [
-          q.id, q.status, q.clientInfo.companyName, q.clientInfo.contactPerson, q.clientInfo.phone, q.totalAmount, formatDate(q.createdAt)
-      ]);
+      // Define Headers
+      const headers = [
+          "報價單ID", "建立日期", "狀態", 
+          "客戶名稱", "統編", "聯絡人", "電話", 
+          "課程系列", "課程名稱", "課程日期", "開始時間", "結束時間", "人數", "單價",
+          "折扣金額", "加價總額", "是否開發票", "總金額"
+      ];
+
+      // Flatten Data
+      const rows = quotes.flatMap(q => {
+          // Handle potential missing items array or legacy data
+          const items = q.items || [];
+          return items.map(item => [
+              q.id,
+              formatDate(q.createdAt ? q.createdAt.seconds * 1000 : new Date()),
+              q.status,
+              q.clientInfo?.companyName || '',
+              q.clientInfo?.taxId || '',
+              q.clientInfo?.contactPerson || '',
+              q.clientInfo?.phone || '',
+              item.courseSeries || '',
+              item.courseName || '',
+              item.eventDate || '',
+              item.startTime || '',
+              item.endTime || '',
+              item.peopleCount || 0,
+              item.price || 0,
+              item.calc?.discountAmount || 0,
+              item.calc?.totalExtraFee || 0,
+              item.hasInvoice ? "是" : "否",
+              item.calc?.finalTotal || 0
+          ]);
+      });
+
       const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
           + [headers, ...rows].map(e => e.join(",")).join("\n");
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "quotes_report.csv");
+      link.setAttribute("download", "詳細報價單報表.csv");
       document.body.appendChild(link);
       link.click();
       link.remove();
-  };
-
-  const exportJSON = () => {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(quotes));
-      const link = document.createElement('a');
-      link.setAttribute("href", dataStr);
-      link.setAttribute("download", "quotes_backup_" + new Date().toISOString().slice(0,10) + ".json");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-  };
-
-  const importJSON = (event) => {
-      const fileObj = event.target.files[0];
-      if (!fileObj) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-          try {
-              const json = JSON.parse(e.target.result);
-              if (Array.isArray(json)) {
-                  setQuotes(json);
-                  alert("資料還原成功！已載入 " + json.length + " 筆報價單。");
-              } else {
-                  alert("檔案格式錯誤：請確認上傳的是正確的備份檔 (JSON)");
-              }
-          } catch (error) {
-              alert("無法讀取檔案：" + error);
-          }
-      };
-      reader.readAsText(fileObj);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
-        {/* TOP HEADER NAVIGATION */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between h-16">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0 flex items-center">
-                            <div className="bg-slate-800 text-white p-2 rounded mr-2">
-                                <FileText className="w-6 h-6" />
-                            </div>
-                            <span className="font-bold text-xl text-gray-800 tracking-wide">下班隨手作報價管理系統</span>
-                        </div>
-                    </div>
-                    <div className="hidden md:flex items-center space-x-4">
-                        <button 
-                            onClick={() => setActiveTab('create')} 
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            報價計算
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('list')} 
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            追蹤清單
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('calendar')} 
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            行事曆
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('stats')} 
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            業績統計
-                        </button>
-                    </div>
-                    {/* Mobile Menu Button (Simplified) */}
-                    <div className="flex items-center md:hidden">
-                        <button className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100">
-                            <Menu className="w-6 h-6" />
-                        </button>
-                    </div>
+            <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+                <div className="flex items-center font-bold text-xl text-gray-800">
+                    <FileText className="w-6 h-6 mr-2" /> 下班隨手作報價系統
+                </div>
+                <div className="flex space-x-4">
+                    <button onClick={() => setActiveTab('create')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>報價計算</button>
+                    <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>追蹤清單</button>
+                    <button onClick={() => setActiveTab('calendar')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>行事曆</button>
+                    <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>業績統計</button>
                 </div>
             </div>
         </header>
 
-      <main className="flex-1 overflow-auto bg-gray-50 print:bg-white print:p-0 print:overflow-visible">
+      <main className="flex-1 overflow-auto bg-gray-50 p-4 md:p-8">
             {activeTab === 'list' && (
-                <div className="print:hidden p-4 md:p-8">
                 <ListView 
                     quotes={quotes} 
                     onEdit={handleEdit} 
@@ -1796,11 +1926,8 @@ const App = () => {
                     onPreview={handleOpenPreview}
                     onStatusChange={handleStatusChange}
                     onExport={exportCSV}
-                    onExportBackup={exportJSON}
-                    onImportBackup={importJSON}
                     onCreate={handleCreateNew}
                 />
-                </div>
             )}
             {activeTab === 'create' && (
                 <QuoteCreator 
@@ -1809,18 +1936,11 @@ const App = () => {
                     onCancel={() => setActiveTab('list')} 
                 />
             )}
-            {activeTab === 'calendar' && (
-                <div className="print:hidden p-4 md:p-8">
-                <CalendarView quotes={quotes} />
-                </div>
-            )}
-            {activeTab === 'stats' && (
-                <div className="print:hidden p-4 md:p-8">
-                <StatsView quotes={quotes} />
-                </div>
-            )}
+            {activeTab === 'calendar' && <CalendarView quotes={quotes} />}
+            {activeTab === 'stats' && <StatsView quotes={quotes} />}
       </main>
 
+      {/* Global Modals for List View Actions */}
       {showPaymentModal && selectedQuoteForPayment && (
           <PaymentModal 
               quote={selectedQuoteForPayment} 
@@ -1830,12 +1950,23 @@ const App = () => {
       )}
       
       {showPreviewModal && selectedQuoteForPreview && (
-          <QuotePreview 
-            clientInfo={selectedQuoteForPreview.clientInfo}
-            items={selectedQuoteForPreview.items} // Pass full items to calculate on the fly correctly in preview
-            totalAmount={selectedQuoteForPreview.totalAmount}
-            dateStr={formatDate(selectedQuoteForPreview.createdAt)}
-            idStr={selectedQuoteForPreview.id}
+          <PreviewModal 
+            quote={selectedQuoteForPreview}
+            onClose={() => setShowPreviewModal(false)}
+            // For list view preview, we use default unsigned state or you can manage it
+            isSigned={false} 
+            toggleSign={() => {}} // Disabled signing in read-only list view or add state if needed
+            onDownload={() => {
+                // Quick download logic for list view preview (reusing the function logic)
+                const element = document.getElementById('printable-area');
+                if (!element) return;
+                const dateStr = new Date().toISOString().slice(0,10);
+                const filename = `${selectedQuoteForPreview.clientInfo.companyName}_${dateStr}.pdf`;
+                if (typeof html2pdf !== 'undefined') {
+                    const opt = { margin: 0, filename: filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+                    html2pdf().from(element).set(opt).save();
+                } else { alert("需安裝 html2pdf.js"); }
+            }}
           />
       )}
     </div>
