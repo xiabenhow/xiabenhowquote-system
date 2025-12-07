@@ -19,9 +19,8 @@ import {
 
 // === 1. 設定與常數 ===
 
-// ★★★ 印章設定：改成使用專案 public/stamp.png ★★★
-// 請將公司印章圖檔放到專案的 /public/stamp.png
-const STAMP_URL = `${process.env.PUBLIC_URL || ''}/stamp.png`;
+// ★★★ 印章設定：改成使用 public/stamp.png ★★★
+const STAMP_URL = "/stamp.png"; 
 
 // ★★★ FIREBASE 設定 ★★★
 const firebaseConfig = {
@@ -457,7 +456,10 @@ const StatusSelector = ({ status, onChange }) => {
 // --- QuotePreview Component ---
 const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stampUrl, idName = "printable-area" }) => {
     return (
-        <div id={idName} className="bg-white w-[180mm] shadow-none p-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full">
+        <div
+            id={idName}
+            className="bg-white w-[200mm] max-w-full shadow-none px-6 py-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
+        >
             {/* Header */}
             <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
                 <div>
@@ -596,8 +598,12 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
                         <img 
                             src={stampUrl || STAMP_URL} 
                             alt="Company Stamp" 
-                            className="absolute -top-10 left-10 w-36 opacity-90 rotate-[-5deg] pointer-events-none z-20"
+                            crossOrigin="anonymous" 
+                            className="absolute -top-20 left-24 w-32 opacity-90 rotate-[-5deg] pointer-events-none z-20"
                             style={{ mixBlendMode: 'multiply' }}
+                            onError={() => {
+                                console.warn("Stamp load failed (likely CORS). PDF might miss stamp.");
+                            }}
                         />
                     )}
                 </div>
@@ -611,12 +617,7 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
 
 // --- PreviewModal ---
 const PreviewModal = ({ quote, onClose }) => {
-    // 打開預覽時，根據該報價單的 isSigned 決定是否蓋章
-    const [isSigned, setIsSigned] = useState(!!quote.isSigned);
-    
-    useEffect(() => {
-        setIsSigned(!!quote.isSigned);
-    }, [quote]);
+    const [isSigned, setIsSigned] = useState(false);
     
     const displayDateStr = getSafeDate(quote.createdAt).toLocaleDateString('zh-TW');
 
@@ -641,8 +642,7 @@ const PreviewModal = ({ quote, onClose }) => {
                 margin: 5,
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
-                // 已改成不使用 useCORS，避免額外干擾
-                html2canvas: { scale: 2, scrollY: 0 },
+                html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
@@ -703,8 +703,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const [status] = useState(initialData?.status || 'draft');
     
     // Stamp State for real-time preview in creator
-    // 若是編輯既有報價單，從 initialData 帶出之前的蓋章狀態
-    const [isSigned, setIsSigned] = useState(initialData?.isSigned || false);
+    const [isSigned, setIsSigned] = useState(false);
     
     const [items, setItems] = useState(() => {
         if (initialData?.items) {
@@ -799,8 +798,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             alert("報價單中有項目不符合規則，請修正後再儲存。");
             return;
         }
-        // 將 isSigned 一併存進資料庫
-        onSave({ clientInfo, items: calculatedItems, totalAmount, status, isSigned });
+        onSave({ clientInfo, items: calculatedItems, totalAmount, status });
     };
 
     return (
@@ -932,7 +930,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 </div>
                 
                 {/* Embed the preview directly here */}
-                {/* Key Fix: Overflow Hidden to contain the preview without scrollbars affecting page */}
                 <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
                     <QuotePreview 
                         idName="creator-preview-area"
@@ -1134,10 +1131,9 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         const baseUrl = window.location.href.split('?')[0];
         const link = `${baseUrl}?view=calendar&filter=${region}&mode=public`;
         
-        // Use document.execCommand for iframe compatibility
         const textArea = document.createElement("textarea");
         textArea.value = link;
-        textArea.style.position = "fixed";  // Avoid scrolling to bottom
+        textArea.style.position = "fixed";
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
@@ -1145,12 +1141,12 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         try {
             const successful = document.execCommand('copy');
             if (successful) {
-                alert(`已複製${region === 'Central' ? '中部' : '南部'}行程的公開連結！\n${link}`);
+                alert(`已複製行程公開連結！\n${link}`);
             } else {
-                 prompt(`無法自動複製，請手動複製${region === 'Central' ? '中部' : '南部'}行程連結：`, link);
+                 prompt(`無法自動複製，請手動複製行程連結：`, link);
             }
         } catch (err) {
-             prompt(`無法自動複製，請手動複製${region === 'Central' ? '中部' : '南部'}行程連結：`, link);
+             prompt(`無法自動複製，請手動複製行程連結：`, link);
         }
         
         document.body.removeChild(textArea);
@@ -1325,7 +1321,7 @@ const CalendarView = ({ quotes, publicMode = false }) => {
                         {events.map(q => {
                             const region = q.items[0]?.outingRegion || 'North';
                             return (
-                                <div key={q.id} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg白 ${region.includes('North') ? 'border-l-blue-500' : region.includes('Central') ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
+                                <div key={q.id} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${region.includes('North') ? 'border-l-blue-500' : region.includes('Central') ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
                                     <div className="mr-6 text-center min-w-[80px]">
                                         <div className="text-xl font-bold text-gray-800">{q.items[0]?.startTime}</div>
                                         <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}>
@@ -1355,33 +1351,36 @@ const CalendarView = ({ quotes, publicMode = false }) => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto bg-white p-6 rounded shadow">
-             {/* Public Share Buttons (Only visible in internal mode) */}
+        <div className="max-w-6xl mx-auto bg-white p-6 rounded shadow relative">
+             {publicMode && (
+                 <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm font-bold text-center rounded border border-blue-200 flex items-center justify-center">
+                     <Lock className="w-4 h-4 mr-2"/>
+                     此頁為行程分享連結（唯讀模式）
+                 </div>
+             )}
+
+             {renderHeader()}
+
+             {/* 內部模式下的複製連結按鈕：標題下方、靠右 */}
              {!publicMode && (
                  <div className="mb-4 flex justify-end gap-2">
                      <button
                          onClick={() => copyLink('Central')}
                          className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold flex items-center hover:bg-yellow-200 transition"
+                         title="複製中部行程連結"
                      >
-                         <LinkIcon className="w-3 h-3 mr-1" /> 複製連結
+                         <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
                      </button>
                      <button
                          onClick={() => copyLink('South')}
                          className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center hover:bg-green-200 transition"
+                         title="複製南部行程連結"
                      >
-                         <LinkIcon className="w-3 h-3 mr-1" /> 複製連結
+                         <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
                      </button>
                  </div>
              )}
 
-             {publicMode && (
-                 <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm font-bold text-center rounded border border-blue-200 flex items-center justify-center">
-                     <Lock className="w-4 h-4 mr-2"/>
-                     目前顯示：{filterRegion === 'Central' ? '中部' : filterRegion === 'South' ? '南部' : '特定'}地區行程表 (唯讀模式)
-                 </div>
-             )}
-
-             {renderHeader()}
              {viewMode === 'month' && renderMonthView()}
              {viewMode === 'week' && renderWeekView()}
              {viewMode === 'day' && renderDayView()}
@@ -1422,7 +1421,7 @@ const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChan
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <h2 className="text-2xl font-bold text-gray-800">報價單管理</h2>
                 <div className="flex gap-2 flex-wrap">
-                     <button onClick={onExport} className="px-4 py-2 bg白 border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
+                     <button onClick={onExport} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
                         <FileText className="w-4 h-4 mr-2"/> 匯出報表 (CSV)
                      </button>
                      <button onClick={onCreate} className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm">新增</button>
@@ -1635,7 +1634,6 @@ const App = () => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const quotesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // DEDUPLICATION FIX: Ensure we never have duplicate IDs in the state
       const uniqueQuotes = Array.from(new Map(quotesData.map(item => [item.id, item])).values());
       setQuotes(uniqueQuotes);
     });
@@ -1647,7 +1645,6 @@ const App = () => {
 
   const handleSaveQuote = async (quoteData) => {
       if (!db) {
-          // 模擬儲存成功 (演示模式)
           alert("【演示模式】儲存成功！\n(因為未設定 API Key，資料僅暫存於記憶體，重整後會消失)");
           const mockId = "mock_" + generateId();
           const mockQuote = { ...quoteData, id: mockId, createdAt: { seconds: Date.now()/1000 } };
@@ -1698,12 +1695,9 @@ const App = () => {
       }
   };
 
-  // NEW: Handler for Opening Preview
   const handleOpenPreview = (quote) => {
-      // Ensure calculation data exists (for legacy quotes)
       const safeItems = (quote.items || []).map(item => {
           if (item.calc) return item;
-          // Re-calculate if missing
           return { ...item, calc: calculateItem(item) };
       });
       
@@ -1755,7 +1749,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
-        {/* Hide Header in Public Mode */}
         {!isPublicMode && (
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm print:hidden">
                 <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
