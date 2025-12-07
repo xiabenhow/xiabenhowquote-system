@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Calendar, FileText, Check, DollarSign, Printer, Search, Folder, ChevronDown, ChevronRight, ChevronLeft, Save, Trash2, X, Edit, AlertCircle, Eye, EyeOff, Download, MapPin, Clock, Filter, Menu, ArrowDown, BarChart3, TrendingUp, PieChart, Upload, FileJson, UploadCloud, Loader2, Cloud, PenTool, Image as ImageIcon, Link as LinkIcon, ExternalLink, Copy, Lock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Calendar, FileText, Check, DollarSign, Printer, Search, Folder, ChevronDown, ChevronRight, ChevronLeft, Save, Trash2, X, Edit, AlertCircle, Eye, Download, MapPin, BarChart3, TrendingUp, PieChart, Link as LinkIcon, Lock } from 'lucide-react';
 
 // === FIREBASE IMPORTS ===
 import { initializeApp } from "firebase/app";
@@ -51,8 +51,8 @@ try {
 }
 
 // --- Helper: Load External Script (CDN) ---
-const loadScript = (src: string) => {
-  return new Promise<void>((resolve, reject) => {
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
       resolve();
       return;
@@ -69,7 +69,7 @@ const loadScript = (src: string) => {
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
 // --- Helper: Safe Date Parser ---
-const getSafeDate = (val: any) => {
+const getSafeDate = (val) => {
   if (!val) return new Date(); 
   if (val.seconds) return new Date(val.seconds * 1000); 
   if (val instanceof Date) return val; 
@@ -78,7 +78,7 @@ const getSafeDate = (val: any) => {
   return new Date(); 
 };
 
-const formatDate = (val: any) => {
+const formatDate = (val) => {
   try {
     return getSafeDate(val).toLocaleDateString('zh-TW');
   } catch (e) {
@@ -92,7 +92,7 @@ const SECTION_CLASS = "bg-white p-6 rounded-lg shadow-sm border border-gray-200"
 
 // --- 2. 靜態資料 (Data Models) ---
 
-const COURSE_DATA: Record<string, { name: string; price: number }[]> = {
+const COURSE_DATA = {
   "平板課程": [
     { name: "平板課程-招財水晶樹", price: 690 },
     { name: "平板課程-純淨水晶礦石吊飾", price: 590 },
@@ -257,7 +257,7 @@ const COURSE_DATA: Record<string, { name: string; price: number }[]> = {
   ]
 };
 
-const TRANSPORT_FEES: any = {
+const TRANSPORT_FEES = {
   "台北市": {
     "default": 0,
     "zones": {
@@ -321,8 +321,7 @@ const TRANSPORT_FEES: any = {
   }
 };
 
-const getAvailableCities = (region: string) => {
-  const allCities = Object.keys(TRANSPORT_FEES);
+const getAvailableCities = (region) => {
   if (region === 'North') {
     return [
       '台北市', '新北市', '基隆市', '桃園市', '新竹縣市', '宜蘭縣', '苗栗縣',
@@ -341,7 +340,7 @@ const getAvailableCities = (region: string) => {
 
 // --- 3. 核心計算邏輯 ---
 
-const calculateItem = (item: any) => {
+const calculateItem = (item) => {
   const { 
     price, peopleCount, locationMode, 
     outingRegion, city, area, 
@@ -364,16 +363,16 @@ const calculateItem = (item: any) => {
   let totalExtraFee = parseInt(extraFee) || 0; 
   if (extraFees && Array.isArray(extraFees)) {
     totalExtraFee += extraFees
-      .filter((f: any) => f.isEnabled) 
-      .reduce((sum: number, f: any) => sum + (parseInt(f.amount) || 0), 0);
+      .filter((f) => f.isEnabled) 
+      .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
   // Minimum people check
   if (locationMode === 'outing') {
     if (outingRegion === 'North') {
-      const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || city.includes('(北部出發)');
+      const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || (city && city.includes('(北部出發)'));
       if (isRemote) {
-        if (count < 25) error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+        if (count < 25) error = `北部遠程外派(${(city || '').replace(/\(.*\)/, '')})最低出課人數為 25 人`;
       } else {
         if (['台北市', '新北市'].includes(city)) {
           if (count >= 10 && count <= 14) teacherFee = 2000;
@@ -428,7 +427,7 @@ const calculateItem = (item: any) => {
 
 // --- 4. UI Components ---
 
-const StatusSelector = ({ status, onChange }: { status: string; onChange: (v: string) => void }) => {
+const StatusSelector = ({ status, onChange }) => {
   const options = [
     { value: "draft", label: "草稿", color: "bg-gray-100 text-gray-800" },
     { value: "pending", label: "報價中", color: "bg-blue-100 text-blue-800" },
@@ -454,7 +453,7 @@ const StatusSelector = ({ status, onChange }: { status: string; onChange: (v: st
 };
 
 // --- QuotePreview Component ---
-const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stampUrl, idName = "printable-area" }: any) => {
+const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stampUrl, idName = "printable-area" }) => {
   return (
     <div
       id={idName}
@@ -493,7 +492,7 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {items.map((item: any, i: number) => (
+          {items.map((item, i) => (
             <React.Fragment key={i}>
               <tr className="break-inside-avoid">
                 <td className="p-3">
@@ -531,7 +530,7 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
               {(item.calc.transportFee > 0) && (
                 <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
                   <td colSpan={3} className="p-1 pl-4 text-right">
-                    車馬費 ({item.city.replace(/\(.*\)/, '')}{item.area})
+                    車馬費 ({(item.city || '').replace(/\(.*\)/, '')}{item.area || ''})
                   </td>
                   <td className="p-1 text-right font-bold">+${item.calc.transportFee.toLocaleString()}</td>
                 </tr>
@@ -542,12 +541,12 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
                   <td className="p-1 text-right font-bold">+${item.calc.teacherFee.toLocaleString()}</td>
                 </tr>
               )}
-              {item.extraFees && item.extraFees.filter((f: any) => f.isEnabled).map((fee: any) => (
+              {item.extraFees && item.extraFees.filter((f) => f.isEnabled).map((fee) => (
                 <tr key={fee.id} className="bg-green-50 text-xs text-green-900 break-inside-avoid">
                   <td colSpan={3} className="p-1 pl-4 text-right">
                     額外加價 ({fee.description || '未說明'})
                   </td>
-                  <td className="p-1 text-right font-bold">+${parseInt(fee.amount).toLocaleString()}</td>
+                  <td className="p-1 text-right font-bold">+${parseInt(fee.amount || 0).toLocaleString()}</td>
                 </tr>
               ))}
               {(item.hasInvoice) && (
@@ -630,991 +629,1434 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
 
 // --- PreviewModal ---
 const PreviewModal = ({ quote, onClose }) => {
-    const [isSigned, setIsSigned] = useState(false);
+  const [isSigned, setIsSigned] = useState(false);
+  
+  const displayDateStr = getSafeDate(quote.createdAt).toLocaleDateString('zh-TW');
+
+  const handleDownload = async () => {
+    const element = document.getElementById('preview-modal-area');
+    if (!element) return;
     
-    const displayDateStr = getSafeDate(quote.createdAt).toLocaleDateString('zh-TW');
+    const dateStr = new Date().toISOString().slice(0,10);
+    const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
 
-    const handleDownload = async () => {
-        const element = document.getElementById('preview-modal-area');
-        if (!element) return;
-        
-        const dateStr = new Date().toISOString().slice(0,10);
-        const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
+    if (!window.html2pdf) {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+      } catch (e) {
+        alert("無法載入 PDF 產生器，請檢查網路連線。");
+        return;
+      }
+    }
 
-        if (!window.html2pdf) {
-          try {
-            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
-          } catch (e) {
-            alert("無法載入 PDF 產生器，請檢查網路連線。");
-            return;
-          }
-        }
+    if (window.html2pdf) {
+      const opt = {
+        margin: 5,
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+      window.html2pdf().from(element).set(opt).save();
+    }
+  };
 
-        if (window.html2pdf) {
-            const opt = {
-                margin: 5,
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-            window.html2pdf().from(element).set(opt).save();
-        }
-    };
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
+      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
+        {/* Toolbar */}
+        <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
+          <h3 className="font-bold text-lg text-gray-700 flex items-center"><Printer className="w-5 h-5 mr-2"/> 報價單預覽</h3>
+          <div className="flex gap-2 items-center flex-wrap">
+              
+            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+              <input 
+                type="checkbox" 
+                checked={isSigned}
+                onChange={(e) => setIsSigned(e.target.checked)}
+                className="w-5 h-5 text-blue-600"
+              />
+              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
+            </label>
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
-            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
-                {/* Toolbar */}
-                <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
-                    <h3 className="font-bold text-lg text-gray-700 flex items-center"><Printer className="w-5 h-5 mr-2"/> 報價單預覽</h3>
-                    <div className="flex gap-2 items-center flex-wrap">
-                        
-                        <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-                             <input 
-                                type="checkbox" 
-                                checked={isSigned}
-                                onChange={(e) => setIsSigned(e.target.checked)}
-                                className="w-5 h-5 text-blue-600"
-                             />
-                             <span className="text-sm font-bold text-blue-800">蓋上印章</span>
-                        </label>
-
-                        <button onClick={handleDownload} className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow">
-                            <Download className="w-4 h-4 mr-2"/> 下載 PDF
-                        </button>
-                        <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"><X/></button>
-                    </div>
-                </div>
-
-                {/* Preview Content */}
-                <div className="flex-1 overflow-auto p-4 bg-gray-100">
-                    <div className="shadow-lg mx-auto">
-                        <QuotePreview 
-                            idName="preview-modal-area"
-                            clientInfo={quote.clientInfo} 
-                            items={quote.items} 
-                            totalAmount={quote.totalAmount}
-                            dateStr={displayDateStr}
-                            isSigned={isSigned}
-                            stampUrl={STAMP_URL}
-                        />
-                    </div>
-                </div>
-            </div>
+            <button onClick={handleDownload} className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow">
+              <Download className="w-4 h-4 mr-2"/> 下載 PDF
+            </button>
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"><X/></button>
+          </div>
         </div>
-    );
+
+        {/* Preview Content */}
+        <div className="flex-1 overflow-auto p-4 bg-gray-100">
+          <div className="shadow-lg mx-auto">
+            <QuotePreview 
+              idName="preview-modal-area"
+              clientInfo={quote.clientInfo} 
+              items={quote.items} 
+              totalAmount={quote.totalAmount}
+              dateStr={displayDateStr}
+              isSigned={isSigned}
+              stampUrl={STAMP_URL}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // --- QuoteCreator ---
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
-    // Removed Email field from state init
-    const [clientInfo, setClientInfo] = useState(initialData?.clientInfo || {
-        companyName: '', taxId: '', contactPerson: '', phone: '', address: ''
-    });
-    const [status] = useState(initialData?.status || 'draft');
-    
-    // Stamp State for real-time preview in creator
-    const [isSigned, setIsSigned] = useState(false);
-    
-    const [items, setItems] = useState(() => {
-        if (initialData?.items) {
-            return initialData.items.map(item => {
-                const newItem = { ...item };
-                if (!newItem.extraFees) newItem.extraFees = [];
-                if (newItem.extraFee > 0 && newItem.extraFees.length === 0) {
-                     newItem.extraFees.push({
-                         id: generateId(), 
-                         description: newItem.extraFeeDesc || '額外加價',
-                         amount: newItem.extraFee,
-                         isEnabled: true
-                     });
-                     newItem.extraFee = 0; 
-                     newItem.extraFeeDesc = '';
-                }
-                return newItem;
-            });
+  // Removed Email field from state init
+  const [clientInfo, setClientInfo] = useState(initialData?.clientInfo || {
+    companyName: '', taxId: '', contactPerson: '', phone: '', address: ''
+  });
+  const [status] = useState(initialData?.status || 'draft');
+  
+  // Stamp State for real-time preview in creator
+  const [isSigned, setIsSigned] = useState(false);
+  
+  const [items, setItems] = useState(() => {
+    if (initialData?.items) {
+      return initialData.items.map(item => {
+        const newItem = { ...item };
+        if (!newItem.extraFees) newItem.extraFees = [];
+        if (newItem.extraFee > 0 && newItem.extraFees.length === 0) {
+          newItem.extraFees.push({
+            id: generateId(), 
+            description: newItem.extraFeeDesc || '額外加價',
+            amount: newItem.extraFee,
+            isEnabled: true
+          });
+          newItem.extraFee = 0; 
+          newItem.extraFeeDesc = '';
         }
-        return [{
-            id: generateId(),
-            courseSeries: '水晶系列',
-            courseName: '手作輕寶石水晶手鍊',
-            price: 980,
-            peopleCount: 1,
-            locationMode: 'store', 
-            regionType: 'North', 
-            outingRegion: 'North', 
-            city: '台北市',
-            area: '',
-            eventDate: '',
-            startTime: '', endTime: '', hasInvoice: false,
-            enableDiscount90: false, customDiscount: 0, customDiscountDesc: '', 
-            extraFees: [], extraFee: 0, extraFeeDesc: '', 
-            address: '', itemNote: ''
-        }];
-    });
-
-    const calculatedItems = useMemo(() => items.map(item => ({...item, calc: calculateItem(item)})), [items]);
-    const totalAmount = calculatedItems.reduce((sum, item) => sum + (item.calc.finalTotal || 0), 0);
-
-    const updateItem = (index, field, value) => {
-        const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
-        // Auto-fill logic
-        if (field === 'courseName') {
-            const series = COURSE_DATA[newItems[index].courseSeries];
-            const course = series.find(c => c.name === value);
-            if (course) newItems[index].price = course.price;
-        }
-        if (field === 'courseSeries') {
-             const series = COURSE_DATA[value];
-             if(series && series.length > 0) {
-                 newItems[index].courseName = series[0].name;
-                 newItems[index].price = series[0].price;
-             }
-        }
-        if (field === 'outingRegion') {
-            const available = getAvailableCities(value);
-            newItems[index].city = available[0] || '';
-            newItems[index].area = '';
-        }
-        if (field === 'city') newItems[index].area = '';
-        setItems(newItems);
-    };
-
-    const addExtraFee = (index) => {
-        const newItems = [...items];
-        if(!newItems[index].extraFees) newItems[index].extraFees = [];
-        newItems[index].extraFees.push({ id: generateId(), description: '', amount: 0, isEnabled: true });
-        setItems(newItems);
+        return newItem;
+      });
     }
-    const removeExtraFee = (itemIndex, feeId) => {
-        const newItems = [...items];
-        newItems[itemIndex].extraFees = newItems[itemIndex].extraFees.filter(f => f.id !== feeId);
-        setItems(newItems);
+    return [{
+      id: generateId(),
+      courseSeries: '水晶系列',
+      courseName: '手作輕寶石水晶手鍊',
+      price: 980,
+      peopleCount: 1,
+      locationMode: 'store', 
+      regionType: 'North', 
+      outingRegion: 'North', 
+      city: '台北市',
+      area: '',
+      eventDate: '',
+      startTime: '', endTime: '', hasInvoice: false,
+      enableDiscount90: false, customDiscount: 0, customDiscountDesc: '', 
+      extraFees: [], extraFee: 0, extraFeeDesc: '', 
+      address: '', itemNote: ''
+    }];
+  });
+
+  const calculatedItems = useMemo(() => items.map(item => ({...item, calc: calculateItem(item)})), [items]);
+  const totalAmount = calculatedItems.reduce((sum, item) => sum + (item.calc.finalTotal || 0), 0);
+
+  const updateItem = (index, field, value) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    // Auto-fill logic
+    if (field === 'courseName') {
+      const series = COURSE_DATA[newItems[index].courseSeries];
+      const course = series.find(c => c.name === value);
+      if (course) newItems[index].price = course.price;
     }
-    const updateExtraFee = (itemIndex, feeId, field, value) => {
-        const newItems = [...items];
-        const feeIndex = newItems[itemIndex].extraFees.findIndex(f => f.id === feeId);
-        if(feeIndex > -1) {
-            newItems[itemIndex].extraFees[feeIndex][field] = value;
-            setItems(newItems);
-        }
+    if (field === 'courseSeries') {
+      const series = COURSE_DATA[value];
+      if(series && series.length > 0) {
+        newItems[index].courseName = series[0].name;
+        newItems[index].price = series[0].price;
+      }
     }
-    const addItem = () => setItems([...items, { ...items[items.length-1], id: generateId(), itemNote: '', enableDiscount90: false, extraFees: [], extraFee: 0 }]);
-    const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
+    if (field === 'outingRegion') {
+      const available = getAvailableCities(value);
+      newItems[index].city = available[0] || '';
+      newItems[index].area = '';
+    }
+    if (field === 'city') newItems[index].area = '';
+    setItems(newItems);
+  };
 
-    const handleSave = () => {
-        const hasError = calculatedItems.some(i => i.calc.error);
-        if (hasError) {
-            alert("報價單中有項目不符合規則，請修正後再儲存。");
-            return;
-        }
-        onSave({ clientInfo, items: calculatedItems, totalAmount, status });
-    };
+  const addExtraFee = (index) => {
+    const newItems = [...items];
+    if(!newItems[index].extraFees) newItems[index].extraFees = [];
+    newItems[index].extraFees.push({ id: generateId(), description: '', amount: 0, isEnabled: true });
+    setItems(newItems);
+  };
+  const removeExtraFee = (itemIndex, feeId) => {
+    const newItems = [...items];
+    newItems[itemIndex].extraFees = newItems[itemIndex].extraFees.filter(f => f.id !== feeId);
+    setItems(newItems);
+  };
+  const updateExtraFee = (itemIndex, feeId, field, value) => {
+    const newItems = [...items];
+    const feeIndex = newItems[itemIndex].extraFees.findIndex(f => f.id === feeId);
+    if(feeIndex > -1) {
+      newItems[itemIndex].extraFees[feeIndex][field] = value;
+      setItems(newItems);
+    }
+  };
+  const addItem = () => setItems([...items, { ...items[items.length-1], id: generateId(), itemNote: '', enableDiscount90: false, extraFees: [], extraFee: 0 }]);
+  const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
 
-    return (
-        <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8">
-            
-            {/* Input Form Section */}
-            <div className="print:hidden space-y-6">
-                <section className={SECTION_CLASS}>
-                    <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
-                        <div className="w-1 h-6 bg-slate-800 mr-2 rounded"></div>
-                        客戶基本資料 (報價單抬頭)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className={LABEL_CLASS}>公司/客戶名稱</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入名稱" value={clientInfo.companyName} onChange={e => setClientInfo({...clientInfo, companyName: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>統一編號</label>
-                            <input className={INPUT_CLASS} placeholder="選填" value={clientInfo.taxId} onChange={e => setClientInfo({...clientInfo, taxId: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>聯絡人</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入聯絡人" value={clientInfo.contactPerson} onChange={e => setClientInfo({...clientInfo, contactPerson: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLASS}>電話</label>
-                            <input className={INPUT_CLASS} placeholder="請輸入電話" value={clientInfo.phone} onChange={e => setClientInfo({...clientInfo, phone: e.target.value})} />
-                        </div>
-                    </div>
-                </section>
+  const handleSave = () => {
+    const hasError = calculatedItems.some(i => i.calc.error);
+    if (hasError) {
+      alert("報價單中有項目不符合規則，請修正後再儲存。");
+      return;
+    }
+    onSave({ clientInfo, items: calculatedItems, totalAmount, status });
+  };
 
-                {items.map((item, idx) => (
-                    <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                                    <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
-                                </h3>
-                                {items.length > 1 && (
-                                    <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-5 h-5"/></button>
-                                )}
-                            </div>
-                            {/* Course Select */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                <div><label className={LABEL_CLASS}>課程系列</label><select className={INPUT_CLASS} value={item.courseSeries} onChange={e => updateItem(idx, 'courseSeries', e.target.value)}>{Object.keys(COURSE_DATA).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                                <div className="md:col-span-2"><label className={LABEL_CLASS}>課程名稱 (單價: ${item.price})</label><select className={INPUT_CLASS} value={item.courseName} onChange={e => updateItem(idx, 'courseName', e.target.value)}>{COURSE_DATA[item.courseSeries]?.map(c => <option key={c.name} value={c.name}>{c.name} (${c.price})</option>)}</select></div>
-                            </div>
-                            {/* Date/Time/Count */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={e => updateItem(idx, 'peopleCount', e.target.value)} /></div>
-                                <div><label className={LABEL_CLASS}>日期</label><input type="date" className={INPUT_CLASS} value={item.eventDate} onChange={e => updateItem(idx, 'eventDate', e.target.value)} /></div>
-                                <div><label className={LABEL_CLASS}>開始時間</label><input type="time" className={INPUT_CLASS} value={item.startTime} onChange={e => updateItem(idx, 'startTime', e.target.value)} /></div>
-                                <div><label className={LABEL_CLASS}>結束時間</label><input type="time" className={INPUT_CLASS} value={item.endTime} onChange={e => updateItem(idx, 'endTime', e.target.value)} /></div>
-                                <div className="flex flex-col gap-2 pt-6 md:col-span-4">
-                                    <div className="flex gap-4">
-                                        <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1"><input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={e => updateItem(idx, 'hasInvoice', e.target.checked)} /><span className="text-sm font-medium text-gray-700">是否開立發票? (5%)</span></label>
-                                        <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1"><input type="checkbox" className="mr-2 w-4 h-4" checked={item.enableDiscount90 || false} onChange={e => updateItem(idx, 'enableDiscount90', e.target.checked)} /><span className="text-sm font-medium text-red-700">套用九折優惠 (10% Off)</span></label>
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Location */}
-                            <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
-                                <div className="flex gap-6 mb-4">
-                                    <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
-                                    <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
-                                </div>
-                                {item.locationMode === 'outing' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div><label className={LABEL_CLASS}>車馬費計算區域</label><select className={INPUT_CLASS} value={item.outingRegion} onChange={e => updateItem(idx, 'outingRegion', e.target.value)}><option value="North">北部出課</option><option value="Central">中部老師出課</option><option value="South">南部老師出課</option></select></div>
-                                        <div><label className={LABEL_CLASS}>縣市 {calculatedItems[idx].calc.transportFee > 0 && !calculatedItems[idx].area && <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">預估: ${calculatedItems[idx].calc.transportFee}</span>}</label><select className={INPUT_CLASS} value={item.city} onChange={e => updateItem(idx, 'city', e.target.value)}>{getAvailableCities(item.outingRegion).map(c => <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>)}</select></div>
-                                        {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
-                                            <div><label className={LABEL_CLASS}>選擇區域 {calculatedItems[idx].calc.transportFee > 0 && <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calculatedItems[idx].calc.transportFee}</span>}</label><select className={INPUT_CLASS} value={item.area} onChange={e => updateItem(idx, 'area', e.target.value)}><option value="">選擇區域...</option>{Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => <option key={zone} value={zone}>{zone} (+${fee})</option>)}</select></div>
-                                        )}
-                                        <div className="md:col-span-3"><label className={LABEL_CLASS}>詳細地址</label><input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address} onChange={e => updateItem(idx, 'address', e.target.value)} /></div>
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-4"><div><label className={LABEL_CLASS}>店內區域</label><select className={INPUT_CLASS} value={item.regionType} onChange={e => updateItem(idx, 'regionType', e.target.value)}><option value="North">北部店內</option><option value="Central">中部店內</option><option value="South">南部店內</option></select></div></div>
-                                )}
-                            </div>
-                            <div className="mb-4"><label className={LABEL_CLASS}>該堂課備註說明 (選填)</label><input type="text" className={INPUT_CLASS} placeholder="例如: 需提前半小時進場、特殊需求..." value={item.itemNote} onChange={e => updateItem(idx, 'itemNote', e.target.value)} /></div>
-                            {/* Extras */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-red-50 p-4 rounded border border-red-100">
-                                    <label className={LABEL_CLASS + " text-red-800"}>手動折扣 (減項)</label>
-                                    <div className="flex flex-col gap-2"><div className="relative"><span className="absolute left-3 top-2 text-gray-500 font-bold">-</span><input type="number" className={INPUT_CLASS + " pl-6"} placeholder="金額" value={item.customDiscount} onChange={e => updateItem(idx, 'customDiscount', e.target.value)} /></div><input type="text" className={INPUT_CLASS} placeholder="折扣說明" value={item.customDiscountDesc || ''} onChange={e => updateItem(idx, 'customDiscountDesc', e.target.value)} /></div>
-                                </div>
-                                <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                                    <div className="flex justify-between items-center mb-2"><label className={LABEL_CLASS + " text-blue-800 mb-0"}>額外加價 (加項)</label><button onClick={() => addExtraFee(idx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"><Plus className="w-3 h-3 mr-1"/> 新增</button></div>
-                                    <div className="space-y-2">
-                                        {item.extraFees && item.extraFees.map(fee => (
-                                            <div key={fee.id} className="flex gap-2 items-center"><input type="checkbox" className="w-5 h-5 cursor-pointer accent-blue-600" checked={fee.isEnabled} onChange={e => updateExtraFee(idx, fee.id, 'isEnabled', e.target.checked)} /><input type="text" className={INPUT_CLASS + " flex-1 " + (!fee.isEnabled ? "opacity-50" : "")} placeholder="加價說明" value={fee.description} onChange={e => updateExtraFee(idx, fee.id, 'description', e.target.value)} disabled={!fee.isEnabled}/><div className="relative w-32"><span className="absolute left-2 top-2 text-gray-500 font-bold">+</span><input type="number" className={INPUT_CLASS + " pl-5 " + (!fee.isEnabled ? "opacity-50" : "")} placeholder="金額" value={fee.amount} onChange={e => updateExtraFee(idx, fee.id, 'amount', e.target.value)} disabled={!fee.isEnabled}/></div><button onClick={() => removeExtraFee(idx, fee.id)} className="text-red-400 hover:text-red-600 p-2"><X className="w-4 h-4"/></button></div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Error */}
-                            {calculatedItems[idx].calc.error && (<div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center"><AlertCircle className="w-5 h-5 mr-2" /><span className="font-bold">{calculatedItems[idx].calc.error}</span></div>)}
-                    </div>
-                ))}
-                
-                <button onClick={addItem} className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg">
-                    <Plus className="w-6 h-6 mr-2" /> 增加更多課程
-                </button>
+  return (
+    <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8">
+      
+      {/* Input Form Section */}
+      <div className="print:hidden space-y-6">
+        <section className={SECTION_CLASS}>
+          <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
+            <div className="w-1 h-6 bg-slate-800 mr-2 rounded"></div>
+            客戶基本資料 (報價單抬頭)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={LABEL_CLASS}>公司/客戶名稱</label>
+              <input className={INPUT_CLASS} placeholder="請輸入名稱" value={clientInfo.companyName} onChange={e => setClientInfo({...clientInfo, companyName: e.target.value})} />
             </div>
+            <div>
+              <label className={LABEL_CLASS}>統一編號</label>
+              <input className={INPUT_CLASS} placeholder="選填" value={clientInfo.taxId} onChange={e => setClientInfo({...clientInfo, taxId: e.target.value})} />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>聯絡人</label>
+              <input className={INPUT_CLASS} placeholder="請輸入聯絡人" value={clientInfo.contactPerson} onChange={e => setClientInfo({...clientInfo, contactPerson: e.target.value})} />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>電話</label>
+              <input className={INPUT_CLASS} placeholder="請輸入電話" value={clientInfo.phone} onChange={e => setClientInfo({...clientInfo, phone: e.target.value})} />
+            </div>
+          </div>
+        </section>
 
-            {/* REAL-TIME PREVIEW SECTION */}
-            <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
-                <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
-                    <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-                        <Eye className="mr-2"/> 即時報價單預覽
-                    </h3>
-                    <div className="flex gap-4 items-center flex-wrap">
-                        
-                        <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-                             <input 
-                                type="checkbox" 
-                                checked={isSigned}
-                                onChange={(e) => setIsSigned(e.target.checked)}
-                                className="w-5 h-5 text-blue-600"
-                             />
-                             <span className="text-sm font-bold text-blue-800">蓋上印章</span>
-                        </label>
-
-                        <button onClick={handleSave} className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center">
-                            <Save className="w-4 h-4 mr-2" /> 儲存至資料庫
-                        </button>
-                        <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
-                    </div>
-                </div>
-                
-                {/* Embed the preview directly here */}
-                <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-                    <QuotePreview 
-                        idName="creator-preview-area"
-                        clientInfo={clientInfo} 
-                        items={calculatedItems} 
-                        totalAmount={totalAmount}
-                        dateStr={new Date().toISOString().slice(0,10)}
-                        isSigned={isSigned}
-                        stampUrl={STAMP_URL}
+        {items.map((item, idx) => (
+          <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-blue-800 flex items-center">
+                <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
+              </h3>
+              {items.length > 1 && (
+                <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-5 h-5"/></button>
+              )}
+            </div>
+            {/* Course Select */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className={LABEL_CLASS}>課程系列</label>
+                <select 
+                  className={INPUT_CLASS} 
+                  value={item.courseSeries} 
+                  onChange={e => updateItem(idx, 'courseSeries', e.target.value)}
+                >
+                  {Object.keys(COURSE_DATA).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className={LABEL_CLASS}>課程名稱 (單價: ${item.price})</label>
+                <select 
+                  className={INPUT_CLASS} 
+                  value={item.courseName} 
+                  onChange={e => updateItem(idx, 'courseName', e.target.value)}
+                >
+                  {COURSE_DATA[item.courseSeries]?.map(c => (
+                    <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {/* Date/Time/Count */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className={LABEL_CLASS}>人數</label>
+                <input 
+                  type="number" 
+                  className={INPUT_CLASS} 
+                  value={item.peopleCount} 
+                  onChange={e => updateItem(idx, 'peopleCount', e.target.value)} 
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>日期</label>
+                <input 
+                  type="date" 
+                  className={INPUT_CLASS} 
+                  value={item.eventDate} 
+                  onChange={e => updateItem(idx, 'eventDate', e.target.value)} 
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>開始時間</label>
+                <input 
+                  type="time" 
+                  className={INPUT_CLASS} 
+                  value={item.startTime} 
+                  onChange={e => updateItem(idx, 'startTime', e.target.value)} 
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>結束時間</label>
+                <input 
+                  type="time" 
+                  className={INPUT_CLASS} 
+                  value={item.endTime} 
+                  onChange={e => updateItem(idx, 'endTime', e.target.value)} 
+                />
+              </div>
+              <div className="flex flex-col gap-2 pt-6 md:col-span-4">
+                <div className="flex gap-4">
+                  <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 w-4 h-4" 
+                      checked={item.hasInvoice} 
+                      onChange={e => updateItem(idx, 'hasInvoice', e.target.checked)} 
                     />
+                    <span className="text-sm font-medium text-gray-700">是否開立發票? (5%)</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 w-4 h-4" 
+                      checked={item.enableDiscount90 || false} 
+                      onChange={e => updateItem(idx, 'enableDiscount90', e.target.checked)} 
+                    />
+                    <span className="text-sm font-medium text-red-700">套用九折優惠 (10% Off)</span>
+                  </label>
                 </div>
+              </div>
             </div>
+            {/* Location */}
+            <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
+              <div className="flex gap-6 mb-4">
+                <label className="flex items-center cursor-pointer font-bold text-gray-700">
+                  <input 
+                    type="radio" 
+                    name={`mode-${item.id}`} 
+                    className="mr-2 w-4 h-4" 
+                    checked={item.locationMode === 'outing'} 
+                    onChange={() => updateItem(idx, 'locationMode', 'outing')} 
+                  /> 外派教學
+                </label>
+                <label className="flex items-center cursor-pointer font-bold text-gray-700">
+                  <input 
+                    type="radio" 
+                    name={`mode-${item.id}`} 
+                    className="mr-2 w-4 h-4" 
+                    checked={item.locationMode === 'store'} 
+                    onChange={() => updateItem(idx, 'locationMode', 'store')} 
+                  /> 店內包班
+                </label>
+              </div>
+              {item.locationMode === 'outing' ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={LABEL_CLASS}>車馬費計算區域</label>
+                    <select 
+                      className={INPUT_CLASS} 
+                      value={item.outingRegion} 
+                      onChange={e => updateItem(idx, 'outingRegion', e.target.value)}
+                    >
+                      <option value="North">北部出課</option>
+                      <option value="Central">中部老師出課</option>
+                      <option value="South">南部老師出課</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      縣市 
+                      {calculatedItems[idx].calc.transportFee > 0 && !calculatedItems[idx].area && (
+                        <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
+                          預估: ${calculatedItems[idx].calc.transportFee}
+                        </span>
+                      )}
+                    </label>
+                    <select 
+                      className={INPUT_CLASS} 
+                      value={item.city} 
+                      onChange={e => updateItem(idx, 'city', e.target.value)}
+                    >
+                      {getAvailableCities(item.outingRegion).map(c => (
+                        <option key={c} value={c}>
+                          {c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
+                    <div>
+                      <label className={LABEL_CLASS}>
+                        選擇區域 
+                        {calculatedItems[idx].calc.transportFee > 0 && (
+                          <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
+                            +${calculatedItems[idx].calc.transportFee}
+                          </span>
+                        )}
+                      </label>
+                      <select 
+                        className={INPUT_CLASS} 
+                        value={item.area} 
+                        onChange={e => updateItem(idx, 'area', e.target.value)}
+                      >
+                        <option value="">選擇區域...</option>
+                        {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
+                          <option key={zone} value={zone}>{zone} (+${fee})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="md:col-span-3">
+                    <label className={LABEL_CLASS}>詳細地址</label>
+                    <input 
+                      className={INPUT_CLASS} 
+                      placeholder="請輸入詳細地址" 
+                      value={item.address} 
+                      onChange={e => updateItem(idx, 'address', e.target.value)} 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  <div>
+                    <label className={LABEL_CLASS}>店內區域</label>
+                    <select 
+                      className={INPUT_CLASS} 
+                      value={item.regionType} 
+                      onChange={e => updateItem(idx, 'regionType', e.target.value)}
+                    >
+                      <option value="North">北部店內</option>
+                      <option value="Central">中部店內</option>
+                      <option value="South">南部店內</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mb-4">
+              <label className={LABEL_CLASS}>該堂課備註說明 (選填)</label>
+              <input 
+                type="text" 
+                className={INPUT_CLASS} 
+                placeholder="例如: 需提前半小時進場、特殊需求..." 
+                value={item.itemNote} 
+                onChange={e => updateItem(idx, 'itemNote', e.target.value)} 
+              />
+            </div>
+            {/* Extras */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-red-50 p-4 rounded border border-red-100">
+                <label className={LABEL_CLASS + " text-red-800"}>手動折扣 (減項)</label>
+                <div className="flex flex-col gap-2">
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500 font-bold">-</span>
+                    <input 
+                      type="number" 
+                      className={INPUT_CLASS + " pl-6"} 
+                      placeholder="金額" 
+                      value={item.customDiscount} 
+                      onChange={e => updateItem(idx, 'customDiscount', e.target.value)} 
+                    />
+                  </div>
+                  <input 
+                    type="text" 
+                    className={INPUT_CLASS} 
+                    placeholder="折扣說明" 
+                    value={item.customDiscountDesc || ''} 
+                    onChange={e => updateItem(idx, 'customDiscountDesc', e.target.value)} 
+                  />
+                </div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded border border-blue-100">
+                <div className="flex justify-between items-center mb-2">
+                  <label className={LABEL_CLASS + " text-blue-800 mb-0"}>額外加價 (加項)</label>
+                  <button 
+                    onClick={() => addExtraFee(idx)} 
+                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
+                  >
+                    <Plus className="w-3 h-3 mr-1"/> 新增
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {item.extraFees && item.extraFees.map(fee => (
+                    <div key={fee.id} className="flex gap-2 items-center">
+                      <input 
+                        type="checkbox" 
+                        className="w-5 h-5 cursor-pointer accent-blue-600" 
+                        checked={fee.isEnabled} 
+                        onChange={e => updateExtraFee(idx, fee.id, 'isEnabled', e.target.checked)} 
+                      />
+                      <input 
+                        type="text" 
+                        className={INPUT_CLASS + " flex-1 " + (!fee.isEnabled ? "opacity-50" : "")} 
+                        placeholder="加價說明" 
+                        value={fee.description} 
+                        onChange={e => updateExtraFee(idx, fee.id, 'description', e.target.value)} 
+                        disabled={!fee.isEnabled}
+                      />
+                      <div className="relative w-32">
+                        <span className="absolute left-2 top-2 text-gray-500 font-bold">+</span>
+                        <input 
+                          type="number" 
+                          className={INPUT_CLASS + " pl-5 " + (!fee.isEnabled ? "opacity-50" : "")} 
+                          placeholder="金額" 
+                          value={fee.amount} 
+                          onChange={e => updateExtraFee(idx, fee.id, 'amount', e.target.value)} 
+                          disabled={!fee.isEnabled}
+                        />
+                      </div>
+                      <button 
+                        onClick={() => removeExtraFee(idx, fee.id)} 
+                        className="text-red-400 hover:text-red-600 p-2"
+                      >
+                        <X className="w-4 h-4"/>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Error */}
+            {calculatedItems[idx].calc.error && (
+              <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                <span className="font-bold">{calculatedItems[idx].calc.error}</span>
+              </div>
+            )}
+          </div>
+        ))}
+        
+        <button 
+          onClick={addItem} 
+          className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
+        >
+          <Plus className="w-6 h-6 mr-2" /> 增加更多課程
+        </button>
+      </div>
+
+      {/* REAL-TIME PREVIEW SECTION */}
+      <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
+        <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Eye className="mr-2"/> 即時報價單預覽
+          </h3>
+          <div className="flex gap-4 items-center flex-wrap">
+              
+            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+              <input 
+                type="checkbox" 
+                checked={isSigned}
+                onChange={(e) => setIsSigned(e.target.checked)}
+                className="w-5 h-5 text-blue-600"
+              />
+              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
+            </label>
+
+            <button 
+              onClick={handleSave} 
+              className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" /> 儲存至資料庫
+            </button>
+            <button 
+              onClick={onCancel} 
+              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+          </div>
         </div>
-    );
+        
+        {/* Embed the preview directly here */}
+        <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
+          <QuotePreview 
+            idName="creator-preview-area"
+            clientInfo={clientInfo} 
+            items={calculatedItems} 
+            totalAmount={totalAmount}
+            dateStr={new Date().toISOString().slice(0,10)}
+            isSigned={isSigned}
+            stampUrl={STAMP_URL}
+          />
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // --- StatsView Component ---
 const StatsView = ({ quotes }) => {
-    const availableMonths = useMemo(() => {
-        const months = new Set();
-        quotes.forEach(q => {
-            if (q.status !== 'draft') {
-                const date = getSafeDate(q.createdAt);
-                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                months.add(key);
-            }
-        });
-        return Array.from(months).sort().reverse();
-    }, [quotes]);
+  const availableMonths = useMemo(() => {
+    const months = new Set();
+    quotes.forEach(q => {
+      if (q.status !== 'draft') {
+        const date = getSafeDate(q.createdAt);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        months.add(key);
+      }
+    });
+    return Array.from(months).sort().reverse();
+  }, [quotes]);
 
-    const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || "");
+  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || "");
 
-    useEffect(() => {
-        if (!selectedMonth && availableMonths.length > 0) {
-            setSelectedMonth(availableMonths[0]);
-        }
-    }, [availableMonths]);
-
-    const stats = useMemo(() => {
-        const result = {
-            totalRevenue: 0,
-            totalOrders: 0,
-            regions: {
-                'North': { name: '北部', revenue: 0, count: 0, color: 'bg-blue-500' },
-                'Central': { name: '中部', revenue: 0, count: 0, color: 'bg-yellow-500' },
-                'South': { name: '南部', revenue: 0, count: 0, color: 'bg-green-500' }
-            },
-            statuses: {
-                'pending': { name: '報價中', count: 0, color: 'bg-blue-100 text-blue-800' },
-                'confirmed': { name: '已回簽 (待付訂)', count: 0, color: 'bg-purple-100 text-purple-800' },
-                'paid': { name: '已付訂 (待結清)', count: 0, color: 'bg-orange-100 text-orange-800' },
-                'closed': { name: '已結案', count: 0, color: 'bg-green-100 text-green-800' }
-            }
-        };
-
-        if (!selectedMonth) return result;
-
-        quotes.forEach(q => {
-            const date = getSafeDate(q.createdAt);
-            const qMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            
-            if (q.status !== 'draft' && qMonth === selectedMonth) {
-                let regionKey = 'North'; 
-                if (q.items && q.items.length > 0) {
-                    const firstItem = q.items[0];
-                    const r = firstItem.outingRegion || firstItem.regionType;
-                    if (r && result.regions[r]) {
-                        regionKey = r;
-                    }
-                }
-
-                const amount = q.totalAmount || 0;
-                result.totalRevenue += amount;
-                result.totalOrders += 1;
-                result.regions[regionKey].revenue += amount;
-                result.regions[regionKey].count += 1;
-
-                if (result.statuses[q.status]) {
-                    result.statuses[q.status].count += 1;
-                }
-            }
-        });
-
-        return result;
-    }, [quotes, selectedMonth]);
-
-    if (availableMonths.length === 0) {
-        return (
-            <div className="p-8 text-center text-gray-500">
-                <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <p>目前沒有有效的報價單資料可供統計。</p>
-            </div>
-        );
+  useEffect(() => {
+    if (!selectedMonth && availableMonths.length > 0) {
+      setSelectedMonth(availableMonths[0]);
     }
+  }, [availableMonths, selectedMonth]);
 
+  const stats = useMemo(() => {
+    const result = {
+      totalRevenue: 0,
+      totalOrders: 0,
+      regions: {
+        'North': { name: '北部', revenue: 0, count: 0, color: 'bg-blue-500' },
+        'Central': { name: '中部', revenue: 0, count: 0, color: 'bg-yellow-500' },
+        'South': { name: '南部', revenue: 0, count: 0, color: 'bg-green-500' }
+      },
+      statuses: {
+        'pending': { name: '報價中', count: 0, color: 'bg-blue-100 text-blue-800' },
+        'confirmed': { name: '已回簽 (待付訂)', count: 0, color: 'bg-purple-100 text-purple-800' },
+        'paid': { name: '已付訂 (待結清)', count: 0, color: 'bg-orange-100 text-orange-800' },
+        'closed': { name: '已結案', count: 0, color: 'bg-green-100 text-green-800' }
+      }
+    };
+
+    if (!selectedMonth) return result;
+
+    quotes.forEach(q => {
+      const date = getSafeDate(q.createdAt);
+      const qMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (q.status !== 'draft' && qMonth === selectedMonth) {
+        let regionKey = 'North'; 
+        if (q.items && q.items.length > 0) {
+          const firstItem = q.items[0];
+          const r = firstItem.outingRegion || firstItem.regionType;
+          if (r && result.regions[r]) {
+            regionKey = r;
+          }
+        }
+
+        const amount = q.totalAmount || 0;
+        result.totalRevenue += amount;
+        result.totalOrders += 1;
+        result.regions[regionKey].revenue += amount;
+        result.regions[regionKey].count += 1;
+
+        if (result.statuses[q.status]) {
+          result.statuses[q.status].count += 1;
+        }
+      }
+    });
+
+    return result;
+  }, [quotes, selectedMonth]);
+
+  if (availableMonths.length === 0) {
     return (
-        <div className="max-w-5xl mx-auto p-4 md:p-8">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <TrendingUp className="mr-3 text-blue-600" /> 業績統計儀表板
-                </h2>
-                <div className="flex items-center gap-2">
-                    <span className="text-gray-600 font-medium">選擇月份:</span>
-                    <select 
-                        className={INPUT_CLASS + " w-40"}
-                        value={selectedMonth}
-                        onChange={e => setSelectedMonth(e.target.value)}
-                    >
-                        {availableMonths.map(m => (
-                            <option key={m} value={m}>{m}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text-white shadow-lg mb-8">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-blue-100 font-medium mb-1">本月總業績 ({selectedMonth})</p>
-                        <h3 className="text-4xl font-bold tracking-tight">${stats.totalRevenue.toLocaleString()}</h3>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-blue-100 font-medium mb-1">總成交案件</p>
-                        <h3 className="text-3xl font-bold">{stats.totalOrders} <span className="text-base font-normal opacity-80">件</span></h3>
-                    </div>
-                </div>
-            </div>
-
-            <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                <PieChart className="w-5 h-5 mr-2"/> 案件狀態分佈
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {Object.keys(stats.statuses).map(key => (
-                    <div key={key} className={`p-4 rounded-lg border ${stats.statuses[key].color.replace('bg-', 'border-').replace('100', '200')} ${stats.statuses[key].color}`}>
-                        <p className="text-xs font-bold uppercase opacity-70">{stats.statuses[key].name}</p>
-                        <p className="text-2xl font-bold mt-1">{stats.statuses[key].count}</p>
-                    </div>
-                ))}
-            </div>
-
-            <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                <MapPin className="w-5 h-5 mr-2"/> 地區業績佔比
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Object.keys(stats.regions).map(key => {
-                    const region = stats.regions[key];
-                    const percentage = stats.totalRevenue > 0 ? Math.round((region.revenue / stats.totalRevenue) * 100) : 0;
-                    
-                    return (
-                        <div key={key} className="bg-white p-6 rounded-xl shadow border border-gray-100 relative overflow-hidden">
-                            <div className={`absolute top-0 left-0 w-2 h-full ${region.color}`}></div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h4 className="text-lg font-bold text-gray-700">{region.name}區域</h4>
-                                <span className={`text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600`}>
-                                    {percentage}% 佔比
-                                </span>
-                            </div>
-                            <div className="space-y-2">
-                                <div>
-                                    <p className="text-gray-500 text-xs uppercase tracking-wider">區域營收</p>
-                                    <p className="text-2xl font-bold text-gray-900">${region.revenue.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                    <p className="text-gray-500 text-xs uppercase tracking-wider">案件數量</p>
-                                    <p className="text-lg font-semibold text-gray-700">{region.count} 件</p>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+      <div className="p-8 text-center text-gray-500">
+        <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
+        <p>目前沒有有效的報價單資料可供統計。</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto p-4 md:p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+          <TrendingUp className="mr-3 text-blue-600" /> 業績統計儀表板
+        </h2>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600 font-medium">選擇月份:</span>
+          <select 
+            className={INPUT_CLASS + " w-40"}
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+          >
+            {availableMonths.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text-white shadow-lg mb-8">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-blue-100 font-medium mb-1">本月總業績 ({selectedMonth})</p>
+            <h3 className="text-4xl font-bold tracking-tight">${stats.totalRevenue.toLocaleString()}</h3>
+          </div>
+          <div className="text-right">
+            <p className="text-blue-100 font-medium mb-1">總成交案件</p>
+            <h3 className="text-3xl font-bold">
+              {stats.totalOrders} <span className="text-base font-normal opacity-80">件</span>
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+        <PieChart className="w-5 h-5 mr-2"/> 案件狀態分佈
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {Object.keys(stats.statuses).map(key => (
+          <div 
+            key={key} 
+            className={`p-4 rounded-lg border ${stats.statuses[key].color.replace('bg-', 'border-').replace('100', '200')} ${stats.statuses[key].color}`}
+          >
+            <p className="text-xs font-bold uppercase opacity-70">{stats.statuses[key].name}</p>
+            <p className="text-2xl font-bold mt-1">{stats.statuses[key].count}</p>
+          </div>
+        ))}
+      </div>
+
+      <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+        <MapPin className="w-5 h-5 mr-2"/> 地區業績佔比
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {Object.keys(stats.regions).map(key => {
+          const region = stats.regions[key];
+          const percentage = stats.totalRevenue > 0 ? Math.round((region.revenue / stats.totalRevenue) * 100) : 0;
+          
+          return (
+            <div key={key} className="bg-white p-6 rounded-xl shadow border border-gray-100 relative overflow-hidden">
+              <div className={`absolute top-0 left-0 w-2 h-full ${region.color}`}></div>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-bold text-gray-700">{region.name}區域</h4>
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                  {percentage}% 佔比
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wider">區域營收</p>
+                  <p className="text-2xl font-bold text-gray-900">${region.revenue.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wider">案件數量</p>
+                  <p className="text-lg font-semibold text-gray-700">{region.count} 件</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 // --- CalendarView Component ---
 const CalendarView = ({ quotes, publicMode = false }) => {
-    const today = new Date();
-    const [currentDate, setCurrentDate] = useState(today);
-    const [viewMode, setViewMode] = useState('month'); 
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(today);
+  const [viewMode, setViewMode] = useState('month'); 
+  
+  // Parse initial filter from URL if present
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialFilter = urlParams.get('filter');
+  const [filterRegion, setFilterRegion] = useState(initialFilter || 'all');
+
+  const activeQuotes = quotes.filter(q => q.status !== 'draft');
+
+  const getFilteredEvents = (events) => {
+    if (filterRegion === 'all') return events;
+    return events.filter(q => {
+      const region = q.items[0]?.outingRegion || q.items[0]?.regionType || 'North'; 
+      return region === filterRegion;
+    });
+  };
+
+  // --- Link Sharing ---
+  const copyLink = (region) => {
+    const baseUrl = window.location.href.split('?')[0];
+    const link = `${baseUrl}?view=calendar&filter=${region}&mode=public`;
     
-    // Parse initial filter from URL if present
-    const urlParams = new URLSearchParams(window.location.search);
-    const initialFilter = urlParams.get('filter');
-    const [filterRegion, setFilterRegion] = useState(initialFilter || 'all');
+    const textArea = document.createElement("textarea");
+    textArea.value = link;
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        alert(`已複製行程公開連結！\n${link}`);
+      } else {
+        // 退而求其次
+        // eslint-disable-next-line no-alert
+        prompt(`無法自動複製，請手動複製行程連結：`, link);
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      prompt(`無法自動複製，請手動複製行程連結：`, link);
+    }
+    
+    document.body.removeChild(textArea);
+  };
 
-    const activeQuotes = quotes.filter(q => q.status !== 'draft');
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
 
-    const getFilteredEvents = (events) => {
-        if (filterRegion === 'all') return events;
-        return events.filter(q => {
-            const region = q.items[0]?.outingRegion || q.items[0]?.regionType || 'North'; 
-            return region === filterRegion;
-        });
-    };
+  const nextPeriod = () => {
+    if (viewMode === 'month') setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    if (viewMode === 'week') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 7);
+      setCurrentDate(d);
+    }
+    if (viewMode === 'day') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 1);
+      setCurrentDate(d);
+    }
+  };
 
-    // --- Link Sharing ---
-    const copyLink = (region) => {
-        const baseUrl = window.location.href.split('?')[0];
-        const link = `${baseUrl}?view=calendar&filter=${region}&mode=public`;
-        
-        const textArea = document.createElement("textarea");
-        textArea.value = link;
-        textArea.style.position = "fixed";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-            const successful = document.execCommand('copy');
-            if (successful) {
-                alert(`已複製行程公開連結！\n${link}`);
-            } else {
-                 prompt(`無法自動複製，請手動複製行程連結：`, link);
-            }
-        } catch (err) {
-             prompt(`無法自動複製，請手動複製行程連結：`, link);
-        }
-        
-        document.body.removeChild(textArea);
-    };
+  const prevPeriod = () => {
+    if (viewMode === 'month') setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    if (viewMode === 'week') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 7);
+      setCurrentDate(d);
+    }
+    if (viewMode === 'day') {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      setCurrentDate(d);
+    }
+  };
 
-    const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
-    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+  const handleDayClick = (day) => {
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    setCurrentDate(newDate);
+    setViewMode('day');
+  };
 
-    const nextPeriod = () => {
-        if (viewMode === 'month') setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-        if (viewMode === 'week') {
-            const d = new Date(currentDate);
-            d.setDate(d.getDate() + 7);
-            setCurrentDate(d);
-        }
-        if (viewMode === 'day') {
-            const d = new Date(currentDate);
-            d.setDate(d.getDate() + 1);
-            setCurrentDate(d);
-        }
-    };
+  const getEventsForDay = (date) => {
+    const events = activeQuotes.filter(q => {
+      if(!q.items || q.items.length === 0) return false;
+      return q.items.some(item => {
+        if(!item.eventDate) return false;
+        const d = new Date(item.eventDate);
+        return d.getDate() === date.getDate() && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
+      });
+    });
+    return getFilteredEvents(events);
+  };
 
-    const prevPeriod = () => {
-        if (viewMode === 'month') setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-        if (viewMode === 'week') {
-            const d = new Date(currentDate);
-            d.setDate(d.getDate() - 7);
-            setCurrentDate(d);
-        }
-        if (viewMode === 'day') {
-            const d = new Date(currentDate);
-            d.setDate(d.getDate() - 1);
-            setCurrentDate(d);
-        }
-    };
+  const regionColors = {
+    'North': 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+    'Central': 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
+    'South': 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
+  };
 
-    const handleDayClick = (day) => {
-        const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-        setCurrentDate(newDate);
-        setViewMode('day');
-    };
-
-    const getEventsForDay = (date) => {
-        const events = activeQuotes.filter(q => {
-            if(!q.items || q.items.length === 0) return false;
-            return q.items.some(item => {
-                if(!item.eventDate) return false;
-                const d = new Date(item.eventDate);
-                return d.getDate() === date.getDate() && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
-            });
-        });
-        return getFilteredEvents(events);
-    };
-
-    const regionColors = {
-        'North': 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
-        'Central': 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
-        'South': 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
-    };
-
-    const renderHeader = () => (
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-             <div className="flex items-center gap-4">
-                 <h2 className="text-2xl font-bold flex items-center">
-                     <Calendar className="mr-2"/>
-                     {viewMode === 'month' && `${currentDate.getFullYear()}年 ${currentDate.getMonth() + 1}月`}
-                     {viewMode === 'week' && `週視圖 (${currentDate.toLocaleDateString()})`}
-                     {viewMode === 'day' && `${currentDate.toLocaleDateString()} (${['日','一','二','三','四','五','六'][currentDate.getDay()]})`}
-                 </h2>
-                 <div className="flex bg-gray-100 rounded-lg p-1">
-                     <button onClick={() => setViewMode('month')} className={`px-3 py-1 text-sm rounded ${viewMode === 'month' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>月</button>
-                     <button onClick={() => setViewMode('week')} className={`px-3 py-1 text-sm rounded ${viewMode === 'week' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>週</button>
-                     <button onClick={() => setViewMode('day')} className={`px-3 py-1 text-sm rounded ${viewMode === 'day' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>日</button>
-                 </div>
-             </div>
-             
-             <div className="flex items-center gap-4 w-full md:w-auto">
-                 {/* Region Filter - Hidden in Public Mode to enforce restriction */}
-                 {!publicMode && (
-                     <div className="flex bg-gray-100 rounded-lg p-1 overflow-x-auto">
-                         <button onClick={() => setFilterRegion('all')} className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-600'}`}>全部</button>
-                         <button onClick={() => setFilterRegion('North')} className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'North' ? 'bg-blue-600 text-white shadow' : 'text-gray-600'}`}>北部</button>
-                         <button onClick={() => setFilterRegion('Central')} className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'Central' ? 'bg-yellow-600 text-white shadow' : 'text-gray-600'}`}>中部</button>
-                         <button onClick={() => setFilterRegion('South')} className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'South' ? 'bg-green-600 text-white shadow' : 'text-gray-600'}`}>南部</button>
-                     </div>
-                 )}
-
-                 <div className="flex gap-2">
-                     <button onClick={prevPeriod} className="p-2 hover:bg-gray-100 rounded border"><ChevronLeft/></button>
-                     <button onClick={nextPeriod} className="p-2 hover:bg-gray-100 rounded border"><ChevronRight/></button>
-                 </div>
-             </div>
+  const renderHeader = () => (
+    <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-bold flex items-center">
+          <Calendar className="mr-2"/>
+          {viewMode === 'month' && `${currentDate.getFullYear()}年 ${currentDate.getMonth() + 1}月`}
+          {viewMode === 'week' && `週視圖 (${currentDate.toLocaleDateString()})`}
+          {viewMode === 'day' && `${currentDate.toLocaleDateString()} (${['日','一','二','三','四','五','六'][currentDate.getDay()]})`}
+        </h2>
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button 
+            onClick={() => setViewMode('month')} 
+            className={`px-3 py-1 text-sm rounded ${viewMode === 'month' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}
+          >
+            月
+          </button>
+          <button 
+            onClick={() => setViewMode('week')} 
+            className={`px-3 py-1 text-sm rounded ${viewMode === 'week' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}
+          >
+            週
+          </button>
+          <button 
+            onClick={() => setViewMode('day')} 
+            className={`px-3 py-1 text-sm rounded ${viewMode === 'day' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}
+          >
+            日
+          </button>
         </div>
+      </div>
+      
+      <div className="flex items-center gap-4 w-full md:w-auto">
+        {/* Region Filter - Hidden in Public Mode to enforce restriction */}
+        {!publicMode && (
+          <div className="flex bg-gray-100 rounded-lg p-1 overflow-x-auto">
+            <button 
+              onClick={() => setFilterRegion('all')} 
+              className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-600'}`}
+            >
+              全部
+            </button>
+            <button 
+              onClick={() => setFilterRegion('North')} 
+              className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'North' ? 'bg-blue-600 text-white shadow' : 'text-gray-600'}`}
+            >
+              北部
+            </button>
+            <button 
+              onClick={() => setFilterRegion('Central')} 
+              className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'Central' ? 'bg-yellow-600 text-white shadow' : 'text-gray-600'}`}
+            >
+              中部
+            </button>
+            <button 
+              onClick={() => setFilterRegion('South')} 
+              className={`px-3 py-1 text-sm whitespace-nowrap rounded ${filterRegion === 'South' ? 'bg-green-600 text-white shadow' : 'text-gray-600'}`}
+            >
+              南部
+            </button>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={prevPeriod} className="p-2 hover:bg-gray-100 rounded border">
+            <ChevronLeft/>
+          </button>
+          <button onClick={nextPeriod} className="p-2 hover:bg-gray-100 rounded border">
+            <ChevronRight/>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMonthView = () => {
+    const days = Array.from({ length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) }, (_, i) => i + 1);
+    const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+    return (
+      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200">
+        {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+          <div key={d} className="bg-gray-50 p-2 text-center font-bold text-gray-500">{d}</div>
+        ))}
+        {blanks.map(b => <div key={`blank-${b}`} className="bg-white min-h-[100px]"/>)}
+        {days.map(day => {
+          const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+          const events = getEventsForDay(date);
+          return (
+            <div 
+              key={day} 
+              onClick={() => handleDayClick(day)} 
+              className="bg-white min-h-[100px] p-2 border hover:bg-blue-50 transition relative cursor-pointer group"
+            >
+              <span className="text-sm text-gray-400 font-semibold absolute top-1 right-2 group-hover:text-blue-600">
+                {day}
+              </span>
+              <div className="mt-4 space-y-1">
+                {events.map(q => {
+                  const region = q.items[0]?.outingRegion || 'North';
+                  return (
+                    <div 
+                      key={q.id} 
+                      className={`text-xs p-1 rounded border truncate ${regionColors[region]}`} 
+                      title={`${q.clientInfo.companyName}`}
+                    >
+                      {q.items[0]?.startTime?.slice(0,5)} {q.clientInfo.companyName}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     );
+  };
 
-    const renderMonthView = () => {
-        const days = Array.from({ length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) }, (_, i) => i + 1);
-        const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
-        return (
-            <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200">
-                 {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-                     <div key={d} className="bg-gray-50 p-2 text-center font-bold text-gray-500">{d}</div>
-                 ))}
-                 {blanks.map(b => <div key={`blank-${b}`} className="bg-white min-h-[100px]"/>)}
-                 {days.map(day => {
-                     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                     const events = getEventsForDay(date);
-                     return (
-                         <div key={day} onClick={() => handleDayClick(day)} className="bg-white min-h-[100px] p-2 border hover:bg-blue-50 transition relative cursor-pointer group">
-                             <span className="text-sm text-gray-400 font-semibold absolute top-1 right-2 group-hover:text-blue-600">{day}</span>
-                             <div className="mt-4 space-y-1">
-                                 {events.map(q => {
-                                     const region = q.items[0]?.outingRegion || 'North';
-                                     return (
-                                         <div key={q.id} className={`text-xs p-1 rounded border truncate ${regionColors[region]}`} title={`${q.clientInfo.companyName}`}>
-                                             {q.items[0]?.startTime?.slice(0,5)} {q.clientInfo.companyName}
-                                         </div>
-                                     );
-                                 })}
-                             </div>
-                         </div>
-                     );
-                 })}
-            </div>
-        );
-    };
-
-    const renderWeekView = () => {
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-        const weekDays = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(startOfWeek);
-            d.setDate(startOfWeek.getDate() + i);
-            return d;
-        });
-
-        return (
-            <div className="grid grid-cols-7 gap-px bg-gray-200 border h-[600px]">
-                {weekDays.map((date, i) => (
-                    <div key={i} className="bg-white flex flex-col h-full">
-                        <div className="p-2 border-b bg-gray-50 text-center font-bold">
-                            <div>{['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}</div>
-                            <div className="text-2xl">{date.getDate()}</div>
-                        </div>
-                        <div className="flex-1 p-2 space-y-2 overflow-auto">
-                            {getEventsForDay(date).map(q => {
-                                const region = q.items[0]?.outingRegion || 'North';
-                                return (
-                                    <div key={q.id} className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}>
-                                        <div className="font-bold">{q.items[0]?.startTime?.slice(0,5)}</div>
-                                        <div>{q.clientInfo.companyName}</div>
-                                        <div className="text-[10px] mt-1 opacity-75">{q.items[0]?.courseName}</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    };
-
-    const renderDayView = () => {
-        const events = getEventsForDay(currentDate).sort((a,b) => (a.items[0]?.startTime || '').localeCompare(b.items[0]?.startTime || ''));
-        return (
-            <div className="border rounded-lg bg-white min-h-[500px] p-6">
-                <h3 className="text-xl font-bold mb-6 border-b pb-4">行程列表</h3>
-                {events.length === 0 ? (
-                    <div className="text-gray-400 text-center py-10">本日無行程</div>
-                ) : (
-                    <div className="space-y-4">
-                        {events.map(q => {
-                            const region = q.items[0]?.outingRegion || 'North';
-                            return (
-                                <div key={q.id} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${region.includes('North') ? 'border-l-blue-500' : region.includes('Central') ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
-                                    <div className="mr-6 text-center min-w-[80px]">
-                                        <div className="text-xl font-bold text-gray-800">{q.items[0]?.startTime}</div>
-                                        <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}>
-                                            {region === 'North' ? '北部' : region === 'Central' ? '中部' : '南部'}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-lg font-bold text-gray-900">{q.clientInfo.companyName}</h4>
-                                        <div className="text-gray-600 mt-1 flex items-center">
-                                            <FileText className="w-4 h-4 mr-1"/> {q.items[0]?.courseName} ({q.items[0]?.peopleCount}人)
-                                        </div>
-                                        <div className="text-gray-500 mt-1 text-sm flex items-center">
-                                            <MapPin className="w-4 h-4 mr-1"/> {q.items[0]?.city} {q.items[0]?.address}
-                                        </div>
-                                        {/* Hide contact info in public mode */}
-                                        {!publicMode && (
-                                            <div className="mt-2 text-sm text-gray-500">聯絡人: {q.clientInfo.contactPerson} ({q.clientInfo.phone})</div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        );
-    };
+  const renderWeekView = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      return d;
+    });
 
     return (
-        <div className="max-w-6xl mx-auto bg-white p-6 rounded shadow relative">
-             {publicMode && (
-                 <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm font-bold text-center rounded border border-blue-200 flex items-center justify-center">
-                     <Lock className="w-4 h-4 mr-2"/>
-                     此頁為行程分享連結（唯讀模式）
-                 </div>
-             )}
-
-             {renderHeader()}
-
-             {/* 內部模式下的複製連結按鈕：標題下方、靠右 */}
-             {!publicMode && (
-                 <div className="mb-4 flex justify-end gap-2">
-                     <button
-                         onClick={() => copyLink('Central')}
-                         className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold flex items-center hover:bg-yellow-200 transition"
-                         title="複製中部行程連結"
-                     >
-                         <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
-                     </button>
-                     <button
-                         onClick={() => copyLink('South')}
-                         className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center hover:bg-green-200 transition"
-                         title="複製南部行程連結"
-                     >
-                         <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
-                     </button>
-                 </div>
-             )}
-
-             {viewMode === 'month' && renderMonthView()}
-             {viewMode === 'week' && renderWeekView()}
-             {viewMode === 'day' && renderDayView()}
-             
-             {!publicMode && (
-                 <div className="mt-4 flex gap-4 text-xs text-gray-500 justify-end">
-                     <span className="flex items-center"><div className="w-3 h-3 bg-blue-100 border border-blue-200 mr-1"></div> 北部行程</span>
-                     <span className="flex items-center"><div className="w-3 h-3 bg-yellow-100 border border-yellow-200 mr-1"></div> 中部行程</span>
-                     <span className="flex items-center"><div className="w-3 h-3 bg-green-100 border border-green-200 mr-1"></div> 南部行程</span>
-                 </div>
-             )}
-        </div>
+      <div className="grid grid-cols-7 gap-px bg-gray-200 border h-[600px]">
+        {weekDays.map((date, i) => (
+          <div key={i} className="bg-white flex flex-col h-full">
+            <div className="p-2 border-b bg-gray-50 text-center font-bold">
+              <div>{['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}</div>
+              <div className="text-2xl">{date.getDate()}</div>
+            </div>
+            <div className="flex-1 p-2 space-y-2 overflow-auto">
+              {getEventsForDay(date).map(q => {
+                const region = q.items[0]?.outingRegion || 'North';
+                return (
+                  <div 
+                    key={q.id} 
+                    className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}
+                  >
+                    <div className="font-bold">{q.items[0]?.startTime?.slice(0,5)}</div>
+                    <div>{q.clientInfo.companyName}</div>
+                    <div className="text-[10px] mt-1 opacity-75">
+                      {q.items[0]?.courseName}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     );
+  };
+
+  const renderDayView = () => {
+    const events = getEventsForDay(currentDate).sort((a,b) => (a.items[0]?.startTime || '').localeCompare(b.items[0]?.startTime || ''));
+    return (
+      <div className="border rounded-lg bg-white min-h-[500px] p-6">
+        <h3 className="text-xl font-bold mb-6 border-b pb-4">行程列表</h3>
+        {events.length === 0 ? (
+          <div className="text-gray-400 text-center py-10">本日無行程</div>
+        ) : (
+          <div className="space-y-4">
+            {events.map(q => {
+              const region = q.items[0]?.outingRegion || 'North';
+              return (
+                <div 
+                  key={q.id} 
+                  className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${
+                    region.includes('North') ? 'border-l-blue-500' 
+                      : region.includes('Central') ? 'border-l-yellow-500' 
+                      : 'border-l-green-500'
+                  }`}
+                >
+                  <div className="mr-6 text-center min-w-[80px]">
+                    <div className="text-xl font-bold text-gray-800">{q.items[0]?.startTime}</div>
+                    <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}>
+                      {region === 'North' ? '北部' : region === 'Central' ? '中部' : '南部'}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-900">{q.clientInfo.companyName}</h4>
+                    <div className="text-gray-600 mt-1 flex items-center">
+                      <FileText className="w-4 h-4 mr-1"/> {q.items[0]?.courseName} ({q.items[0]?.peopleCount}人)
+                    </div>
+                    <div className="text-gray-500 mt-1 text-sm flex items-center">
+                      <MapPin className="w-4 h-4 mr-1"/> {q.items[0]?.city} {q.items[0]?.address}
+                    </div>
+                    {/* Hide contact info in public mode */}
+                    {!publicMode && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        聯絡人: {q.clientInfo.contactPerson} ({q.clientInfo.phone})
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto bg-white p-6 rounded shadow relative">
+      {publicMode && (
+        <div className="mb-4 p-3 bg-blue-50 text-blue-700 text-sm font-bold text-center rounded border border-blue-200 flex items-center justify-center">
+          <Lock className="w-4 h-4 mr-2"/>
+          此頁為行程分享連結（唯讀模式）
+        </div>
+      )}
+
+      {renderHeader()}
+
+      {/* 內部模式下的複製連結按鈕：標題下方、靠右 */}
+      {!publicMode && (
+        <div className="mb-4 flex justify-end gap-2">
+          <button
+            onClick={() => copyLink('Central')}
+            className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold flex items-center hover:bg-yellow-200 transition"
+            title="複製中部行程連結"
+          >
+            <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
+          </button>
+          <button
+            onClick={() => copyLink('South')}
+            className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center hover:bg-green-200 transition"
+            title="複製南部行程連結"
+          >
+            <LinkIcon className="w-3 h-3 mr-1"/> 複製連結
+          </button>
+        </div>
+      )}
+
+      {viewMode === 'month' && renderMonthView()}
+      {viewMode === 'week' && renderWeekView()}
+      {viewMode === 'day' && renderDayView()}
+      
+      {!publicMode && (
+        <div className="mt-4 flex gap-4 text-xs text-gray-500 justify-end">
+          <span className="flex items-center">
+            <div className="w-3 h-3 bg-blue-100 border border-blue-200 mr-1"></div> 北部行程
+          </span>
+          <span className="flex items-center">
+            <div className="w-3 h-3 bg-yellow-100 border border-yellow-200 mr-1"></div> 中部行程
+          </span>
+          <span className="flex items-center">
+            <div className="w-3 h-3 bg-green-100 border border-green-200 mr-1"></div> 南部行程
+          </span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // --- ListView Component ---
 const ListView = ({ quotes, onEdit, onDelete, onPayment, onPreview, onStatusChange, onExport, onCreate }) => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [monthFilter, setMonthFilter] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all"); 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); 
 
-    const groupedQuotes = useMemo(() => {
-        const groups = {};
-        quotes.forEach(q => {
-            const date = getSafeDate(q.createdAt);
-            const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(q);
-        });
-        return groups;
-    }, [quotes]);
+  const groupedQuotes = useMemo(() => {
+    const groups = {};
+    quotes.forEach(q => {
+      const date = getSafeDate(q.createdAt);
+      const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(q);
+    });
+    return groups;
+  }, [quotes]);
 
-    const filteredMonths = Object.keys(groupedQuotes).sort().reverse().filter(m => !monthFilter || m === monthFilter);
+  const filteredMonths = Object.keys(groupedQuotes)
+    .sort()
+    .reverse()
+    .filter(m => !monthFilter || m === monthFilter);
 
-    return (
-        <div className="max-w-6xl mx-auto">
-            {/* Header Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">報價單管理</h2>
-                <div className="flex gap-2 flex-wrap">
-                     <button onClick={onExport} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium">
-                        <FileText className="w-4 h-4 mr-2"/> 匯出報表 (CSV)
-                     </button>
-                     <button onClick={onCreate} className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm">新增</button>
-                </div>
-            </div>
-
-            {/* Filters */}
-            <div className={SECTION_CLASS + " mb-6 flex flex-col md:flex-row gap-4 items-center"}>
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5"/>
-                    <input 
-                        type="text" 
-                        placeholder="搜尋客戶名稱、電話..." 
-                        className={INPUT_CLASS + " pl-10"}
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                
-                {/* Month Filter */}
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 whitespace-nowrap">月份:</span>
-                    <select 
-                        className={INPUT_CLASS + " md:w-40"}
-                        value={monthFilter}
-                        onChange={e => setMonthFilter(e.target.value)}
-                    >
-                        <option value="">全部月份</option>
-                        {Object.keys(groupedQuotes).sort().reverse().map(m => (
-                            <option key={m} value={m}>{m}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Status Filter */}
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 whitespace-nowrap">狀態:</span>
-                    <select 
-                        className={INPUT_CLASS + " md:w-40"}
-                        value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
-                    >
-                        <option value="all">全部狀態</option>
-                        <option value="draft">草稿</option>
-                        <option value="pending">報價中</option>
-                        <option value="confirmed">已回簽 (未付訂)</option>
-                        <option value="paid">已付訂 (未結清)</option>
-                        <option value="closed">已結案</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* List */}
-            <div className="space-y-6">
-                {filteredMonths.map(month => {
-                    const monthQuotes = groupedQuotes[month].filter(q => {
-                        const matchesSearch = q.clientInfo?.companyName?.includes(searchTerm) || q.clientInfo?.phone?.includes(searchTerm);
-                        const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
-                        return matchesSearch && matchesStatus;
-                    });
-
-                    if (monthQuotes.length === 0) return null;
-
-                    return (
-                        <div key={month} className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-                            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center font-semibold text-gray-700">
-                                <Folder className="w-5 h-5 mr-2 text-yellow-500" />
-                                {month} ({monthQuotes.length})
-                            </div>
-                            <div className="divide-y divide-gray-100">
-                                {monthQuotes.map(quote => (
-                                    <div key={quote.id} className="p-4 hover:bg-blue-50 transition flex flex-col md:flex-row justify-between items-center gap-4">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-3 mb-1 flex-wrap">
-                                                <StatusSelector 
-                                                    status={quote.status} 
-                                                    onChange={(val) => onStatusChange(quote.id, val)}
-                                                />
-                                                <span className="font-bold text-lg text-gray-900 truncate">{quote.clientInfo.companyName}</span>
-                                                <span className="text-xs text-gray-400 font-mono">#{quote.id.slice(-4)}</span>
-                                            </div>
-                                            <div className="text-sm text-gray-600 truncate">
-                                                <span className="mr-3">聯絡人: {quote.clientInfo.contactPerson}</span>
-                                                <span>課程: {quote.items[0]?.courseName} {quote.items.length > 1 ? `(+${quote.items.length - 1})` : ''}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-400 mt-1">
-                                                建立於: {formatDate(quote.createdAt)}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-2 min-w-[150px]">
-                                            <div className="text-xl font-bold text-blue-600">
-                                                ${quote.totalAmount?.toLocaleString()}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => onPreview(quote)} className="p-2 text-blue-600 hover:bg-blue-100 rounded tooltip transition-colors" title="預覽報價單">
-                                                    <Eye className="w-5 h-5"/>
-                                                </button>
-                                                {quote.status === 'paid' && (
-                                                    <button onClick={() => onPayment(quote)} className="p-2 text-orange-600 hover:bg-orange-100 rounded tooltip transition-colors" title="款項管理">
-                                                        <DollarSign className="w-5 h-5"/>
-                                                    </button>
-                                                )}
-                                                <button onClick={() => onEdit(quote)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="編輯">
-                                                    <Edit className="w-5 h-5"/>
-                                                </button>
-                                                <button onClick={() => onDelete(quote.id)} className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors" title="刪除">
-                                                    <Trash2 className="w-5 h-5"/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+  return (
+    <div className="max-w-6xl mx-auto">
+      {/* Header Actions */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <h2 className="text-2xl font-bold text-gray-800">報價單管理</h2>
+        <div className="flex gap-2 flex-wrap">
+          <button 
+            onClick={onExport} 
+            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium"
+          >
+            <FileText className="w-4 h-4 mr-2"/> 匯出報表 (CSV)
+          </button>
+          <button 
+            onClick={onCreate} 
+            className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm"
+          >
+            新增
+          </button>
         </div>
-    );
+      </div>
+
+      {/* Filters */}
+      <div className={SECTION_CLASS + " mb-6 flex flex-col md:flex-row gap-4 items-center"}>
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5"/>
+          <input 
+            type="text" 
+            placeholder="搜尋客戶名稱、電話..." 
+            className={INPUT_CLASS + " pl-10"}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        {/* Month Filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 whitespace-nowrap">月份:</span>
+          <select 
+            className={INPUT_CLASS + " md:w-40"}
+            value={monthFilter}
+            onChange={e => setMonthFilter(e.target.value)}
+          >
+            <option value="">全部月份</option>
+            {Object.keys(groupedQuotes).sort().reverse().map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500 whitespace-nowrap">狀態:</span>
+          <select 
+            className={INPUT_CLASS + " md:w-40"}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+          >
+            <option value="all">全部狀態</option>
+            <option value="draft">草稿</option>
+            <option value="pending">報價中</option>
+            <option value="confirmed">已回簽 (未付訂)</option>
+            <option value="paid">已付訂 (未結清)</option>
+            <option value="closed">已結案</option>
+          </select>
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="space-y-6">
+        {filteredMonths.map(month => {
+          const monthQuotes = groupedQuotes[month].filter(q => {
+            const matchesSearch = 
+              (q.clientInfo?.companyName || '').includes(searchTerm) || 
+              (q.clientInfo?.phone || '').includes(searchTerm);
+            const matchesStatus = statusFilter === 'all' || q.status === statusFilter;
+            return matchesSearch && matchesStatus;
+          });
+
+          if (monthQuotes.length === 0) return null;
+
+          return (
+            <div key={month} className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center font-semibold text-gray-700">
+                <Folder className="w-5 h-5 mr-2 text-yellow-500" />
+                {month} ({monthQuotes.length})
+              </div>
+              <div className="divide-y divide-gray-100">
+                {monthQuotes.map(quote => (
+                  <div 
+                    key={quote.id} 
+                    className="p-4 hover:bg-blue-50 transition flex flex-col md:flex-row justify-between items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <StatusSelector 
+                          status={quote.status} 
+                          onChange={(val) => onStatusChange(quote.id, val)}
+                        />
+                        <span className="font-bold text-lg text-gray-900 truncate">
+                          {quote.clientInfo.companyName}
+                        </span>
+                        <span className="text-xs text-gray-400 font-mono">
+                          #{String(quote.id).slice(-4)}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600 truncate">
+                        <span className="mr-3">
+                          聯絡人: {quote.clientInfo.contactPerson}
+                        </span>
+                        <span>
+                          課程: {quote.items[0]?.courseName} {quote.items.length > 1 ? `(+${quote.items.length - 1})` : ''}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        建立於: {formatDate(quote.createdAt)}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 min-w-[150px]">
+                      <div className="text-xl font-bold text-blue-600">
+                        ${quote.totalAmount?.toLocaleString()}
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => onPreview(quote)} 
+                          className="p-2 text-blue-600 hover:bg-blue-100 rounded tooltip transition-colors" 
+                          title="預覽報價單"
+                        >
+                          <Eye className="w-5 h-5"/>
+                        </button>
+                        {quote.status === 'paid' && (
+                          <button 
+                            onClick={() => onPayment(quote)} 
+                            className="p-2 text-orange-600 hover:bg-orange-100 rounded tooltip transition-colors" 
+                            title="款項管理"
+                          >
+                            <DollarSign className="w-5 h-5"/>
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => onEdit(quote)} 
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" 
+                          title="編輯"
+                        >
+                          <Edit className="w-5 h-5"/>
+                        </button>
+                        <button 
+                          onClick={() => onDelete(quote.id)} 
+                          className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors" 
+                          title="刪除"
+                        >
+                          <Trash2 className="w-5 h-5"/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 const PaymentModal = ({ quote, onClose, onSave }) => {
-    const [details, setDetails] = useState({
-        depositAmount: 0, depositNote: '', additionalPayment: 0, additionalPaymentNote: '', finalPayment: 0, finalPaymentNote: ''
-    });
-    useEffect(() => { if (quote.paymentDetails) setDetails(quote.paymentDetails); }, [quote]);
-    const actualTotal = (quote.totalAmount || 0) + parseInt(details.additionalPayment || 0);
-    const paidTotal = parseInt(details.depositAmount || 0) + parseInt(details.finalPayment || 0);
-    const remaining = actualTotal - paidTotal;
-    const handleSave = () => {
-        onSave(quote.id, { paymentDetails: details, status: remaining === 0 ? 'closed' : quote.status, closedAt: remaining === 0 ? new Date().toISOString() : quote.closedAt });
-        onClose();
-    };
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 overflow-auto max-h-[90vh]">
-                <h2 className="text-xl font-bold mb-4">款項管理</h2>
-                <div className="grid grid-cols-2 gap-4 mb-4"><div className="bg-gray-50 p-4 rounded">原始: ${quote.totalAmount}</div><div className="bg-blue-50 p-4 rounded">應收: ${actualTotal}</div></div>
-                
-                <div className="space-y-4">
-                    <div className="border p-4 rounded-lg">
-                        <h4 className="font-bold mb-3 flex items-center"><Check className="w-4 h-4 mr-2 text-green-500"/> 1. 訂金 (Deposit)</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className={LABEL_CLASS}>金額</label><input type="number" className={INPUT_CLASS} value={details.depositAmount} onChange={e=>setDetails({...details, depositAmount: e.target.value})}/></div>
-                            <div><label className={LABEL_CLASS}>備註</label><input type="text" className={INPUT_CLASS} value={details.depositNote} onChange={e=>setDetails({...details, depositNote: e.target.value})}/></div>
-                        </div>
-                    </div>
-                    <div className="border p-4 rounded-lg border-orange-200 bg-orange-50">
-                        <h4 className="font-bold mb-3 flex items-center text-orange-800"><Plus className="w-4 h-4 mr-2"/> 2. 追加款項 (Additional)</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className={LABEL_CLASS}>金額</label><input type="number" className={INPUT_CLASS} value={details.additionalPayment} onChange={e=>setDetails({...details, additionalPayment: e.target.value})}/></div>
-                            <div><label className={LABEL_CLASS}>原因說明</label><input type="text" className={INPUT_CLASS} value={details.additionalPaymentNote} onChange={e=>setDetails({...details, additionalPaymentNote: e.target.value})}/></div>
-                        </div>
-                    </div>
-                    <div className="border p-4 rounded-lg">
-                        <h4 className="font-bold mb-3 flex items-center"><DollarSign className="w-4 h-4 mr-2 text-green-500"/> 3. 尾款 (Final)</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className={LABEL_CLASS}>金額</label><input type="number" className={INPUT_CLASS} value={details.finalPayment} onChange={e=>setDetails({...details, finalPayment: e.target.value})}/></div>
-                            <div><label className={LABEL_CLASS}>備註</label><input type="text" className={INPUT_CLASS} value={details.finalPaymentNote} onChange={e=>setDetails({...details, finalPaymentNote: e.target.value})}/></div>
-                        </div>
-                    </div>
-                </div>
+  const [details, setDetails] = useState({
+    depositAmount: 0, 
+    depositNote: '', 
+    additionalPayment: 0, 
+    additionalPaymentNote: '', 
+    finalPayment: 0, 
+    finalPaymentNote: ''
+  });
 
-                <div className="mt-6 flex justify-between items-center p-4 bg-gray-100 rounded-lg">
-                    <div>
-                        <span className="text-gray-600">剩餘未付金額：</span>
-                        <span className={`text-xl font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            ${remaining.toLocaleString()}
-                        </span>
-                    </div>
-                    <div className="space-x-2">
-                        <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded">取消</button>
-                        <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold flex items-center">
-                            <Save className="w-4 h-4 mr-2" /> 儲存並更新狀態
-                        </button>
-                    </div>
-                </div>
-            </div>
+  useEffect(() => { 
+    if (quote.paymentDetails) setDetails(quote.paymentDetails); 
+  }, [quote]);
+
+  const actualTotal = (quote.totalAmount || 0) + parseInt(details.additionalPayment || 0);
+  const paidTotal = parseInt(details.depositAmount || 0) + parseInt(details.finalPayment || 0);
+  const remaining = actualTotal - paidTotal;
+
+  const handleSave = () => {
+    onSave(quote.id, { 
+      paymentDetails: details, 
+      status: remaining === 0 ? 'closed' : quote.status, 
+      closedAt: remaining === 0 ? new Date().toISOString() : quote.closedAt 
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 overflow-auto max-h-[90vh]">
+        <h2 className="text-xl font-bold mb-4">款項管理</h2>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-gray-50 p-4 rounded">
+            原始: ${quote.totalAmount}
+          </div>
+          <div className="bg-blue-50 p-4 rounded">
+            應收: ${actualTotal}
+          </div>
         </div>
-    );
+        
+        <div className="space-y-4">
+          <div className="border p-4 rounded-lg">
+            <h4 className="font-bold mb-3 flex items-center">
+              <Check className="w-4 h-4 mr-2 text-green-500"/> 1. 訂金 (Deposit)
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={LABEL_CLASS}>金額</label>
+                <input 
+                  type="number" 
+                  className={INPUT_CLASS} 
+                  value={details.depositAmount} 
+                  onChange={e=>setDetails({...details, depositAmount: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>備註</label>
+                <input 
+                  type="text" 
+                  className={INPUT_CLASS} 
+                  value={details.depositNote} 
+                  onChange={e=>setDetails({...details, depositNote: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border p-4 rounded-lg border-orange-200 bg-orange-50">
+            <h4 className="font-bold mb-3 flex items-center text-orange-800">
+              <Plus className="w-4 h-4 mr-2"/> 2. 追加款項 (Additional)
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={LABEL_CLASS}>金額</label>
+                <input 
+                  type="number" 
+                  className={INPUT_CLASS} 
+                  value={details.additionalPayment} 
+                  onChange={e=>setDetails({...details, additionalPayment: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>原因說明</label>
+                <input 
+                  type="text" 
+                  className={INPUT_CLASS} 
+                  value={details.additionalPaymentNote} 
+                  onChange={e=>setDetails({...details, additionalPaymentNote: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border p-4 rounded-lg">
+            <h4 className="font-bold mb-3 flex items-center">
+              <DollarSign className="w-4 h-4 mr-2 text-green-500"/> 3. 尾款 (Final)
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={LABEL_CLASS}>金額</label>
+                <input 
+                  type="number" 
+                  className={INPUT_CLASS} 
+                  value={details.finalPayment} 
+                  onChange={e=>setDetails({...details, finalPayment: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>備註</label>
+                <input 
+                  type="text" 
+                  className={INPUT_CLASS} 
+                  value={details.finalPaymentNote} 
+                  onChange={e=>setDetails({...details, finalPaymentNote: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-between items-center p-4 bg-gray-100 rounded-lg">
+          <div>
+            <span className="text-gray-600">剩餘未付金額：</span>
+            <span className={`text-xl font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              ${remaining.toLocaleString()}
+            </span>
+          </div>
+          <div className="space-x-2">
+            <button 
+              onClick={onClose} 
+              className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded"
+            >
+              取消
+            </button>
+            <button 
+              onClick={handleSave} 
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" /> 儲存並更新狀態
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // --- App Container ---
@@ -1636,8 +2078,8 @@ const App = () => {
     const mode = urlParams.get('mode');
     
     if (mode === 'public') {
-        setIsPublicMode(true);
-        setActiveTab('calendar'); // Force to calendar view
+      setIsPublicMode(true);
+      setActiveTab('calendar'); // Force to calendar view
     }
   }, []);
 
@@ -1646,169 +2088,205 @@ const App = () => {
     if (!db) return; 
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const quotesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const quotesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       const uniqueQuotes = Array.from(new Map(quotesData.map(item => [item.id, item])).values());
       setQuotes(uniqueQuotes);
     });
     return () => unsubscribe();
   }, []);
 
-  const handleCreateNew = () => { setEditingQuote(null); setActiveTab('create'); };
-  const handleEdit = (quote) => { setEditingQuote(quote); setActiveTab('create'); };
+  const handleCreateNew = () => { 
+    setEditingQuote(null); 
+    setActiveTab('create'); 
+  };
+  const handleEdit = (quote) => { 
+    setEditingQuote(quote); 
+    setActiveTab('create'); 
+  };
 
   const handleSaveQuote = async (quoteData) => {
-      if (!db) {
-          alert("【演示模式】儲存成功！\n(因為未設定 API Key，資料僅暫存於記憶體，重整後會消失)");
-          const mockId = "mock_" + generateId();
-          const mockQuote = { ...quoteData, id: mockId, createdAt: { seconds: Date.now()/1000 } };
-          setQuotes([mockQuote, ...quotes]);
-          setActiveTab('list');
-          return;
+    if (!db) {
+      alert("【演示模式】儲存成功！\n(因為未設定 API Key，資料僅暫存於記憶體，重整後會消失)");
+      const mockId = "mock_" + generateId();
+      const mockQuote = { ...quoteData, id: mockId, createdAt: { seconds: Date.now()/1000 } };
+      setQuotes([mockQuote, ...quotes]);
+      setActiveTab('list');
+      return;
+    }
+    try {
+      if (editingQuote) {
+        await updateDoc(doc(db, "quotes", editingQuote.id), { ...quoteData, updatedAt: serverTimestamp() });
+      } else {
+        await addDoc(collection(db, "quotes"), { ...quoteData, createdAt: serverTimestamp(), status: 'draft' });
       }
-      try {
-          if (editingQuote) {
-              await updateDoc(doc(db, "quotes", editingQuote.id), { ...quoteData, updatedAt: serverTimestamp() });
-          } else {
-              await addDoc(collection(db, "quotes"), { ...quoteData, createdAt: serverTimestamp(), status: 'draft' });
-          }
-          setActiveTab('list');
-      } catch (error) {
-          console.error("Error saving document: ", error);
-          alert("儲存失敗，請檢查網路連線");
-      }
+      setActiveTab('list');
+    } catch (error) {
+      console.error("Error saving document: ", error);
+      alert("儲存失敗，請檢查網路連線");
+    }
   };
 
   const handleDelete = async (id) => {
-      if (!db) {
-          setQuotes(quotes.filter(q => q.id !== id));
-          return;
-      }
-      if (confirm("確定要刪除此報價單嗎？")) {
-          await deleteDoc(doc(db, "quotes", id));
-      }
+    if (!db) {
+      setQuotes(quotes.filter(q => q.id !== id));
+      return;
+    }
+    if (window.confirm("確定要刪除此報價單嗎？")) {
+      await deleteDoc(doc(db, "quotes", id));
+    }
   };
 
   const handleUpdatePayment = async (id, updates) => {
-      if (!db) return;
-      try {
-          await updateDoc(doc(db, "quotes", id), updates);
-      } catch (error) {
-          console.error("Error updating payment: ", error);
-          alert("更新失敗");
-      }
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, "quotes", id), updates);
+    } catch (error) {
+      console.error("Error updating payment: ", error);
+      alert("更新失敗");
+    }
   };
 
   const handleStatusChange = async (id, newStatus) => {
-      if (!db) return;
-      try {
-          await updateDoc(doc(db, "quotes", id), { status: newStatus });
-      } catch (error) {
-          console.error("Error updating status: ", error);
-          alert("狀態更新失敗");
-      }
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, "quotes", id), { status: newStatus });
+    } catch (error) {
+      console.error("Error updating status: ", error);
+      alert("狀態更新失敗");
+    }
   };
 
   const handleOpenPreview = (quote) => {
-      const safeItems = (quote.items || []).map(item => {
-          if (item.calc) return item;
-          return { ...item, calc: calculateItem(item) };
-      });
-      
-      setSelectedQuoteForPreview({ ...quote, items: safeItems });
-      setShowPreviewModal(true);
+    const safeItems = (quote.items || []).map(item => {
+      if (item.calc) return item;
+      return { ...item, calc: calculateItem(item) };
+    });
+    
+    setSelectedQuoteForPreview({ ...quote, items: safeItems });
+    setShowPreviewModal(true);
   };
 
   const exportCSV = () => {
-      const headers = [
-          "報價單ID", "建立日期", "狀態", 
-          "客戶名稱", "統編", "聯絡人", "電話", 
-          "課程系列", "課程名稱", "課程日期", "開始時間", "結束時間", "人數", "單價",
-          "折扣金額", "加價總額", "是否開發票", "總金額"
-      ];
+    const headers = [
+      "報價單ID", "建立日期", "狀態", 
+      "客戶名稱", "統編", "聯絡人", "電話", 
+      "課程系列", "課程名稱", "課程日期", "開始時間", "結束時間", "人數", "單價",
+      "折扣金額", "加價總額", "是否開發票", "總金額"
+    ];
 
-      const rows = quotes.flatMap(q => {
-          const items = q.items || [];
-          return items.map(item => [
-              q.id,
-              formatDate(q.createdAt),
-              q.status,
-              q.clientInfo?.companyName || '',
-              q.clientInfo?.taxId || '',
-              q.clientInfo?.contactPerson || '',
-              q.clientInfo?.phone || '',
-              item.courseSeries || '',
-              item.courseName || '',
-              item.eventDate || '',
-              item.startTime || '',
-              item.endTime || '',
-              item.peopleCount || 0,
-              item.price || 0,
-              item.calc?.discountAmount || 0,
-              item.calc?.totalExtraFee || 0,
-              item.hasInvoice ? "是" : "否",
-              item.calc?.finalTotal || 0
-          ]);
-      });
+    const rows = quotes.flatMap(q => {
+      const items = q.items || [];
+      return items.map(item => [
+        q.id,
+        formatDate(q.createdAt),
+        q.status,
+        q.clientInfo?.companyName || '',
+        q.clientInfo?.taxId || '',
+        q.clientInfo?.contactPerson || '',
+        q.clientInfo?.phone || '',
+        item.courseSeries || '',
+        item.courseName || '',
+        item.eventDate || '',
+        item.startTime || '',
+        item.endTime || '',
+        item.peopleCount || 0,
+        item.price || 0,
+        item.calc?.discountAmount || 0,
+        item.calc?.totalExtraFee || 0,
+        item.hasInvoice ? "是" : "否",
+        item.calc?.finalTotal || 0
+      ]);
+    });
 
-      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-          + [headers, ...rows].map(e => e.join(",")).join("\n");
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "詳細報價單報表.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers, ...rows].map(e => e.join(",")).join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", "詳細報價單報表.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
-        {!isPublicMode && (
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm print:hidden">
-                <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-                    <div className="flex items-center font-bold text-xl text-gray-800"><FileText className="w-6 h-6 mr-2" /> 下班隨手作報價系統</div>
-                    <div className="flex space-x-4">
-                        <button onClick={() => setActiveTab('create')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>報價計算</button>
-                        <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>追蹤清單</button>
-                        <button onClick={() => setActiveTab('calendar')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>行事曆</button>
-                        <button onClick={() => setActiveTab('stats')} className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>業績統計</button>
-                    </div>
-                </div>
-            </header>
-        )}
+      {!isPublicMode && (
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm print:hidden">
+          <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+            <div className="flex items-center font-bold text-xl text-gray-800">
+              <FileText className="w-6 h-6 mr-2" /> 下班隨手作報價系統
+            </div>
+            <div className="flex space-x-4">
+              <button 
+                onClick={() => setActiveTab('create')} 
+                className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'create' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                報價計算
+              </button>
+              <button 
+                onClick={() => setActiveTab('list')} 
+                className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                追蹤清單
+              </button>
+              <button 
+                onClick={() => setActiveTab('calendar')} 
+                className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                行事曆
+              </button>
+              <button 
+                onClick={() => setActiveTab('stats')} 
+                className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                業績統計
+              </button>
+            </div>
+          </div>
+        </header>
+      )}
 
       <main className="flex-1 overflow-auto bg-gray-50 p-4 md:p-8">
-            {!isPublicMode && activeTab === 'list' && (
-                <ListView 
-                    quotes={quotes} 
-                    onEdit={handleEdit} 
-                    onDelete={handleDelete} 
-                    onPayment={(q) => {setSelectedQuoteForPayment(q); setShowPaymentModal(true);}} 
-                    onPreview={handleOpenPreview} 
-                    onStatusChange={handleStatusChange}
-                    onExport={exportCSV}
-                    onCreate={handleCreateNew}
-                />
-            )}
-            {!isPublicMode && activeTab === 'create' && (
-                <QuoteCreator 
-                    initialData={editingQuote} 
-                    onSave={handleSaveQuote} 
-                    onCancel={() => setActiveTab('list')} 
-                />
-            )}
-            {activeTab === 'calendar' && <CalendarView quotes={quotes} publicMode={isPublicMode} />}
-            {!isPublicMode && activeTab === 'stats' && <StatsView quotes={quotes} />}
+        {!isPublicMode && activeTab === 'list' && (
+          <ListView 
+            quotes={quotes} 
+            onEdit={handleEdit} 
+            onDelete={handleDelete} 
+            onPayment={(q) => {setSelectedQuoteForPayment(q); setShowPaymentModal(true);}} 
+            onPreview={handleOpenPreview} 
+            onStatusChange={handleStatusChange}
+            onExport={exportCSV}
+            onCreate={handleCreateNew}
+          />
+        )}
+        {!isPublicMode && activeTab === 'create' && (
+          <QuoteCreator 
+            initialData={editingQuote} 
+            onSave={handleSaveQuote} 
+            onCancel={() => setActiveTab('list')} 
+          />
+        )}
+        {activeTab === 'calendar' && (
+          <CalendarView quotes={quotes} publicMode={isPublicMode} />
+        )}
+        {!isPublicMode && activeTab === 'stats' && (
+          <StatsView quotes={quotes} />
+        )}
       </main>
 
       {showPaymentModal && selectedQuoteForPayment && (
-          <PaymentModal quote={selectedQuoteForPayment} onClose={() => setShowPaymentModal(false)} onSave={handleUpdatePayment} />
+        <PaymentModal 
+          quote={selectedQuoteForPayment} 
+          onClose={() => setShowPaymentModal(false)} 
+          onSave={handleUpdatePayment} 
+        />
       )}
       
       {showPreviewModal && selectedQuoteForPreview && (
-          <PreviewModal 
-              quote={selectedQuoteForPreview} 
-              onClose={() => setShowPreviewModal(false)} 
-          />
+        <PreviewModal 
+          quote={selectedQuoteForPreview} 
+          onClose={() => setShowPreviewModal(false)} 
+        />
       )}
     </div>
   );
