@@ -867,36 +867,54 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 注意事項 */}
-      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
-        <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
-        <ol className="list-decimal list-inside space-y-1">
-          <li>
-            本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。
-          </li>
-          <li>
-            人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。
-          </li>
-          <li>
-            教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。
-          </li>
-          <li>
-            客戶確認訂單簽章後，回傳Mail:
-            xiabenhow@gmail.com。 或官方Line :@xiabenhow下班隨手作
-          </li>
-          <li className="text-red-600 font-bold">
-            付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。
-          </li>
-          <li>
-            已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。
-          </li>
-        </ol>
-        <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
-          <p className="font-bold text-sm">
-            銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
-          </p>
+     {/* 注意事項 */}
+<div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
+  <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
+
+  {/* 用左右欄位排版：左邊數字，右邊文字，多行會自動對齊 */}
+  <div className="space-y-1">
+    {[
+      {
+        text: "本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。"
+      },
+      {
+        text: "人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。"
+      },
+      {
+        text: "教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。"
+      },
+      {
+        text: "客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。"
+      },
+      {
+        text: "付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。",
+        highlight: true
+      },
+      {
+        text: "已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。"
+      }
+    ].map((item, index) => (
+      <div key={index} className="flex items-start">
+        {/* 左邊數字欄位 */}
+        <div className="w-5 pr-1 text-right">
+          {index + 1}.
+        </div>
+        {/* 右邊文字，多行自動縮排對齊，不會壓到數字 */}
+        <div className={`flex-1 ${item.highlight ? "text-red-600 font-bold" : ""}`}>
+          {item.text}
         </div>
       </div>
+    ))}
+  </div>
+
+  {/* 銀行資訊區塊保留 */}
+  <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
+    <p className="font-bold text-sm">
+      銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
+    </p>
+  </div>
+</div>
+
 
       {/* 簽章區：避免換頁 */}
       <div
