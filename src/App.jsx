@@ -19,15 +19,14 @@ import {
   AlertCircle,
   Eye,
   Download,
+  Upload,
   MapPin,
   BarChart3,
   TrendingUp,
   PieChart,
   Link as LinkIcon,
   Lock,
-  Upload, // ★ 新增：CSV 匯入按鈕 icon
 } from 'lucide-react';
-
 
 // ==========  Firebase 設定  ==========
 import { initializeApp } from 'firebase/app';
@@ -43,12 +42,11 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
-
 
 // ★★★ 印章圖片路徑（請放在 public/stamp.png） ★★★
 const STAMP_URL = '/stamp.png';
-
 
 // Firebase config
 const firebaseConfig = {
@@ -77,7 +75,6 @@ try {
   console.error('Firebase 初始化失敗', err);
 }
 
-
 // ========== 共用小工具 ==========
 
 // 動態載入 html2pdf
@@ -101,8 +98,7 @@ const getSafeDate = (val) => {
   if (!val) return new Date();
   if (val instanceof Date) return val;
   if (val.seconds) return new Date(val.seconds * 1000);
-  if (typeof val === 'string' || typeof val === 'number')
-    return new Date(val);
+  if (typeof val === 'string' || typeof val === 'number') return new Date(val);
   return new Date();
 };
 
@@ -114,71 +110,14 @@ const formatDate = (val) => {
   }
 };
 
-// ★ 新增：items 陣列在 CSV 裡的 Base64 編碼／解碼，方便匯入匯出 ★
-const encodeItemsToBase64 = (items) => {
-  try {
-    const json = JSON.stringify(items || []);
-    if (typeof window === 'undefined' || !window.btoa) return json;
-    // 處理中文
-    return window.btoa(unescape(encodeURIComponent(json)));
-  } catch {
-    return '';
-  }
-};
-
-const decodeItemsFromBase64 = (str) => {
-  if (!str) return [];
-  try {
-    if (typeof window === 'undefined' || !window.atob) {
-      return JSON.parse(str);
-    }
-    const json = decodeURIComponent(escape(window.atob(str)));
-    return JSON.parse(json);
-  } catch {
-    // 如果不是 base64，就當作 JSON 試著 parse
-    try {
-      return JSON.parse(str);
-    } catch {
-      return [];
-    }
-  }
-};
-
-// ★ 新增：簡單 CSV 每行解析（支援欄位加上引號與跳脫 "） ★
-const parseCsvLine = (line) => {
-  const result = [];
-  let cur = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-
-    if (ch === '"') {
-      // 連續兩個 "" 視為一個 "
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      result.push(cur);
-      cur = '';
-    } else {
-      cur += ch;
-    }
-  }
-  result.push(cur);
-  return result;
-};
-
 const INPUT_CLASS =
   'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white';
 const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
-const SECTION_CLASS = 'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
-
+const SECTION_CLASS =
+  'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
 // ========== 課程資料 ==========
+
 const COURSE_DATA = {
   平板課程: [
     { name: '平板課程-招財水晶樹', price: 690 },
@@ -342,8 +281,8 @@ const COURSE_DATA = {
   ],
 };
 
-
 // ========== 車馬費表 ==========
+
 const TRANSPORT_FEES = {
   台北市: {
     default: 0,
@@ -522,8 +461,8 @@ const getAvailableCities = (region) => {
   return [];
 };
 
-
 // ========== 價格計算邏輯 ==========
+
 const calculateItem = (item) => {
   const {
     price,
@@ -659,8 +598,8 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
-
 // ========== UI 小元件 ==========
+
 const StatusSelector = ({ status, onChange }) => {
   const options = [
     { value: 'draft', label: '草稿', color: 'bg-gray-100 text-gray-800' },
@@ -693,8 +632,8 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-
 // ========== 報價單預覽（含印章） ==========
+
 const QuotePreview = ({
   clientInfo,
   items,
@@ -707,7 +646,7 @@ const QuotePreview = ({
   return (
     <div
       id={idName}
-      className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-8 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full" // ★ 上方只留 5px
+      className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-8 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
       {/* 標題 */}
       <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
@@ -722,43 +661,57 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* ★ 公司資料 + 客戶資料，左邊固定品牌單位，右邊是客戶 */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 公司固定資料 */}
-        <div className="bg-gray-50 p-4 rounded border border-gray-100">
-          <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
-            品牌 / 公司資料
-          </h2>
-          <div className="space-y-1 text-sm text-gray-700">
-            <p>公司行號：下班文化國際有限公司</p>
-            <p>統一編號：83475827</p>
-            <p>聯絡電話：02-2371-4171</p>
-            <p>聯絡人：下班隨手作</p>
+      {/* 品牌單位 + 客戶資料 */}
+      <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 左邊：品牌單位（固定公司資料） */}
+          <div>
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+              品牌單位
+            </h2>
+            <div className="space-y-1 text-sm text-gray-700">
+              <p>
+                <span className="text-gray-500 mr-2">公司行號:</span>
+                下班文化國際有限公司
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">統一編號:</span>
+                83475827
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">聯絡電話:</span>
+                02-2371-4171
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">聯絡人:</span>
+                下班隨手作
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* 客戶資料（不顯示 email） */}
-        <div className="bg-gray-50 p-4 rounded border border-gray-100">
-          <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
-            客戶資料
-          </h2>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-            <p>
-              <span className="text-gray-500 mr-2">名稱:</span>
-              {clientInfo.companyName || '-'}
-            </p>
-            <p>
-              <span className="text-gray-500 mr-2">統編:</span>
-              {clientInfo.taxId || '-'}
-            </p>
-            <p>
-              <span className="text-gray-500 mr-2">聯絡人:</span>
-              {clientInfo.contactPerson || '-'}
-            </p>
-            <p>
-              <span className="text-gray-500 mr-2">電話:</span>
-              {clientInfo.phone || '-'}
-            </p>
+          {/* 右邊：客戶資料（不顯示 email） */}
+          <div>
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+              客戶資料
+            </h2>
+            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+              <p>
+                <span className="text-gray-500 mr-2">名稱:</span>
+                {clientInfo.companyName || '-'}
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">統編:</span>
+                {clientInfo.taxId || '-'}
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">聯絡人:</span>
+                {clientInfo.contactPerson || '-'}
+              </p>
+              <p>
+                <span className="text-gray-500 mr-2">電話:</span>
+                {clientInfo.phone || '-'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -960,7 +913,9 @@ const QuotePreview = ({
               className="absolute top-0 left-16 w-28 opacity-90 rotate-[-5deg] pointer-events-none"
               style={{ mixBlendMode: 'multiply' }}
               onError={() =>
-                console.warn('Stamp load failed，PDF 可能看不到印章（CORS 問題）')
+                console.warn(
+                  'Stamp load failed，PDF 可能看不到印章（CORS 問題）',
+                )
               }
             />
           )}
@@ -978,8 +933,8 @@ const QuotePreview = ({
   );
 };
 
-
 // ========== 報價單預覽 Modal（含下載 PDF） ==========
+
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
@@ -1072,8 +1027,8 @@ const PreviewModal = ({ quote, onClose }) => {
   );
 };
 
-
 // ========== 報價單建立 / 編輯表單 ==========
+
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
@@ -1445,11 +1400,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       className="mr-2 w-4 h-4"
                       checked={item.enableDiscount90 || false}
                       onChange={(e) =>
-                        updateItem(
-                          idx,
-                          'enableDiscount90',
-                          e.target.checked,
-                        )
+                        updateItem(idx, 'enableDiscount90', e.target.checked)
                       }
                     />
                     <span className="text-sm font-medium text-red-700">
@@ -1468,21 +1419,19 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       name={`mode-${item.id}`}
                       className="mr-2 w-4 h-4"
                       checked={item.locationMode === 'outing'}
-                      onChange={() =>
-                        updateItem(idx, 'locationMode', 'outing')
-                      }
+                      onChange={() => updateItem(idx, 'locationMode', 'outing')}
                     />
                     外派教學
                   </label>
+               
+
                   <label className="flex items-center cursor-pointer font-bold text-gray-700">
                     <input
                       type="radio"
                       name={`mode-${item.id}`}
                       className="mr-2 w-4 h-4"
                       checked={item.locationMode === 'store'}
-                      onChange={() =>
-                        updateItem(idx, 'locationMode', 'store')
-                      }
+                      onChange={() => updateItem(idx, 'locationMode', 'store')}
                     />
                     店內包班
                   </label>
@@ -1507,13 +1456,12 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     <div>
                       <label className={LABEL_CLASS}>
                         縣市{' '}
-                        {calcItem.calc.transportFee > 0 &&
-                          !calcItem.area && (
-                            <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                              預估: $
-                              {calcItem.calc.transportFee.toLocaleString()}
-                            </span>
-                          )}
+                        {calcItem.calc.transportFee > 0 && !calcItem.area && (
+                          <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
+                            預估: $
+                            {calcItem.calc.transportFee.toLocaleString()}
+                          </span>
+                        )}
                       </label>
                       <select
                         className={INPUT_CLASS}
@@ -1605,9 +1553,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                   className={INPUT_CLASS}
                   placeholder="例如：需提前半小時進場、特殊需求..."
                   value={item.itemNote || ''}
-                  onChange={(e) =>
-                    updateItem(idx, 'itemNote', e.target.value)
-                  }
+                  onChange={(e) => updateItem(idx, 'itemNote', e.target.value)}
                 />
               </div>
 
@@ -1629,11 +1575,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                         placeholder="金額"
                         value={item.customDiscount}
                         onChange={(e) =>
-                          updateItem(
-                            idx,
-                            'customDiscount',
-                            e.target.value,
-                          )
+                          updateItem(idx, 'customDiscount', e.target.value)
                         }
                       />
                     </div>
@@ -1643,11 +1585,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       placeholder="折扣說明"
                       value={item.customDiscountDesc || ''}
                       onChange={(e) =>
-                        updateItem(
-                          idx,
-                          'customDiscountDesc',
-                          e.target.value,
-                        )
+                        updateItem(idx, 'customDiscountDesc', e.target.value)
                       }
                     />
                   </div>
@@ -1791,7 +1729,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             </button>
             <button
               onClick={onCancel}
-              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
             >
               取消
             </button>
@@ -1814,8 +1752,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-
 // ========== 統計頁面 ==========
+
 const StatsView = ({ quotes }) => {
   const availableMonths = useMemo(() => {
     const months = new Set();
@@ -1832,9 +1770,7 @@ const StatsView = ({ quotes }) => {
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  const [selectedMonth, setSelectedMonth] = useState(
-    availableMonths[0] || '',
-  );
+  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
 
   useEffect(() => {
     if (!selectedMonth && availableMonths.length > 0) {
@@ -1944,7 +1880,7 @@ const StatsView = ({ quotes }) => {
       </div>
 
       {/* 總業績 */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text-white shadow-lg mb-8">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text白 shadow-lg mb-8">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-blue-100 font-medium mb-1">
@@ -1958,10 +1894,7 @@ const StatsView = ({ quotes }) => {
             <p className="text-blue-100 font-medium mb-1">總成交案件</p>
             <h3 className="text-3xl font-bold">
               {stats.totalOrders}
-              <span className="text-base font-normal opacity-80">
-                {' '}
-                件
-              </span>
+              <span className="text-base font-normal opacity-80"> 件</span>
             </h3>
           </div>
         </div>
@@ -1976,9 +1909,7 @@ const StatsView = ({ quotes }) => {
         {Object.keys(stats.statuses).map((key) => (
           <div
             key={key}
-            className={`p-4 rounded-lg border ${stats.statuses[
-              key
-            ].color
+            className={`p-4 rounded-lg border ${stats.statuses[key].color
               .replace('bg-', 'border-')
               .replace('100', '200')} ${stats.statuses[key].color}`}
           >
@@ -2046,9 +1977,14 @@ const StatsView = ({ quotes }) => {
   );
 };
 
+// ========== 行事曆視圖（含常態課 regularClasses） ==========
 
-// ========== 行事曆視圖 ==========
-const CalendarView = ({ quotes, publicMode = false }) => {
+const CalendarView = ({
+  quotes,
+  regularClasses = [],
+  publicMode = false,
+  onCreateRegularClass,
+}) => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [viewMode, setViewMode] = useState('month');
@@ -2057,15 +1993,26 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   const initialFilter = urlParams.get('filter');
   const [filterRegion, setFilterRegion] = useState(initialFilter || 'all');
 
+  const [showRegularForm, setShowRegularForm] = useState(false);
+  const [regularForm, setRegularForm] = useState({
+    title: '',
+    date: '',
+    timeRange: '',
+    city: '台北',
+  });
+
   const activeQuotes = quotes.filter((q) => q.status !== 'draft');
 
-  const getFilteredEvents = (events) => {
-    if (filterRegion === 'all') return events;
-    return events.filter((q) => {
-      const region =
-        q.items[0]?.outingRegion || q.items[0]?.regionType || 'North';
-      return region === filterRegion;
-    });
+  const getQuoteRegion = (q) => {
+    const first = q.items[0] || {};
+    return first.outingRegion || first.regionType || 'North';
+  };
+
+  const getRegularRegion = (rc) => rc.region || 'North';
+
+  const filterByRegion = (list, getRegion) => {
+    if (filterRegion === 'all') return list;
+    return list.filter((item) => getRegion(item) === filterRegion);
   };
 
   const getDaysInMonth = (year, month) =>
@@ -2120,7 +2067,8 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   };
 
   const getEventsForDay = (date) => {
-    const events = activeQuotes.filter((q) => {
+    // 企業報價事件
+    const quoteEvents = activeQuotes.filter((q) => {
       if (!q.items || q.items.length === 0) return false;
       return q.items.some((item) => {
         if (!item.eventDate) return false;
@@ -2132,7 +2080,25 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         );
       });
     });
-    return getFilteredEvents(events);
+
+    // 老師常態課事件
+    const regularEvents = regularClasses.filter((rc) => {
+      if (!rc.date) return false;
+      const d = new Date(rc.date);
+      return (
+        d.getDate() === date.getDate() &&
+        d.getMonth() === date.getMonth() &&
+        d.getFullYear() === date.getFullYear()
+      );
+    });
+
+    const filteredQuotes = filterByRegion(quoteEvents, getQuoteRegion);
+    const filteredRegulars = filterByRegion(regularEvents, getRegularRegion);
+
+    return [
+      ...filteredQuotes.map((q) => ({ kind: 'quote', quote: q })),
+      ...filteredRegulars.map((regular) => ({ kind: 'regular', regular })),
+    ];
   };
 
   const copyLink = (region) => {
@@ -2258,7 +2224,7 @@ const CalendarView = ({ quotes, publicMode = false }) => {
               onClick={() => setFilterRegion('South')}
               className={`px-3 py-1 text-sm whitespace-nowrap rounded ${
                 filterRegion === 'South'
-                  ? 'bg-green-600 text-white shadow'
+                  ? 'bg-green-600 text白 shadow'
                   : 'text-gray-600'
               }`}
             >
@@ -2287,7 +2253,12 @@ const CalendarView = ({ quotes, publicMode = false }) => {
 
   const renderMonthView = () => {
     const days = Array.from(
-      { length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) },
+      {
+        length: getDaysInMonth(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+        ),
+      },
       (_, i) => i + 1,
     );
     const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
@@ -2323,22 +2294,37 @@ const CalendarView = ({ quotes, publicMode = false }) => {
                 {day}
               </span>
               <div className="mt-4 space-y-1">
-                {events.map((q) => {
-                  const first = q.items[0] || {};
-                  const region =
-                    first.outingRegion || first.regionType || 'North';
-                  const timeText =
-                    first.timeRange ||
-                    first.startTime?.slice(0, 5) ||
-                    '';
+                {events.map((e) => {
+                  if (e.kind === 'quote') {
+                    const q = e.quote;
+                    const first = q.items[0] || {};
+                    const region = getQuoteRegion(q);
+                    const timeText =
+                      first.timeRange ||
+                      first.startTime?.slice(0, 5) ||
+                      '';
+                    return (
+                      <div
+                        key={`q-${q.id}`}
+                        className={`text-xs p-1 rounded border truncate ${regionColors[region]}`}
+                        title={q.clientInfo.companyName}
+                      >
+                        {timeText && `${timeText} `}
+                        {q.clientInfo.companyName}
+                      </div>
+                    );
+                  }
+                  const rc = e.regular;
+                  const region = getRegularRegion(rc);
+                  const timeText = rc.timeRange || '';
                   return (
                     <div
-                      key={q.id}
+                      key={`r-${rc.id}`}
                       className={`text-xs p-1 rounded border truncate ${regionColors[region]}`}
-                      title={`${q.clientInfo.companyName}`}
+                      title={rc.title}
                     >
                       {timeText && `${timeText} `}
-                      {q.clientInfo.companyName}
+                      {rc.title}（常態課）
                     </div>
                   );
                 })}
@@ -2370,23 +2356,40 @@ const CalendarView = ({ quotes, publicMode = false }) => {
               <div className="text-2xl">{date.getDate()}</div>
             </div>
             <div className="flex-1 p-2 space-y-2 overflow-auto">
-              {getEventsForDay(date).map((q) => {
-                const first = q.items[0] || {};
-                const region =
-                  first.outingRegion || first.regionType || 'North';
-                const timeText =
-                  first.timeRange ||
-                  first.startTime?.slice(0, 5) ||
-                  '';
+              {getEventsForDay(date).map((e) => {
+                if (e.kind === 'quote') {
+                  const q = e.quote;
+                  const first = q.items[0] || {};
+                  const region = getQuoteRegion(q);
+                  const timeText =
+                    first.timeRange ||
+                    first.startTime?.slice(0, 5) ||
+                    '';
+                  return (
+                    <div
+                      key={`q-${q.id}`}
+                      className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}
+                    >
+                      <div className="font-bold">{timeText}</div>
+                      <div>{q.clientInfo.companyName}</div>
+                      <div className="text-[10px] mt-1 opacity-75">
+                        {first.courseName}
+                      </div>
+                    </div>
+                  );
+                }
+                const rc = e.regular;
+                const region = getRegularRegion(rc);
+                const timeText = rc.timeRange || '';
                 return (
                   <div
-                    key={q.id}
+                    key={`r-${rc.id}`}
                     className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}
                   >
                     <div className="font-bold">{timeText}</div>
-                    <div>{q.clientInfo.companyName}</div>
+                    <div>{rc.title}（常態課）</div>
                     <div className="text-[10px] mt-1 opacity-75">
-                      {first.courseName}
+                      {rc.city}店內
                     </div>
                   </div>
                 );
@@ -2400,13 +2403,17 @@ const CalendarView = ({ quotes, publicMode = false }) => {
 
   const renderDayView = () => {
     const events = getEventsForDay(currentDate).sort((a, b) => {
-      const aItem = a.items[0] || {};
-      const bItem = b.items[0] || {};
-      const aKey =
-        (aItem.timeRange || aItem.startTime || '').slice(0, 5) || '00:00';
-      const bKey =
-        (bItem.timeRange || bItem.startTime || '').slice(0, 5) || '00:00';
-      return aKey.localeCompare(bKey);
+      const getTimeKey = (e) => {
+        if (e.kind === 'quote') {
+          const first = e.quote.items[0] || {};
+          return (
+            (first.timeRange || first.startTime || '').slice(0, 5) || '00:00'
+          );
+        }
+        const rc = e.regular;
+        return (rc.timeRange || '').slice(0, 5) || '00:00';
+      };
+      return getTimeKey(a).localeCompare(getTimeKey(b));
     });
 
     return (
@@ -2418,16 +2425,67 @@ const CalendarView = ({ quotes, publicMode = false }) => {
           </div>
         ) : (
           <div className="space-y-4">
-            {events.map((q) => {
-              const first = q.items[0] || {};
-              const region =
-                first.outingRegion || first.regionType || 'North';
-              const timeText =
-                first.timeRange || first.startTime || '';
+            {events.map((e) => {
+              if (e.kind === 'quote') {
+                const q = e.quote;
+                const first = q.items[0] || {};
+                const region = getQuoteRegion(q);
+                const timeText = first.timeRange || first.startTime || '';
+                return (
+                  <div
+                    key={`q-${q.id}`}
+                    className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${
+                      region.includes('North')
+                        ? 'border-l-blue-500'
+                        : region.includes('Central')
+                        ? 'border-l-yellow-500'
+                        : 'border-l-green-500'
+                    }`}
+                  >
+                    <div className="mr-6 text-center min-w-[80px]">
+                      <div className="text-xl font-bold text-gray-800">
+                        {timeText}
+                      </div>
+                      <div
+                        className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}
+                      >
+                        {region === 'North'
+                          ? '北部'
+                          : region === 'Central'
+                          ? '中部'
+                          : '南部'}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-gray-900">
+                        {q.clientInfo.companyName}
+                      </h4>
+                      <div className="text-gray-600 mt-1 flex items-center">
+                        <FileText className="w-4 h-4 mr-1" />
+                        {first.courseName} ({first.peopleCount} 人)
+                      </div>
+                      <div className="text-gray-500 mt-1 text-sm flex items-center">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        {first.city} {first.address}
+                      </div>
+                      {!publicMode && (
+                        <div className="mt-2 text-sm text-gray-500">
+                          聯絡人：{q.clientInfo.contactPerson}（
+                          {q.clientInfo.phone}）
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              const rc = e.regular;
+              const region = getRegularRegion(rc);
+              const timeText = rc.timeRange || '';
 
               return (
                 <div
-                  key={q.id}
+                  key={`r-${rc.id}`}
                   className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white ${
                     region.includes('North')
                       ? 'border-l-blue-500'
@@ -2452,22 +2510,12 @@ const CalendarView = ({ quotes, publicMode = false }) => {
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900">
-                      {q.clientInfo.companyName}
+                      {rc.title}（常態課）
                     </h4>
-                    <div className="text-gray-600 mt-1 flex items-center">
-                      <FileText className="w-4 h-4 mr-1" />
-                      {first.courseName} ({first.peopleCount} 人)
-                    </div>
                     <div className="text-gray-500 mt-1 text-sm flex items-center">
                       <MapPin className="w-4 h-4 mr-1" />
-                      {first.city} {first.address}
+                      {rc.city}店內
                     </div>
-                    {!publicMode && (
-                      <div className="mt-2 text-sm text-gray-500">
-                        聯絡人：{q.clientInfo.contactPerson}（
-                        {q.clientInfo.phone}）
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -2476,6 +2524,33 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         )}
       </div>
     );
+  };
+
+  const handleRegularSubmit = () => {
+    if (!onCreateRegularClass) return;
+    if (!regularForm.title || !regularForm.date) {
+      alert('請填寫課程名稱與日期');
+      return;
+    }
+    const city = regularForm.city;
+    const region =
+      city === '台北' ? 'North' : city === '台中' ? 'Central' : 'South';
+
+    onCreateRegularClass({
+      title: regularForm.title,
+      date: regularForm.date,
+      timeRange: regularForm.timeRange,
+      city,
+      region,
+    });
+
+    setShowRegularForm(false);
+    setRegularForm({
+      title: '',
+      date: '',
+      timeRange: '',
+      city: '台北',
+    });
   };
 
   return (
@@ -2489,42 +2564,152 @@ const CalendarView = ({ quotes, publicMode = false }) => {
 
       {renderHeader()}
 
-      {/* 內部模式下：複製分享連結按鈕 */}
+      {/* 內部模式下：新增常態課 + 複製分享連結按鈕 */}
       {!publicMode && (
-        <div className="flex justify-end mb-4 gap-2">
+        <div className="flex justify-between mb-4 gap-2 flex-wrap">
           <button
-            onClick={() => copyLink('North')}
-            className="px-3 py-1 text-xs bg-blue-50 text-blue-800 rounded border border-blue-200 hover:bg-blue-100 flex items-center"
+            onClick={() => setShowRegularForm(true)}
+            className="px-3 py-1 text-xs bg-purple-50 text-purple-800 rounded border border-purple-200 hover:bg-purple-100 flex items-center"
           >
-            <LinkIcon className="w-3 h-3 mr-1" />
-            複製北部行程連結
+            <Plus className="w-3 h-3 mr-1" />
+            新增常態課（老師排課）
           </button>
-          <button
-            onClick={() => copyLink('Central')}
-            className="px-3 py-1 text-xs bg-yellow-50 text-yellow-800 rounded border border-yellow-200 hover:bg-yellow-100 flex items-center"
-          >
-            <LinkIcon className="w-3 h-3 mr-1" />
-            複製中部行程連結
-          </button>
-          <button
-            onClick={() => copyLink('South')}
-            className="px-3 py-1 text-xs bg-green-50 text-green-800 rounded border border-green-200 hover:bg-green-100 flex items-center"
-          >
-            <LinkIcon className="w-3 h-3 mr-1" />
-            複製南部行程連結
-          </button>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => copyLink('North')}
+              className="px-3 py-1 text-xs bg-blue-50 text-blue-800 rounded border border-blue-200 hover:bg-blue-100 flex items-center"
+            >
+              <LinkIcon className="w-3 h-3 mr-1" />
+              複製北部行程連結
+            </button>
+            <button
+              onClick={() => copyLink('Central')}
+              className="px-3 py-1 text-xs bg-yellow-50 text-yellow-800 rounded border border-yellow-200 hover:bg-yellow-100 flex items-center"
+            >
+              <LinkIcon className="w-3 h-3 mr-1" />
+              複製中部行程連結
+            </button>
+            <button
+              onClick={() => copyLink('South')}
+              className="px-3 py-1 text-xs bg-green-50 text-green-800 rounded border border-green-200 hover:bg-green-100 flex items-center"
+            >
+              <LinkIcon className="w-3 h-3 mr-1" />
+              複製南部行程連結
+            </button>
+          </div>
         </div>
       )}
 
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
+
+      {/* 常態課建立 Modal */}
+      {showRegularForm && !publicMode && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                新增常態課（老師排課）
+              </h3>
+              <button
+                onClick={() => setShowRegularForm(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className={LABEL_CLASS}>課程名稱</label>
+                <input
+                  className={INPUT_CLASS}
+                  placeholder="例如：水晶手鍊常態班"
+                  value={regularForm.title}
+                  onChange={(e) =>
+                    setRegularForm((prev) => ({
+                      ...prev,
+                      title: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={LABEL_CLASS}>日期</label>
+                  <input
+                    type="date"
+                    className={INPUT_CLASS}
+                    value={regularForm.date}
+                    onChange={(e) =>
+                      setRegularForm((prev) => ({
+                        ...prev,
+                        date: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>時間（選填）</label>
+                  <input
+                    className={INPUT_CLASS}
+                    placeholder="例如：14:00-16:00"
+                    value={regularForm.timeRange}
+                    onChange={(e) =>
+                      setRegularForm((prev) => ({
+                        ...prev,
+                        timeRange: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={LABEL_CLASS}>地區（店內）</label>
+                <select
+                  className={INPUT_CLASS}
+                  value={regularForm.city}
+                  onChange={(e) =>
+                    setRegularForm((prev) => ({
+                      ...prev,
+                      city: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="台北">台北店內（北部）</option>
+                  <option value="台中">台中店內（中部）</option>
+                  <option value="高雄">高雄店內（南部）</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowRegularForm(false)}
+                className="px-4 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleRegularSubmit}
+                className="px-6 py-2 text-sm bg-blue-600 text-white rounded font-bold hover:bg-blue-700 flex items-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                儲存常態課
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
+// ========== 報價單列表（追蹤清單 + 月份/狀態篩選 + CSV） ==========
 
-// ========== 報價單列表 ==========
 const QuoteList = ({
   quotes,
   onCreateNew,
@@ -2533,15 +2718,16 @@ const QuoteList = ({
   onDelete,
   onChangeStatus,
   onSwitchView,
+  onExportCSV,
+  onImportCSV,
 }) => {
   const [search, setSearch] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('all'); // ★ 追蹤清單：月份篩選
-  const [selectedStatus, setSelectedStatus] = useState('all'); // ★ 追蹤清單：狀態篩選
-  const fileInputRef = useRef<HTMLInputElement | null>(null); // ★ CSV 匯入
+  const [filterMonth, setFilterMonth] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const fileInputRef = useRef(null);
 
-  // ★ 可選月份列表（用建立日期）
   const availableMonths = useMemo(() => {
-    const months = new Set<string>();
+    const months = new Set();
     quotes.forEach((q) => {
       if (!q.createdAt) return;
       const d = getSafeDate(q.createdAt);
@@ -2554,25 +2740,24 @@ const QuoteList = ({
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  // ★ 依「月份 + 狀態 + 搜尋字」做篩選
   const filtered = quotes.filter((q) => {
-    // 月份
-    if (selectedMonth !== 'all') {
-      if (!q.createdAt) return false;
+    // 月份篩選
+    if (filterMonth !== 'all') {
       const d = getSafeDate(q.createdAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
         2,
         '0',
       )}`;
-      if (key !== selectedMonth) return false;
+      if (monthKey !== filterMonth) return false;
     }
 
-    // 狀態
-    if (selectedStatus !== 'all') {
-      if ((q.status || 'draft') !== selectedStatus) return false;
+    // 狀態篩選
+    if (filterStatus !== 'all') {
+      const s = q.status || 'draft';
+      if (s !== filterStatus) return false;
     }
 
-    // 搜尋
+    // 搜尋篩選
     if (!search.trim()) return true;
     const kw = search.trim();
     const firstItem = q.items[0] || {};
@@ -2582,173 +2767,17 @@ const QuoteList = ({
     );
   });
 
-  // ★ 匯出 CSV
-  const handleExportCsv = () => {
-    if (!quotes || quotes.length === 0) {
-      alert('目前沒有報價單可以匯出。');
-      return;
-    }
-
-    const header = [
-      'id',
-      'createdAt',
-      'status',
-      'companyName',
-      'taxId',
-      'contactPerson',
-      'phone',
-      'address',
-      'totalAmount',
-      'itemsBase64',
-    ];
-    const lines: string[] = [];
-    lines.push(header.join(','));
-
-    quotes.forEach((q) => {
-      const d = q.createdAt ? getSafeDate(q.createdAt) : new Date();
-      const createdAtStr = d.toISOString();
-      const client = q.clientInfo || {};
-      const itemsBase64 = encodeItemsToBase64(q.items || []);
-      const row = [
-        q.id || '',
-        createdAtStr,
-        q.status || '',
-        client.companyName || '',
-        client.taxId || '',
-        client.contactPerson || '',
-        client.phone || '',
-        client.address || '',
-        String(q.totalAmount || 0),
-        itemsBase64,
-      ].map((value) => {
-        const v = value == null ? '' : String(value);
-        const escaped = v.replace(/"/g, '""');
-        return `"${escaped}"`;
-      });
-      lines.push(row.join(','));
-    });
-
-    const csvContent = lines.join('\n');
-    const blob = new Blob([csvContent], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `quotes_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleImportClick = () => {
     if (fileInputRef.current) {
+      fileInputRef.current.value = '';
       fileInputRef.current.click();
     }
   };
 
-  // ★ 匯入 CSV
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-
-    if (!db) {
-      alert('目前未連線 Firebase，無法匯入資料。');
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      const lines = text
-        .split(/\r?\n/)
-        .filter((line) => line.trim() !== '');
-      if (lines.length <= 1) {
-        alert('CSV 檔案沒有資料。');
-        return;
-      }
-
-      const header = parseCsvLine(lines[0]);
-      const idxId = header.indexOf('id');
-      const idxCreatedAt = header.indexOf('createdAt');
-      const idxStatus = header.indexOf('status');
-      const idxCompanyName = header.indexOf('companyName');
-      const idxTaxId = header.indexOf('taxId');
-      const idxContactPerson = header.indexOf('contactPerson');
-      const idxPhone = header.indexOf('phone');
-      const idxAddress = header.indexOf('address');
-      const idxTotalAmount = header.indexOf('totalAmount');
-      const idxItemsBase64 = header.indexOf('itemsBase64');
-
-      let importedCount = 0;
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line.trim()) continue;
-        const cols = parseCsvLine(line);
-
-        const id = idxId >= 0 ? cols[idxId] : '';
-        const createdAtStr = idxCreatedAt >= 0 ? cols[idxCreatedAt] : '';
-        const status = idxStatus >= 0 ? cols[idxStatus] : '';
-        const companyName = idxCompanyName >= 0 ? cols[idxCompanyName] : '';
-        const taxId = idxTaxId >= 0 ? cols[idxTaxId] : '';
-        const contactPerson =
-          idxContactPerson >= 0 ? cols[idxContactPerson] : '';
-        const phone = idxPhone >= 0 ? cols[idxPhone] : '';
-        const address = idxAddress >= 0 ? cols[idxAddress] : '';
-        const totalAmountStr =
-          idxTotalAmount >= 0 ? cols[idxTotalAmount] : '0';
-        const itemsBase64 =
-          idxItemsBase64 >= 0 ? cols[idxItemsBase64] : '';
-
-        const clientInfo = {
-          companyName,
-          taxId,
-          contactPerson,
-          phone,
-          address,
-        };
-
-        const items = decodeItemsFromBase64(itemsBase64);
-
-        const data: any = {
-          clientInfo,
-          items,
-          totalAmount: Number(totalAmountStr || 0) || 0,
-          status: status || 'pending',
-          updatedAt: serverTimestamp(),
-        };
-
-        if (createdAtStr) {
-          const d = new Date(createdAtStr);
-          if (!isNaN(d.getTime())) {
-            data.createdAt = d;
-          } else {
-            data.createdAt = serverTimestamp();
-          }
-        } else {
-          data.createdAt = serverTimestamp();
-        }
-
-        if (id) {
-          await updateDoc(doc(db, 'quotes', id), data);
-        } else {
-          await addDoc(collection(db, 'quotes'), data);
-        }
-
-        importedCount += 1;
-      }
-
-      alert(
-        `CSV 匯入完成，共處理 ${importedCount} 筆報價單。\n列表會在同步後自動更新。`,
-      );
-    } catch (err) {
-      console.error('匯入 CSV 失敗', err);
-      alert('匯入 CSV 時發生錯誤，請確認檔案格式是否正確。');
-    } finally {
-      if (e.target) {
-        e.target.value = '';
-      }
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file && onImportCSV) {
+      onImportCSV(file);
     }
   };
 
@@ -2757,7 +2786,7 @@ const QuoteList = ({
       {/* 上方工具列 */}
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800複製到剪貼簿 */}
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
             <Folder className="w-6 h-6 mr-2 text-blue-600" />
             報價單管理
           </h1>
@@ -2767,6 +2796,35 @@ const QuoteList = ({
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
+          {/* 月份篩選 */}
+          <select
+            className="px-2 py-2 text-sm rounded border border-gray-300 bg-white"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+          >
+            <option value="all">全部月份</option>
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+
+          {/* 狀態篩選 */}
+          <select
+            className="px-2 py-2 text-sm rounded border border-gray-300 bg-white"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">全部狀態</option>
+            <option value="draft">草稿</option>
+            <option value="pending">報價中</option>
+            <option value="confirmed">已回簽</option>
+            <option value="paid">已付訂</option>
+            <option value="closed">已結案</option>
+          </select>
+
+          {/* 搜尋 */}
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             <input
@@ -2777,76 +2835,47 @@ const QuoteList = ({
             />
           </div>
 
-          {/* ★ 追蹤清單：月份篩選 */}
-          {availableMonths.length > 0 && (
-            <select
-              className="px-3 py-2 text-sm border border-gray-300 rounded bg-white"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            >
-              <option value="all">全部月份</option>
-              {availableMonths.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {/* ★ 追蹤清單：狀態篩選 */}
-          <select
-            className="px-3 py-2 text-sm border border-gray-300 rounded bg-white"
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-          >
-            <option value="all">全部狀態</option>
-            <option value="draft">草稿</option>
-            <option value="pending">報價中</option>
-            <option value="confirmed">已回簽</option>
-            <option value="paid">已付訂</option>
-            <option value="closed">已結案</option>
-          </select>
-
-          {/* ★ CSV 匯出 / 匯入 */}
+          {/* CSV 匯出 / 匯入 */}
           <button
-            onClick={handleExportCsv}
-            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            onClick={onExportCSV}
+            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Download className="w-4 h-4 mr-1" />
             匯出 CSV
           </button>
           <button
             onClick={handleImportClick}
-            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Upload className="w-4 h-4 mr-1" />
             匯入 CSV
           </button>
           <input
-            ref={fileInputRef}
             type="file"
             accept=".csv"
-            className="hidden"
+            ref={fileInputRef}
             onChange={handleFileChange}
+            className="hidden"
           />
 
+          {/* 視圖切換 */}
           <button
             onClick={() => onSwitchView('calendar')}
-            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Calendar className="w-4 h-4 mr-1" />
             行事曆
           </button>
           <button
             onClick={() => onSwitchView('stats')}
-            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <BarChart3 className="w-4 h-4 mr-1" />
             統計
           </button>
           <button
             onClick={onCreateNew}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
+            className="px-4 py-2 bg-blue-600 text白 rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
           >
             <Plus className="w-4 h-4 mr-1" />
             新增報價單
@@ -2964,14 +2993,14 @@ const QuoteList = ({
                       </button>
                       <button
                         onClick={() => onEdit(q)}
-                        className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
+                        className="px-2 py-1 text-xs bg白 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
                       >
                         <Edit className="w-3 h-3 mr-1" />
                         編輯
                       </button>
                       <button
                         onClick={() => onDelete(q)}
-                        className="px-2 py-1 text-xs bg-white border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"
+                        className="px-2 py-1 text-xs bg白 border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
                         刪除
@@ -2988,14 +3017,15 @@ const QuoteList = ({
   );
 };
 
-
 // ========== App 主元件 ==========
+
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const urlView = urlParams.get('view');
   const urlMode = urlParams.get('mode');
 
   const [quotes, setQuotes] = useState([]);
+  const [regularClasses, setRegularClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(
     urlView === 'calendar' ? 'calendar' : 'list',
@@ -3011,13 +3041,13 @@ const App = () => {
       return;
     }
 
-    const q = query(
+    const qRef = query(
       collection(db, 'quotes'),
       orderBy('createdAt', 'desc'),
     );
 
-    const unsub = onSnapshot(
-      q,
+    const unsubQuotes = onSnapshot(
+      qRef,
       (snapshot) => {
         const list = snapshot.docs.map((d) => ({
           id: d.id,
@@ -3032,7 +3062,29 @@ const App = () => {
       },
     );
 
-    return () => unsub();
+    // 監聽老師常態課 regularClasses
+    const rRef = query(
+      collection(db, 'regularClasses'),
+      orderBy('date', 'asc'),
+    );
+    const unsubRegular = onSnapshot(
+      rRef,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setRegularClasses(list);
+      },
+      (err) => {
+        console.error('取得 regularClasses 失敗', err);
+      },
+    );
+
+    return () => {
+      unsubQuotes && unsubQuotes();
+      unsubRegular && unsubRegular();
+    };
   }, []);
 
   const handleSaveQuote = async (data) => {
@@ -3110,11 +3162,244 @@ const App = () => {
     }
   };
 
+  const handleCreateRegularClass = async (data) => {
+    try {
+      if (db) {
+        await addDoc(collection(db, 'regularClasses'), {
+          ...data,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        setRegularClasses((prev) => [
+          {
+            id: generateId(),
+            ...data,
+            createdAt: new Date(),
+          },
+          ...prev,
+        ]);
+      }
+      alert('已新增常態課');
+    } catch (err) {
+      console.error('新增常態課失敗', err);
+      alert('新增常態課失敗，請稍後再試。');
+    }
+  };
+
+  // CSV 匯出
+  const handleExportCSV = () => {
+    if (!quotes || quotes.length === 0) {
+      alert('目前沒有報價單可以匯出。');
+      return;
+    }
+
+    const headers = [
+      'id',
+      'createdAt',
+      'status',
+      'companyName',
+      'taxId',
+      'contactPerson',
+      'phone',
+      'totalAmount',
+      'itemsJson',
+    ];
+
+    const escapeCsv = (value) => {
+      if (value == null) return '""';
+      const str = String(value).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = quotes.map((q) => {
+      const createdAt = getSafeDate(q.createdAt).toISOString();
+      const itemsJson = JSON.stringify(q.items || []);
+      const cells = [
+        q.id || '',
+        createdAt,
+        q.status || '',
+        q.clientInfo?.companyName || '',
+        q.clientInfo?.taxId || '',
+        q.clientInfo?.contactPerson || '',
+        q.clientInfo?.phone || '',
+        q.totalAmount != null ? q.totalAmount : '',
+        itemsJson,
+      ];
+      return cells.map(escapeCsv).join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'quotes-export.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // 簡易 CSV parser（支援引號與逗號）
+  const parseCsvLine = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+    return result;
+  };
+
+  // CSV 匯入
+  const handleImportCSV = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = String(e.target.result || '');
+        const lines = text
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter((l) => l);
+        if (lines.length <= 1) {
+          alert('CSV 內容為空或沒有資料列。');
+          return;
+        }
+
+        const headers = parseCsvLine(lines[0]);
+        const idxId = headers.indexOf('id');
+        const idxCreatedAt = headers.indexOf('createdAt');
+        const idxStatus = headers.indexOf('status');
+        const idxCompanyName = headers.indexOf('companyName');
+        const idxTaxId = headers.indexOf('taxId');
+        const idxContactPerson = headers.indexOf('contactPerson');
+        const idxPhone = headers.indexOf('phone');
+        const idxTotalAmount = headers.indexOf('totalAmount');
+        const idxItemsJson = headers.indexOf('itemsJson');
+
+        if (
+          idxId === -1 ||
+          idxCreatedAt === -1 ||
+          idxStatus === -1 ||
+          idxCompanyName === -1 ||
+          idxItemsJson === -1
+        ) {
+          alert('CSV 欄位格式不正確，請使用系統匯出的原始格式。');
+          return;
+        }
+
+        const imported = [];
+
+        for (let i = 1; i < lines.length; i += 1) {
+          const line = lines[i];
+          if (!line.trim()) continue;
+          const cells = parseCsvLine(line);
+          const safe = (idx) =>
+            idx >= 0 && idx < cells.length ? cells[idx] : '';
+
+          const idRaw = safe(idxId);
+          const id = idRaw || generateId();
+
+          const createdAtStr = safe(idxCreatedAt);
+          const createdAt =
+            createdAtStr && !Number.isNaN(Date.parse(createdAtStr))
+              ? new Date(createdAtStr)
+              : new Date();
+
+          const status = safe(idxStatus) || 'draft';
+          const companyName = safe(idxCompanyName);
+          const taxId = safe(idxTaxId);
+          const contactPerson = safe(idxContactPerson);
+          const phone = safe(idxPhone);
+          const totalAmountStr = safe(idxTotalAmount);
+          const totalAmount = Number(totalAmountStr) || 0;
+
+          const itemsJsonStr = safe(idxItemsJson);
+          let items = [];
+          if (itemsJsonStr) {
+            try {
+              items = JSON.parse(itemsJsonStr);
+            } catch (err) {
+              console.error('itemsJson 解析失敗', err);
+            }
+          }
+
+          const quoteData = {
+            clientInfo: {
+              companyName,
+              taxId,
+              contactPerson,
+              phone,
+            },
+            status,
+            totalAmount,
+            items,
+          };
+
+          if (db) {
+            await setDoc(
+              doc(db, 'quotes', id),
+              {
+                ...quoteData,
+                createdAt,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+          }
+
+          imported.push({
+            id,
+            ...quoteData,
+            createdAt,
+          });
+        }
+
+        if (!db && imported.length > 0) {
+          setQuotes((prev) => {
+            const others = prev.filter(
+              (p) => !imported.some((n) => n.id === p.id),
+            );
+            return [...imported, ...others];
+          });
+        }
+
+        alert(`CSV 匯入完成，共處理 ${imported.length} 筆資料`);
+      } catch (err) {
+        console.error('CSV 匯入失敗', err);
+        alert('CSV 匯入失敗，請確認檔案格式。');
+      }
+    };
+
+    reader.readAsText(file, 'utf-8');
+  };
+
   // 公開行事曆模式（只顯示 CalendarView）
   if (publicCalendarMode) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
-        <CalendarView quotes={quotes} publicMode />
+        <CalendarView
+          quotes={quotes}
+          regularClasses={regularClasses}
+          publicMode
+        />
       </div>
     );
   }
@@ -3146,7 +3431,7 @@ const App = () => {
               }}
               className={`px-3 py-1 rounded-full ${
                 currentView === 'list'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-600 text白'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -3159,7 +3444,7 @@ const App = () => {
               }}
               className={`px-3 py-1 rounded-full ${
                 currentView === 'create'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-600 text白'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -3169,7 +3454,7 @@ const App = () => {
               onClick={() => setCurrentView('calendar')}
               className={`px-3 py-1 rounded-full ${
                 currentView === 'calendar'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-600 text白'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -3179,7 +3464,7 @@ const App = () => {
               onClick={() => setCurrentView('stats')}
               className={`px-3 py-1 rounded-full ${
                 currentView === 'stats'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-600 text白'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -3212,6 +3497,8 @@ const App = () => {
             onDelete={handleDeleteQuote}
             onChangeStatus={handleChangeStatus}
             onSwitchView={(v) => setCurrentView(v)}
+            onExportCSV={handleExportCSV}
+            onImportCSV={handleImportCSV}
           />
         )}
 
@@ -3227,10 +3514,16 @@ const App = () => {
         )}
 
         {!loading && currentView === 'calendar' && (
-          <CalendarView quotes={quotes} />
+          <CalendarView
+            quotes={quotes}
+            regularClasses={regularClasses}
+            onCreateRegularClass={handleCreateRegularClass}
+          />
         )}
 
-        {!loading && currentView === 'stats' && <StatsView quotes={quotes} />}
+        {!loading && currentView === 'stats' && (
+          <StatsView quotes={quotes} />
+        )}
       </main>
 
       {previewQuote && (
