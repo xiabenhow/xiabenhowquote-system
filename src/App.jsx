@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-
 import {
   Plus,
   Calendar,
@@ -662,10 +661,10 @@ const QuotePreview = ({
       </div>
 
       {/* 品牌單位 + 客戶資料 */}
-      <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-6">
+        <div className="grid grid-cols-2 gap-4">
           {/* 左邊：品牌單位（固定公司資料） */}
-          <div>
+          <div className="bg-gray-50 p-4 rounded border border-gray-100">
             <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
               品牌單位
             </h2>
@@ -689,12 +688,12 @@ const QuotePreview = ({
             </div>
           </div>
 
-          {/* 右邊：客戶資料（不顯示 email） */}
-          <div>
+          {/* 右邊：客戶資料 */}
+          <div className="bg-gray-50 p-4 rounded border border-gray-100">
             <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
               客戶資料
             </h2>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+            <div className="space-y-1 text-sm text-gray-700">
               <p>
                 <span className="text-gray-500 mr-2">名稱:</span>
                 {clientInfo.companyName || '-'}
@@ -867,54 +866,49 @@ const QuotePreview = ({
         </div>
       </div>
 
-     {/* 注意事項 */}
-<div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
-  <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
-
-  {/* 用左右欄位排版：左邊數字，右邊文字，多行會自動對齊 */}
-  <div className="space-y-1">
-    {[
-      {
-        text: "本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。"
-      },
-      {
-        text: "人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。"
-      },
-      {
-        text: "教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。"
-      },
-      {
-        text: "客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。"
-      },
-      {
-        text: "付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。",
-        highlight: true
-      },
-      {
-        text: "已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。"
-      }
-    ].map((item, index) => (
-      <div key={index} className="flex items-start">
-        {/* 左邊數字欄位 */}
-        <div className="w-5 pr-1 text-right">
-          {index + 1}.
+      {/* 注意事項 */}
+      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
+        <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
+        <div className="space-y-1">
+          {[
+            {
+              text: '本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+            },
+            {
+              text: '人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
+            },
+            {
+              text: '教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
+            },
+            {
+              text: '客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
+            },
+            {
+              text: '付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
+              highlight: true,
+            },
+            {
+              text: '已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
+            },
+          ].map((item, index) => (
+            <div key={index} className="flex items-start">
+              <div className="w-5 pr-1 text-right">{index + 1}.</div>
+              <div
+                className={`flex-1 ${
+                  item.highlight ? 'text-red-600 font-bold' : ''
+                }`}
+              >
+                {item.text}
+              </div>
+            </div>
+          ))}
         </div>
-        {/* 右邊文字，多行自動縮排對齊，不會壓到數字 */}
-        <div className={`flex-1 ${item.highlight ? "text-red-600 font-bold" : ""}`}>
-          {item.text}
+        <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
+          <p className="font-bold text-sm">
+            銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
+          </p>
         </div>
       </div>
-    ))}
-  </div>
-
-  {/* 銀行資訊區塊保留 */}
-  <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
-    <p className="font-bold text-sm">
-      銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
-    </p>
-  </div>
-</div>
-
 
       {/* 簽章區：避免換頁 */}
       <div
@@ -1787,7 +1781,9 @@ const StatsView = ({ quotes }) => {
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
+  const [selectedMonth, setSelectedMonth] = useState(
+    availableMonths[0] || '',
+  );
 
   useEffect(() => {
     if (!selectedMonth && availableMonths.length > 0) {
@@ -1911,7 +1907,10 @@ const StatsView = ({ quotes }) => {
             <p className="text-blue-100 font-medium mb-1">總成交案件</p>
             <h3 className="text-3xl font-bold">
               {stats.totalOrders}
-              <span className="text-base font-normal opacity-80"> 件</span>
+              <span className="text-base font-normal opacity-80">
+                {' '}
+                件
+              </span>
             </h3>
           </div>
         </div>
@@ -1926,7 +1925,9 @@ const StatsView = ({ quotes }) => {
         {Object.keys(stats.statuses).map((key) => (
           <div
             key={key}
-            className={`p-4 rounded-lg border ${stats.statuses[key].color
+            className={`p-4 rounded-lg border ${stats.statuses[
+              key
+            ].color
               .replace('bg-', 'border-')
               .replace('100', '200')} ${stats.statuses[key].color}`}
           >
@@ -3498,6 +3499,73 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
+              下
+            </div>
+            <div>
+              <div className="font-bold text-gray-800">
+                下班隨手作｜企業報價系統
+              </div>
+              <div className="text-xs text-gray-500">
+                內部管理系統 v2.0
+              </div>
+            </div>
+          </div>
+
+          <nav className="flex gap-2 text-sm overflow-x-auto w-full md:w-auto">
+            <button
+              onClick={() => {
+                setEditingQuote(null);
+                setCurrentView('list');
+              }}
+              className={`px-3 py-1 rounded-full whitespace-nowrap ${
+                currentView === 'list' && !editingQuote
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              追蹤清單
+            </button>
+            <button
+              onClick={() => {
+                setEditingQuote({});
+                setCurrentView('list'); // 讓狀態變更觸發 renderContent -> QuoteCreator
+              }}
+              className={`px-3 py-1 rounded-full whitespace-nowrap ${
+                editingQuote && Object.keys(editingQuote).length === 0
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              新增報價
+            </button>
+            <button
+              onClick={() => setCurrentView('calendar')}
+              className={`px-3 py-1 rounded-full whitespace-nowrap ${
+                currentView === 'calendar'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              行事曆
+            </button>
+            <button
+              onClick={() => setCurrentView('stats')}
+              className={`px-3 py-1 rounded-full whitespace-nowrap ${
+                currentView === 'stats'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              業績統計
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {renderContent()}
       {previewQuote && (
         <PreviewModal
