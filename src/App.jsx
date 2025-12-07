@@ -120,7 +120,7 @@ const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
 const SECTION_CLASS =
   'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
-// ========== 課程資料 (完整版 - 無刪減) ==========
+// ========== 課程資料 (完整版) ==========
 
 const COURSE_DATA = {
   平板課程: [
@@ -285,7 +285,7 @@ const COURSE_DATA = {
   ],
 };
 
-// ========== 車馬費表 (完整版 - 無刪減) ==========
+// ========== 車馬費表 (完整版) ==========
 
 const TRANSPORT_FEES = {
   台北市: {
@@ -1189,7 +1189,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       address: '',
     },
   );
-  const [status] = useState(initialData?.status || 'draft');
+  const [status, setStatus] = useState(initialData?.status || 'draft');
   const [isSigned, setIsSigned] = useState(false);
 
   // 初始化 items
@@ -3186,9 +3186,7 @@ const App = () => {
     });
 
     // 2. 監聽常態課 (★ 新增)
-    const qRegular = query(
-      collection(db, 'regularClasses'),
-    ); // 可加 orderBy date
+    const qRegular = query(collection(db, 'regularClasses')); // 可加 orderBy date
     const unsubRegular = onSnapshot(qRegular, (snapshot) => {
       setRegularClasses(
         snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
@@ -3364,7 +3362,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.0 (款項/行事曆修正版)
+                內部管理系統 v3.1 (白屏修復版)
               </div>
             </div>
           </div>
