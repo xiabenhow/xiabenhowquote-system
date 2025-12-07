@@ -51,16 +51,16 @@ try {
 }
 
 // --- Helper: Load External Script (CDN) ---
-const loadScript = (src) => {
-  return new Promise((resolve, reject) => {
+const loadScript = (src: string) => {
+  return new Promise<void>((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
       resolve();
       return;
     }
     const script = document.createElement('script');
     script.src = src;
-    script.onload = resolve;
-    script.onerror = reject;
+    script.onload = () => resolve();
+    script.onerror = () => reject();
     document.head.appendChild(script);
   });
 };
@@ -69,7 +69,7 @@ const loadScript = (src) => {
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
 // --- Helper: Safe Date Parser ---
-const getSafeDate = (val) => {
+const getSafeDate = (val: any) => {
   if (!val) return new Date(); 
   if (val.seconds) return new Date(val.seconds * 1000); 
   if (val instanceof Date) return val; 
@@ -78,13 +78,13 @@ const getSafeDate = (val) => {
   return new Date(); 
 };
 
-const formatDate = (val) => {
-    try {
-        return getSafeDate(val).toLocaleDateString('zh-TW');
-    } catch (e) {
-        return "";
-    }
-}
+const formatDate = (val: any) => {
+  try {
+    return getSafeDate(val).toLocaleDateString('zh-TW');
+  } catch (e) {
+    return "";
+  }
+};
 
 const INPUT_CLASS = "w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white";
 const LABEL_CLASS = "block text-sm font-bold text-gray-700 mb-1";
@@ -92,7 +92,7 @@ const SECTION_CLASS = "bg-white p-6 rounded-lg shadow-sm border border-gray-200"
 
 // --- 2. 靜態資料 (Data Models) ---
 
-const COURSE_DATA = {
+const COURSE_DATA: Record<string, { name: string; price: number }[]> = {
   "平板課程": [
     { name: "平板課程-招財水晶樹", price: 690 },
     { name: "平板課程-純淨水晶礦石吊飾", price: 590 },
@@ -257,7 +257,7 @@ const COURSE_DATA = {
   ]
 };
 
-const TRANSPORT_FEES = {
+const TRANSPORT_FEES: any = {
   "台北市": {
     "default": 0,
     "zones": {
@@ -288,13 +288,13 @@ const TRANSPORT_FEES = {
   "台南市(北部出發)": { "default": 6500, "zones": {} },
   "高雄市(北部出發)": { "default": 6500, "zones": {} },
   "台中市": {
-     "default": 0,
-     "zones": {
-        "中區": 500, "東區": 500, "南區": 500, "西區": 500, "北區": 500, "西屯區": 500, "南屯區": 500, "北屯區": 500,
-        "太平區": 800, "大里區": 800, "霧峰區": 800, "烏日區": 800,
-        "豐原區": 1200, "后里區": 1200, "石岡區": 1200, "東勢區": 1200, "和平區": 1200, "新社區": 1200, "潭子區": 1200, "大雅區": 1200, "神岡區": 1200, "大肚區": 1200, "外埔區": 1200,
-        "沙鹿區": 1500, "龍井區": 1500, "梧棲區": 1500, "清水區": 1500, "大甲區": 1500, "大安區": 1500
-     }
+    "default": 0,
+    "zones": {
+      "中區": 500, "東區": 500, "南區": 500, "西區": 500, "北區": 500, "西屯區": 500, "南屯區": 500, "北屯區": 500,
+      "太平區": 800, "大里區": 800, "霧峰區": 800, "烏日區": 800,
+      "豐原區": 1200, "后里區": 1200, "石岡區": 1200, "東勢區": 1200, "和平區": 1200, "新社區": 1200, "潭子區": 1200, "大雅區": 1200, "神岡區": 1200, "大肚區": 1200, "外埔區": 1200,
+      "沙鹿區": 1500, "龍井區": 1500, "梧棲區": 1500, "清水區": 1500, "大甲區": 1500, "大安區": 1500
+    }
   },
   "彰化縣": { "default": 1800, "zones": {} },
   "南投縣": { "default": 1800, "zones": {} },
@@ -313,35 +313,35 @@ const TRANSPORT_FEES = {
   "嘉義縣市": { "default": 2200, "zones": {} },
   "雲林縣(南部出發)": { "default": 2500, "zones": {} },
   "屏東縣": { 
-      "default": 0,
-      "zones": {
-          "屏東市區": 2000,
-          "其他地區": 2500
-      }
+    "default": 0,
+    "zones": {
+      "屏東市區": 2000,
+      "其他地區": 2500
+    }
   }
 };
 
-const getAvailableCities = (region) => {
-    const allCities = Object.keys(TRANSPORT_FEES);
-    if (region === 'North') {
-        return [
-            '台北市', '新北市', '基隆市', '桃園市', '新竹縣市', '宜蘭縣', '苗栗縣',
-            '台中市(北部出發)', '彰化縣(北部出發)', '南投縣(北部出發)', '雲林縣(北部出發)',
-            '嘉義縣市(北部出發)', '台南市(北部出發)', '高雄市(北部出發)'
-        ];
-    }
-    if (region === 'Central') {
-        return ['台中市', '彰化縣', '南投縣', '苗栗縣(中部出發)'];
-    }
-    if (region === 'South') {
-        return ['高雄市', '台南市', '嘉義縣市', '屏東縣', '雲林縣(南部出發)'];
-    }
-    return [];
+const getAvailableCities = (region: string) => {
+  const allCities = Object.keys(TRANSPORT_FEES);
+  if (region === 'North') {
+    return [
+      '台北市', '新北市', '基隆市', '桃園市', '新竹縣市', '宜蘭縣', '苗栗縣',
+      '台中市(北部出發)', '彰化縣(北部出發)', '南投縣(北部出發)', '雲林縣(北部出發)',
+      '嘉義縣市(北部出發)', '台南市(北部出發)', '高雄市(北部出發)'
+    ];
+  }
+  if (region === 'Central') {
+    return ['台中市', '彰化縣', '南投縣', '苗栗縣(中部出發)'];
+  }
+  if (region === 'South') {
+    return ['高雄市', '台南市', '嘉義縣市', '屏東縣', '雲林縣(南部出發)'];
+  }
+  return [];
 };
 
 // --- 3. 核心計算邏輯 ---
 
-const calculateItem = (item) => {
+const calculateItem = (item: any) => {
   const { 
     price, peopleCount, locationMode, 
     outingRegion, city, area, 
@@ -363,57 +363,57 @@ const calculateItem = (item) => {
   
   let totalExtraFee = parseInt(extraFee) || 0; 
   if (extraFees && Array.isArray(extraFees)) {
-      totalExtraFee += extraFees
-          .filter(f => f.isEnabled) 
-          .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
+    totalExtraFee += extraFees
+      .filter((f: any) => f.isEnabled) 
+      .reduce((sum: number, f: any) => sum + (parseInt(f.amount) || 0), 0);
   }
 
   // Minimum people check
   if (locationMode === 'outing') {
     if (outingRegion === 'North') {
-        const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || city.includes('(北部出發)');
-        if (isRemote) {
-            if (count < 25) error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
-        } else {
-            if (['台北市', '新北市'].includes(city)) {
-                if (count >= 10 && count <= 14) teacherFee = 2000;
-            }
+      const isRemote = ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) || city.includes('(北部出發)');
+      if (isRemote) {
+        if (count < 25) error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+      } else {
+        if (['台北市', '新北市'].includes(city)) {
+          if (count >= 10 && count <= 14) teacherFee = 2000;
         }
+      }
     } else if (outingRegion === 'Central') {
-        if (city === '台中市') {
-            if (count < 10) error = "中部市區外派最低出課人數為 10 人";
-        } else {
-            if (count < 15) error = "中部其他地區外派最低出課人數為 15 人";
-        }
+      if (city === '台中市') {
+        if (count < 10) error = "中部市區外派最低出課人數為 10 人";
+      } else {
+        if (count < 15) error = "中部其他地區外派最低出課人數為 15 人";
+      }
     } else if (outingRegion === 'South') {
-        if (city === '高雄市') {
-             if (count < 10) error = "南部市區外派最低出課人數為 10 人";
-        } else {
-             if (count < 15) error = "南部其他地區外派最低出課人數為 15 人";
-        }
+      if (city === '高雄市') {
+        if (count < 10) error = "南部市區外派最低出課人數為 10 人";
+      } else {
+        if (count < 15) error = "南部其他地區外派最低出課人數為 15 人";
+      }
     }
   } else {
     if (outingRegion === 'Central') {
-        if (count < 10) error = "中部店內包班最低人數 10 人";
+      if (count < 10) error = "中部店內包班最低人數 10 人";
     } else if (outingRegion === 'South') {
-        if (count < 6) error = "南部店內包班最低人數 6 人";
+      if (count < 6) error = "南部店內包班最低人數 6 人";
     }
   }
 
   if (enableDiscount90) {
-      discountRate = 0.9;
-      isDiscountApplied = true;
+    discountRate = 0.9;
+    isDiscountApplied = true;
   }
 
   if (locationMode === 'outing' && city) {
-      const cityData = TRANSPORT_FEES[city];
-      if (cityData) {
-          if (cityData.zones && area && cityData.zones[area]) {
-              transportFee = cityData.zones[area];
-          } else {
-              transportFee = cityData.default;
-          }
+    const cityData = TRANSPORT_FEES[city];
+    if (cityData) {
+      if (cityData.zones && area && cityData.zones[area]) {
+        transportFee = cityData.zones[area];
+      } else {
+        transportFee = cityData.default;
       }
+    }
   }
 
   const subTotal = unitPrice * count;
@@ -428,199 +428,205 @@ const calculateItem = (item) => {
 
 // --- 4. UI Components ---
 
-const StatusSelector = ({ status, onChange }) => {
-    const options = [
-        { value: "draft", label: "草稿", color: "bg-gray-100 text-gray-800" },
-        { value: "pending", label: "報價中", color: "bg-blue-100 text-blue-800" },
-        { value: "confirmed", label: "已回簽", color: "bg-purple-100 text-purple-800" },
-        { value: "paid", label: "已付訂", color: "bg-orange-100 text-orange-800" },
-        { value: "closed", label: "已結案", color: "bg-green-100 text-green-800" }
-    ];
-    const current = options.find(o => o.value === status) || options[0];
-    return (
-        <div className="relative inline-block text-left group">
-            <select 
-                value={status}
-                onChange={(e) => onChange(e.target.value)}
-                className={`appearance-none cursor-pointer pl-3 pr-8 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-offset-1 focus:ring-blue-300 ${current.color}`}
-            >
-                {options.map(opt => (
-                    <option key={opt.value} value={opt.value} className="bg-white text-gray-900">{opt.label}</option>
-                ))}
-            </select>
-            <ChevronDown className="w-3 h-3 absolute right-2 top-1.5 pointer-events-none opacity-50" />
-        </div>
-    );
+const StatusSelector = ({ status, onChange }: { status: string; onChange: (v: string) => void }) => {
+  const options = [
+    { value: "draft", label: "草稿", color: "bg-gray-100 text-gray-800" },
+    { value: "pending", label: "報價中", color: "bg-blue-100 text-blue-800" },
+    { value: "confirmed", label: "已回簽", color: "bg-purple-100 text-purple-800" },
+    { value: "paid", label: "已付訂", color: "bg-orange-100 text-orange-800" },
+    { value: "closed", label: "已結案", color: "bg-green-100 text-green-800" }
+  ];
+  const current = options.find(o => o.value === status) || options[0];
+  return (
+    <div className="relative inline-block text-left group">
+      <select 
+        value={status}
+        onChange={(e) => onChange(e.target.value)}
+        className={`appearance-none cursor-pointer pl-3 pr-8 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-offset-1 focus:ring-blue-300 ${current.color}`}
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value} className="bg-white text-gray-900">{opt.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="w-3 h-3 absolute right-2 top-1.5 pointer-events-none opacity-50" />
+    </div>
+  );
 };
 
 // --- QuotePreview Component ---
-const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stampUrl, idName = "printable-area" }) => {
-    return (
-        <div
-            id={idName}
-            className="bg-white w-[200mm] max-w-full shadow-none px-6 py-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
-        >
-            {/* Header */}
-            <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">下班隨手作活動報價單</h1>
-                </div>
-                <div className="text-right text-gray-600">
-                    <p>報價日期: {dateStr}</p>
-                    <p className="font-bold mt-1">有效期限：3天</p>
-                </div>
-            </div>
-            {/* Client (Email Removed) */}
-            <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
-                <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">客戶資料</h2>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                    <p><span className="text-gray-500 mr-2">名稱:</span> {clientInfo.companyName || '-'}</p>
-                    <p><span className="text-gray-500 mr-2">統編:</span> {clientInfo.taxId || '-'}</p>
-                    <p><span className="text-gray-500 mr-2">聯絡人:</span> {clientInfo.contactPerson || '-'}</p>
-                    <p><span className="text-gray-500 mr-2">電話:</span> {clientInfo.phone || '-'}</p>
-                </div>
-            </div>
-            {/* Table */}
-            <table className="w-full mb-6 border-collapse">
-                <thead>
-                    <tr className="bg-gray-800 text-white">
-                        <th className="p-2 text-left rounded-l">項目</th>
-                        <th className="p-2 text-right">單價</th>
-                        <th className="p-2 text-right">數量</th>
-                        <th className="p-2 text-right rounded-r">小計</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                    {items.map((item, i) => (
-                        <React.Fragment key={i}>
-                            <tr className="break-inside-avoid">
-                                <td className="p-3">
-                                    <div className="font-bold text-gray-800">{item.courseName}</div>
-                                    {item.itemNote && (
-                                        <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
-                                            備註: {item.itemNote}
-                                        </div>
-                                    )}
-                                    <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
-                                        {(item.eventDate || item.startTime) && (
-                                            <div>
-                                                時間：{item.eventDate} {item.startTime} {item.endTime ? `- ${item.endTime}` : ''}
-                                            </div>
-                                        )}
-                                        {item.address && <div>地點：{item.address}</div>}
-                                    </div>
-                                </td>
-                                <td className="p-3 text-right text-gray-600">${item.price.toLocaleString()}</td>
-                                <td className="p-3 text-right text-gray-600">{item.peopleCount}</td>
-                                <td className="p-3 text-right font-medium">${item.calc.subTotal.toLocaleString()}</td>
-                            </tr>
-                            
-                            {/* Detail Rows */}
-                            {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
-                                <tr className="bg-red-50 text-xs break-inside-avoid">
-                                    <td colSpan="3" className="p-1 pl-4 text-right text-red-600">
-                                        折扣優惠 {item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}
-                                    </td>
-                                    <td className="p-1 text-right text-red-600 font-bold">
-                                        -${((item.calc.discountAmount || 0) + parseInt(item.customDiscount || 0)).toLocaleString()}
-                                    </td>
-                                </tr>
-                            )}
-                            {(item.calc.transportFee > 0) && (
-                                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                                    <td colSpan="3" className="p-1 pl-4 text-right">
-                                        車馬費 ({item.city.replace(/\(.*\)/, '')}{item.area})
-                                    </td>
-                                    <td className="p-1 text-right font-bold">+${item.calc.transportFee.toLocaleString()}</td>
-                                </tr>
-                            )}
-                            {(item.calc.teacherFee > 0) && (
-                                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                                    <td colSpan="3" className="p-1 pl-4 text-right">師資費</td>
-                                    <td className="p-1 text-right font-bold">+${item.calc.teacherFee.toLocaleString()}</td>
-                                </tr>
-                            )}
-                            {item.extraFees && item.extraFees.filter(f => f.isEnabled).map(fee => (
-                                <tr key={fee.id} className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                                    <td colSpan="3" className="p-1 pl-4 text-right">
-                                        額外加價 ({fee.description || '未說明'})
-                                    </td>
-                                    <td className="p-1 text-right font-bold">+${parseInt(fee.amount).toLocaleString()}</td>
-                                </tr>
-                            ))}
-                            {(item.hasInvoice) && (
-                                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                                    <td colSpan="3" className="p-1 pl-4 text-right">營業稅 (5%)</td>
-                                    <td className="p-1 text-right font-bold">+${item.calc.tax.toLocaleString()}</td>
-                                </tr>
-                            )}
-                            <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid">
-                                <td colSpan="3" className="p-2 text-right">項目總計</td>
-                                <td className="p-2 text-right">${item.calc.finalTotal.toLocaleString()}</td>
-                            </tr>
-                        </React.Fragment>
-                    ))}
-                </tbody>
-            </table>
-            
-            {/* Total Block */}
-            <div className="flex justify-end mt-4 break-inside-avoid">
-                <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200">
-                    <div className="flex justify-between items-center text-2xl font-bold text-blue-900">
-                        <span>總金額</span>
-                        <span>${totalAmount.toLocaleString()}</span>
-                    </div>
-                    <p className="text-right text-xs text-gray-500 mt-2">含稅及所有費用</p>
-                </div>
-            </div>
-            
-            {/* Notes */}
-            <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
-                <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
-                <ol className="list-decimal list-inside space-y-1">
-                    <li>本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。</li>
-                    <li>人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。</li>
-                    <li>教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。</li>
-                    <li>客戶確認訂單簽章後，回覆Mail: xiabenhow@gmail.com。 或官方Line :@xiabenhow下班隨手作</li>
-                    <li className="text-red-600 font-bold">付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。</li>
-                    <li>已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。</li>
-                </ol>
-                <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
-                    <p className="font-bold text-sm">銀行：玉山銀行 永安分行 808 &nbsp;&nbsp;&nbsp; 戶名：下班文化國際有限公司 &nbsp;&nbsp;&nbsp; 帳號：1115-940-021201</p>
-                </div>
-            </div>
-
-                        {/* Footer Sign */}
-                        <div className="mt-16 pt-10 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid min-h-[140px]">
-                {/* 左邊：下班隨手作代表 + 印章 */}
-                <div className="relative h-[120px] flex items-end">
-                    {isSigned && (
-                        <img 
-                            src={stampUrl || STAMP_URL} 
-                            alt="Company Stamp" 
-                            crossOrigin="anonymous" 
-                            className="absolute top-0 left-20 w-32 opacity-90 rotate-[-5deg] pointer-events-none z-10"
-                            style={{ mixBlendMode: 'multiply' }}
-                            onError={() => {
-                                console.warn("Stamp load failed (likely CORS). PDF might miss stamp.");
-                            }}
-                        />
-                    )}
-                    {/* 多留一點上方空間，讓印章在上、簽名在下 */}
-                    <p className="z-20 relative mt-10">
-                        下班隨手作代表：_________________
-                    </p>
-                </div>
-
-                {/* 右邊：客戶簽章 */}
-                <div className="flex items-end h-[120px]">
-                    <p>客戶確認簽章：_________________</p>
-                </div>
-            </div>
-
+const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stampUrl, idName = "printable-area" }: any) => {
+  return (
+    <div
+      id={idName}
+      className="bg-white w-[210mm] max-w-full shadow-none px-8 py-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
+    >
+      {/* Header */}
+      <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">下班隨手作活動報價單</h1>
         </div>
-    );
+        <div className="text-right text-gray-600">
+          <p>報價日期: {dateStr}</p>
+          <p className="font-bold mt-1">有效期限：3天</p>
+        </div>
+      </div>
+
+      {/* Client (Email Removed) */}
+      <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
+        <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">客戶資料</h2>
+        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+          <p><span className="text-gray-500 mr-2">名稱:</span> {clientInfo.companyName || '-'}</p>
+          <p><span className="text-gray-500 mr-2">統編:</span> {clientInfo.taxId || '-'}</p>
+          <p><span className="text-gray-500 mr-2">聯絡人:</span> {clientInfo.contactPerson || '-'}</p>
+          <p><span className="text-gray-500 mr-2">電話:</span> {clientInfo.phone || '-'}</p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <table className="w-full mb-6 border-collapse">
+        <thead>
+          <tr className="bg-gray-800 text-white">
+            <th className="p-2 text-left rounded-l">項目</th>
+            <th className="p-2 text-right">單價</th>
+            <th className="p-2 text-right">數量</th>
+            <th className="p-2 text-right rounded-r">小計</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {items.map((item: any, i: number) => (
+            <React.Fragment key={i}>
+              <tr className="break-inside-avoid">
+                <td className="p-3">
+                  <div className="font-bold text-gray-800">{item.courseName}</div>
+                  {item.itemNote && (
+                    <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
+                      備註: {item.itemNote}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
+                    {(item.eventDate || item.startTime) && (
+                      <div>
+                        時間：{item.eventDate} {item.startTime} {item.endTime ? `- ${item.endTime}` : ''}
+                      </div>
+                    )}
+                    {item.address && <div>地點：{item.address}</div>}
+                  </div>
+                </td>
+                <td className="p-3 text-right text-gray-600">${item.price.toLocaleString()}</td>
+                <td className="p-3 text-right text-gray-600">{item.peopleCount}</td>
+                <td className="p-3 text-right font-medium">${item.calc.subTotal.toLocaleString()}</td>
+              </tr>
+              
+              {/* Detail Rows */}
+              {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
+                <tr className="bg-red-50 text-xs break-inside-avoid">
+                  <td colSpan={3} className="p-1 pl-4 text-right text-red-600">
+                    折扣優惠 {item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}
+                  </td>
+                  <td className="p-1 text-right text-red-600 font-bold">
+                    -${((item.calc.discountAmount || 0) + parseInt(item.customDiscount || 0)).toLocaleString()}
+                  </td>
+                </tr>
+              )}
+              {(item.calc.transportFee > 0) && (
+                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                  <td colSpan={3} className="p-1 pl-4 text-right">
+                    車馬費 ({item.city.replace(/\(.*\)/, '')}{item.area})
+                  </td>
+                  <td className="p-1 text-right font-bold">+${item.calc.transportFee.toLocaleString()}</td>
+                </tr>
+              )}
+              {(item.calc.teacherFee > 0) && (
+                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                  <td colSpan={3} className="p-1 pl-4 text-right">師資費</td>
+                  <td className="p-1 text-right font-bold">+${item.calc.teacherFee.toLocaleString()}</td>
+                </tr>
+              )}
+              {item.extraFees && item.extraFees.filter((f: any) => f.isEnabled).map((fee: any) => (
+                <tr key={fee.id} className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                  <td colSpan={3} className="p-1 pl-4 text-right">
+                    額外加價 ({fee.description || '未說明'})
+                  </td>
+                  <td className="p-1 text-right font-bold">+${parseInt(fee.amount).toLocaleString()}</td>
+                </tr>
+              ))}
+              {(item.hasInvoice) && (
+                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                  <td colSpan={3} className="p-1 pl-4 text-right">營業稅 (5%)</td>
+                  <td className="p-1 text-right font-bold">+${item.calc.tax.toLocaleString()}</td>
+                </tr>
+              )}
+              <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid">
+                <td colSpan={3} className="p-2 text-right">項目總計</td>
+                <td className="p-2 text-right">${item.calc.finalTotal.toLocaleString()}</td>
+              </tr>
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+      
+      {/* Total Block */}
+      <div className="flex justify-end mt-4 break-inside-avoid">
+        <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200">
+          <div className="flex justify-between items-center text-2xl font-bold text-blue-900">
+            <span>總金額</span>
+            <span>${totalAmount.toLocaleString()}</span>
+          </div>
+          <p className="text-right text-xs text-gray-500 mt-2">含稅及所有費用</p>
+        </div>
+      </div>
+      
+      {/* Notes */}
+      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
+        <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
+        <ol className="list-decimal list-inside space-y-1">
+          <li>本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。</li>
+          <li>人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。</li>
+          <li>教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。</li>
+          <li>客戶確認訂單簽章後，回覆Mail: xiabenhow@gmail.com。 或官方Line :@xiabenhow下班隨手作</li>
+          <li className="text-red-600 font-bold">付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。</li>
+          <li>已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。</li>
+        </ol>
+        <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
+          <p className="font-bold text-sm">
+            銀行：玉山銀行 永安分行 808 &nbsp;&nbsp;&nbsp;
+            戶名：下班文化國際有限公司 &nbsp;&nbsp;&nbsp;
+            帳號：1115-940-021201
+          </p>
+        </div>
+      </div>
+
+      {/* Footer Sign */}
+      <div className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid">
+        {/* 左邊：下班隨手作代表 + 印章 */}
+        <div className="relative flex items-end h-[110px]">
+          {isSigned && (
+            <img 
+              src={stampUrl || STAMP_URL} 
+              alt="Company Stamp" 
+              crossOrigin="anonymous" 
+              className="absolute top-0 left-16 w-28 opacity-90 rotate-[-5deg] pointer-events-none"
+              style={{ mixBlendMode: 'multiply' }}
+              onError={() => {
+                console.warn("Stamp load failed (likely CORS). PDF might miss stamp.");
+              }}
+            />
+          )}
+          {/* 保留上方空間給印章，簽名在線下方 */}
+          <p className="z-10 relative mt-10">
+            下班隨手作代表：_________________
+          </p>
+        </div>
+
+        {/* 右邊：客戶簽章 */}
+        <div className="flex items-end h-[110px]">
+          <p>客戶確認簽章：_________________</p>
+        </div>
+      </div>
+    </div>
+  );
 };
+
 
 // --- PreviewModal ---
 const PreviewModal = ({ quote, onClose }) => {
