@@ -1423,7 +1423,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     />
                     外派教學
                   </label>
-               
 
                   <label className="flex items-center cursor-pointer font-bold text-gray-700">
                     <input
@@ -1729,7 +1728,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             </button>
             <button
               onClick={onCancel}
-              className="px-4 py-2 bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
             >
               取消
             </button>
@@ -1880,7 +1879,7 @@ const StatsView = ({ quotes }) => {
       </div>
 
       {/* 總業績 */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text白 shadow-lg mb-8">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text-white shadow-lg mb-8">
         <div className="flex justify-between items-start">
           <div>
             <p className="text-blue-100 font-medium mb-1">
@@ -2114,6 +2113,7 @@ const CalendarView = ({
     try {
       const ok = document.execCommand('copy');
       if (ok) {
+        // eslint-disable-next-line no-alert
         alert(`已複製行程公開連結：\n${link}`);
       } else {
         // eslint-disable-next-line no-alert
@@ -2224,7 +2224,7 @@ const CalendarView = ({
               onClick={() => setFilterRegion('South')}
               className={`px-3 py-1 text-sm whitespace-nowrap rounded ${
                 filterRegion === 'South'
-                  ? 'bg-green-600 text白 shadow'
+                  ? 'bg-green-600 text-white shadow'
                   : 'text-gray-600'
               }`}
             >
@@ -2838,14 +2838,14 @@ const QuoteList = ({
           {/* CSV 匯出 / 匯入 */}
           <button
             onClick={onExportCSV}
-            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Download className="w-4 h-4 mr-1" />
             匯出 CSV
           </button>
           <button
             onClick={handleImportClick}
-            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Upload className="w-4 h-4 mr-1" />
             匯入 CSV
@@ -2861,21 +2861,21 @@ const QuoteList = ({
           {/* 視圖切換 */}
           <button
             onClick={() => onSwitchView('calendar')}
-            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <Calendar className="w-4 h-4 mr-1" />
             行事曆
           </button>
           <button
             onClick={() => onSwitchView('stats')}
-            className="px-3 py-2 text-sm bg白 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
           >
             <BarChart3 className="w-4 h-4 mr-1" />
             統計
           </button>
           <button
             onClick={onCreateNew}
-            className="px-4 py-2 bg-blue-600 text白 rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
           >
             <Plus className="w-4 h-4 mr-1" />
             新增報價單
@@ -2993,14 +2993,14 @@ const QuoteList = ({
                       </button>
                       <button
                         onClick={() => onEdit(q)}
-                        className="px-2 py-1 text-xs bg白 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
+                        className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
                       >
                         <Edit className="w-3 h-3 mr-1" />
                         編輯
                       </button>
                       <button
                         onClick={() => onDelete(q)}
-                        className="px-2 py-1 text-xs bg白 border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"
+                        className="px-2 py-1 text-xs bg-white border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
                         刪除
@@ -3305,7 +3305,7 @@ const App = () => {
           return;
         }
 
-        const imported = [];
+        const importedDocs = [];
 
         for (let i = 1; i < lines.length; i += 1) {
           const line = lines[i];
@@ -3318,214 +3318,169 @@ const App = () => {
           const id = idRaw || generateId();
 
           const createdAtStr = safe(idxCreatedAt);
-          const createdAt =
-            createdAtStr && !Number.isNaN(Date.parse(createdAtStr))
-              ? new Date(createdAtStr)
-              : new Date();
-
-          const status = safe(idxStatus) || 'draft';
+          const status = safe(idxStatus) || 'pending';
           const companyName = safe(idxCompanyName);
           const taxId = safe(idxTaxId);
           const contactPerson = safe(idxContactPerson);
           const phone = safe(idxPhone);
           const totalAmountStr = safe(idxTotalAmount);
-          const totalAmount = Number(totalAmountStr) || 0;
+          const totalAmount = totalAmountStr
+            ? Number(totalAmountStr)
+            : 0;
 
-          const itemsJsonStr = safe(idxItemsJson);
           let items = [];
-          if (itemsJsonStr) {
-            try {
-              items = JSON.parse(itemsJsonStr);
-            } catch (err) {
-              console.error('itemsJson 解析失敗', err);
-            }
+          const itemsJsonStr = safe(idxItemsJson);
+          try {
+            items = itemsJsonStr ? JSON.parse(itemsJsonStr) : [];
+          } catch (err) {
+            console.warn('解析 itemsJson 失敗，該列略過 items', err);
           }
 
-          const quoteData = {
-            clientInfo: {
-              companyName,
-              taxId,
-              contactPerson,
-              phone,
-            },
-            status,
-            totalAmount,
-            items,
+          const createdAt = createdAtStr
+            ? new Date(createdAtStr)
+            : new Date();
+
+          const clientInfo = {
+            companyName,
+            taxId,
+            contactPerson,
+            phone,
           };
 
-          if (db) {
-            await setDoc(
-              doc(db, 'quotes', id),
-              {
-                ...quoteData,
-                createdAt,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-          }
-
-          imported.push({
-            id,
-            ...quoteData,
+          const docData = {
+            clientInfo,
+            items,
+            totalAmount,
+            status,
             createdAt,
+          };
+
+          importedDocs.push({
+            id,
+            docData,
+            localData: {
+              id,
+              clientInfo,
+              items,
+              totalAmount,
+              status,
+              createdAt,
+            },
           });
         }
 
-        if (!db && imported.length > 0) {
+        if (importedDocs.length === 0) {
+          alert('沒有任何有效資料列可匯入。');
+          return;
+        }
+
+        if (db) {
+          await Promise.all(
+            importedDocs.map((item) =>
+              setDoc(doc(db, 'quotes', item.id), {
+                ...item.docData,
+                updatedAt: serverTimestamp(),
+              }),
+            ),
+          );
+        } else {
+          // 無 Firebase 模式：直接寫入前端 state
           setQuotes((prev) => {
-            const others = prev.filter(
-              (p) => !imported.some((n) => n.id === p.id),
+            const map = new Map(prev.map((q) => [q.id, q]));
+            importedDocs.forEach((item) => {
+              map.set(item.id, item.localData);
+            });
+            return Array.from(map.values()).sort(
+              (a, b) =>
+                getSafeDate(b.createdAt) - getSafeDate(a.createdAt),
             );
-            return [...imported, ...others];
           });
         }
 
-        alert(`CSV 匯入完成，共處理 ${imported.length} 筆資料`);
+        alert(`匯入完成，共 ${importedDocs.length} 筆資料。`);
       } catch (err) {
-        console.error('CSV 匯入失敗', err);
-        alert('CSV 匯入失敗，請確認檔案格式。');
+        console.error('匯入 CSV 失敗', err);
+        alert('匯入失敗，請確認檔案格式是否正確。');
       }
     };
-
     reader.readAsText(file, 'utf-8');
   };
 
-  // 公開行事曆模式（只顯示 CalendarView）
-  if (publicCalendarMode) {
-    return (
-      <div className="min-h-screen bg-gray-100 py-4">
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-gray-500">
+          資料載入中...
+        </div>
+      );
+    }
+
+    // 公開行事曆模式：只顯示行事曆
+    if (publicCalendarMode) {
+      return (
         <CalendarView
           quotes={quotes}
           regularClasses={regularClasses}
-          publicMode
+          publicMode={true}
         />
-      </div>
+      );
+    }
+
+    // 編輯 / 新增報價單
+    if (editingQuote) {
+      return (
+        <QuoteCreator
+          initialData={editingQuote}
+          onSave={handleSaveQuote}
+          onCancel={() => {
+            setEditingQuote(null);
+            setCurrentView('list');
+          }}
+        />
+      );
+    }
+
+    // 其它主視圖
+    if (currentView === 'calendar') {
+      return (
+        <CalendarView
+          quotes={quotes}
+          regularClasses={regularClasses}
+          publicMode={false}
+          onCreateRegularClass={handleCreateRegularClass}
+        />
+      );
+    }
+
+    if (currentView === 'stats') {
+      return <StatsView quotes={quotes} />;
+    }
+
+    // 預設：列表視圖
+    return (
+      <QuoteList
+        quotes={quotes}
+        onCreateNew={() => {
+          setEditingQuote({}); // 新增：給空資料，讓 QuoteCreator 走預設
+          setCurrentView('list');
+        }}
+        onEdit={(q) => {
+          setEditingQuote(q);
+          setCurrentView('list');
+        }}
+        onPreview={(q) => setPreviewQuote(q)}
+        onDelete={handleDeleteQuote}
+        onChangeStatus={handleChangeStatus}
+        onSwitchView={(view) => setCurrentView(view)}
+        onExportCSV={handleExportCSV}
+        onImportCSV={handleImportCSV}
+      />
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
-              下
-            </div>
-            <div>
-              <div className="font-bold text-gray-800">
-                下班隨手作｜企業報價系統
-              </div>
-              <div className="text-xs text-gray-500">
-                Firestore + React 版本（內部使用）
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex gap-2 text-sm">
-            <button
-              onClick={() => {
-                setEditingQuote(null);
-                setCurrentView('list');
-              }}
-              className={`px-3 py-1 rounded-full ${
-                currentView === 'list'
-                  ? 'bg-blue-600 text白'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              報價列表
-            </button>
-            <button
-              onClick={() => {
-                setEditingQuote(null);
-                setCurrentView('create');
-              }}
-              className={`px-3 py-1 rounded-full ${
-                currentView === 'create'
-                  ? 'bg-blue-600 text白'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              新增報價
-            </button>
-            <button
-              onClick={() => setCurrentView('calendar')}
-              className={`px-3 py-1 rounded-full ${
-                currentView === 'calendar'
-                  ? 'bg-blue-600 text白'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              行事曆
-            </button>
-            <button
-              onClick={() => setCurrentView('stats')}
-              className={`px-3 py-1 rounded-full ${
-                currentView === 'stats'
-                  ? 'bg-blue-600 text白'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              統計
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="py-6">
-        {loading && (
-          <div className="max-w-6xl mx-auto p-8 text-center text-gray-500">
-            載入中…
-          </div>
-        )}
-
-        {!loading && currentView === 'list' && (
-          <QuoteList
-            quotes={quotes}
-            onCreateNew={() => {
-              setEditingQuote(null);
-              setCurrentView('create');
-            }}
-            onEdit={(q) => {
-              setEditingQuote(q);
-              setCurrentView('create');
-            }}
-            onPreview={(q) => setPreviewQuote(q)}
-            onDelete={handleDeleteQuote}
-            onChangeStatus={handleChangeStatus}
-            onSwitchView={(v) => setCurrentView(v)}
-            onExportCSV={handleExportCSV}
-            onImportCSV={handleImportCSV}
-          />
-        )}
-
-        {!loading && currentView === 'create' && (
-          <QuoteCreator
-            initialData={editingQuote}
-            onSave={handleSaveQuote}
-            onCancel={() => {
-              setEditingQuote(null);
-              setCurrentView('list');
-            }}
-          />
-        )}
-
-        {!loading && currentView === 'calendar' && (
-          <CalendarView
-            quotes={quotes}
-            regularClasses={regularClasses}
-            onCreateRegularClass={handleCreateRegularClass}
-          />
-        )}
-
-        {!loading && currentView === 'stats' && (
-          <StatsView quotes={quotes} />
-        )}
-      </main>
-
+    <div className="min-h-screen bg-gray-100">
+      {renderContent()}
       {previewQuote && (
         <PreviewModal
           quote={previewQuote}
