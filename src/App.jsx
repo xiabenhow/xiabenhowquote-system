@@ -26,7 +26,7 @@ import {
   Lock,
 } from 'lucide-react';
 
-// === FIREBASE IMPORTS ===
+// ==========  Firebase 設定  ==========
 import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
 import {
@@ -42,12 +42,10 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 
-// === 1. 設定與常數 ===
-
-// ★ 印章設定：改成使用 public/stamp.png
+// ★★★ 印章圖片路徑（請放在 public/stamp.png） ★★★
 const STAMP_URL = '/stamp.png';
 
-// ★ FIREBASE 設定 ★
+// Firebase config
 const firebaseConfig = {
   apiKey: 'AIzaSyChK75njpy0zmk3wPfq0vnlORfTVFPkxAo',
   authDomain: 'xiabenhow-quote.firebaseapp.com',
@@ -58,7 +56,6 @@ const firebaseConfig = {
   measurementId: 'G-H4CTY88LLF',
 };
 
-// Initialize Firebase
 let app;
 let db;
 let analytics;
@@ -69,17 +66,17 @@ try {
     app = initializeApp(firebaseConfig);
     analytics = getAnalytics(app);
     db = getFirestore(app);
-    console.log('Firebase 連線成功: xiabenhow-quote');
-  } else {
-    console.warn('⚠️ 注意：未偵測到 Firebase Config，目前為「演示模式」，資料不會真正儲存。');
+    console.log('✅ Firebase 已連線：xiabenhow-quote');
   }
-} catch (error) {
-  console.error('Firebase 初始化失敗', error);
+} catch (err) {
+  console.error('Firebase 初始化失敗', err);
 }
 
-// --- Helper: Load External Script (CDN) ---
-const loadScript = (src) => {
-  return new Promise((resolve, reject) => {
+// ========== 共用小工具 ==========
+
+// 動態載入 html2pdf
+const loadScript = (src) =>
+  new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
       resolve();
       return;
@@ -87,29 +84,26 @@ const loadScript = (src) => {
     const script = document.createElement('script');
     script.src = src;
     script.onload = () => resolve();
-    script.onerror = () => reject();
+    script.onerror = reject;
     document.head.appendChild(script);
   });
-};
 
-// --- Helper: Generate Unique ID ---
 const generateId = () =>
-  Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
 
-// --- Helper: Safe Date Parser ---
 const getSafeDate = (val) => {
   if (!val) return new Date();
-  if (val.seconds) return new Date(val.seconds * 1000);
   if (val instanceof Date) return val;
-  if (typeof val === 'string') return new Date(val);
-  if (typeof val === 'number') return new Date(val);
+  if (val.seconds) return new Date(val.seconds * 1000);
+  if (typeof val === 'string' || typeof val === 'number')
+    return new Date(val);
   return new Date();
 };
 
 const formatDate = (val) => {
   try {
     return getSafeDate(val).toLocaleDateString('zh-TW');
-  } catch (e) {
+  } catch {
     return '';
   }
 };
@@ -119,7 +113,7 @@ const INPUT_CLASS =
 const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
 const SECTION_CLASS = 'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
-// --- 2. 靜態資料 (Data Models) ---
+// ========== 課程資料 ==========
 
 const COURSE_DATA = {
   平板課程: [
@@ -284,6 +278,8 @@ const COURSE_DATA = {
   ],
 };
 
+// ========== 車馬費表 ==========
+
 const TRANSPORT_FEES = {
   台北市: {
     default: 0,
@@ -349,6 +345,7 @@ const TRANSPORT_FEES = {
   '嘉義縣市(北部出發)': { default: 5500, zones: {} },
   '台南市(北部出發)': { default: 6500, zones: {} },
   '高雄市(北部出發)': { default: 6500, zones: {} },
+
   台中市: {
     default: 0,
     zones: {
@@ -386,6 +383,7 @@ const TRANSPORT_FEES = {
   彰化縣: { default: 1800, zones: {} },
   南投縣: { default: 1800, zones: {} },
   '苗栗縣(中部出發)': { default: 1800, zones: {} },
+
   高雄市: {
     default: 0,
     zones: {
@@ -460,7 +458,7 @@ const getAvailableCities = (region) => {
   return [];
 };
 
-// --- 3. 核心計算邏輯 ---
+// ========== 價格計算邏輯 ==========
 
 const calculateItem = (item) => {
   const {
@@ -480,12 +478,12 @@ const calculateItem = (item) => {
   let error = null;
   let teacherFee = 0;
   let transportFee = 0;
-  let discountRate = 1.0;
+  let discountRate = 1;
   let isDiscountApplied = false;
 
   const count = parseInt(peopleCount) || 0;
   const unitPrice = parseInt(price) || 0;
-  const cDiscount = parseInt(customDiscount) || 0;
+  const manualDiscount = parseInt(customDiscount) || 0;
 
   let totalExtraFee = parseInt(extraFee) || 0;
   if (extraFees && Array.isArray(extraFees)) {
@@ -494,18 +492,16 @@ const calculateItem = (item) => {
       .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
-  // Minimum people check
+  // --- 最低人數 & 師資費規則 ---
   if (locationMode === 'outing') {
     if (outingRegion === 'North') {
       const isRemote =
         ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) ||
         city.includes('(北部出發)');
       if (isRemote) {
-        if (count < 25)
-          error = `北部遠程外派(${city.replace(
-            /\(.*\)/,
-            '',
-          )})最低出課人數為 25 人`;
+        if (count < 25) {
+          error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+        }
       } else {
         if (['台北市', '新北市'].includes(city)) {
           if (count >= 10 && count <= 14) teacherFee = 2000;
@@ -532,11 +528,13 @@ const calculateItem = (item) => {
     }
   }
 
+  // --- 九折優惠 ---
   if (enableDiscount90) {
     discountRate = 0.9;
     isDiscountApplied = true;
   }
 
+  // --- 車馬費 ---
   if (locationMode === 'outing' && city) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
@@ -551,7 +549,7 @@ const calculateItem = (item) => {
   const subTotal = unitPrice * count;
   const discountedSubTotal = Math.round(subTotal * discountRate);
   const discountAmount = subTotal - discountedSubTotal;
-  const taxableAmount = discountedSubTotal - cDiscount;
+  const taxableAmount = discountedSubTotal - manualDiscount;
   const tax = hasInvoice ? Math.round(taxableAmount * 0.05) : 0;
   const finalTotal =
     taxableAmount + tax + transportFee + teacherFee + totalExtraFee;
@@ -569,30 +567,59 @@ const calculateItem = (item) => {
   };
 };
 
-// --- 4. UI Components ---
+// ★★★ 車馬費去重：同日 + 縣市 + 區域 + 地址，只收一次車馬費 ★★★
+const applyTransportDedup = (itemsWithCalc) => {
+  const seenKeys = new Set();
+
+  return itemsWithCalc.map((item) => {
+    const calc = { ...item.calc };
+
+    if (item.locationMode === 'outing' && calc.transportFee > 0) {
+      const key = [
+        item.eventDate || '',
+        item.city || '',
+        item.area || '',
+        (item.address || '').trim(),
+      ].join('|');
+
+      if (seenKeys.has(key)) {
+        // 已經有同條件課程收過車馬費 → 這一筆不再收
+        calc.finalTotal -= calc.transportFee;
+        calc.transportFee = 0;
+      } else {
+        seenKeys.add(key);
+      }
+    }
+
+    return { ...item, calc };
+  });
+};
+
+// ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
   const options = [
     { value: 'draft', label: '草稿', color: 'bg-gray-100 text-gray-800' },
     { value: 'pending', label: '報價中', color: 'bg-blue-100 text-blue-800' },
-    { value: 'confirmed', label: '已回簽', color: 'bg-purple-100 text-purple-800' },
+    {
+      value: 'confirmed',
+      label: '已回簽',
+      color: 'bg-purple-100 text-purple-800',
+    },
     { value: 'paid', label: '已付訂', color: 'bg-orange-100 text-orange-800' },
     { value: 'closed', label: '已結案', color: 'bg-green-100 text-green-800' },
   ];
   const current = options.find((o) => o.value === status) || options[0];
+
   return (
-    <div className="relative inline-block text-left group">
+    <div className="relative inline-block text-left">
       <select
         value={status}
         onChange={(e) => onChange(e.target.value)}
         className={`appearance-none cursor-pointer pl-3 pr-8 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-offset-1 focus:ring-blue-300 ${current.color}`}
       >
         {options.map((opt) => (
-          <option
-            key={opt.value}
-            value={opt.value}
-            className="bg-white text-gray-900"
-          >
+          <option key={opt.value} value={opt.value} className="bg-white">
             {opt.label}
           </option>
         ))}
@@ -602,7 +629,8 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// --- QuotePreview Component ---
+// ========== 報價單預覽（含印章） ==========
+
 const QuotePreview = ({
   clientInfo,
   items,
@@ -617,7 +645,7 @@ const QuotePreview = ({
       id={idName}
       className="bg-white w-[210mm] max-w-full shadow-none px-8 py-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
-      {/* Header */}
+      {/* 標題 */}
       <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -630,158 +658,171 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* Client (Email Removed) */}
+      {/* 客戶資料（不顯示 email） */}
       <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
         <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
           客戶資料
         </h2>
         <div className="grid grid-cols-2 gap-y-2 gap-x-4">
           <p>
-            <span className="text-gray-500 mr-2">名稱:</span>{' '}
+            <span className="text-gray-500 mr-2">名稱:</span>
             {clientInfo.companyName || '-'}
           </p>
           <p>
-            <span className="text-gray-500 mr-2">統編:</span>{' '}
+            <span className="text-gray-500 mr-2">統編:</span>
             {clientInfo.taxId || '-'}
           </p>
           <p>
-            <span className="text-gray-500 mr-2">聯絡人:</span>{' '}
+            <span className="text-gray-500 mr-2">聯絡人:</span>
             {clientInfo.contactPerson || '-'}
           </p>
           <p>
-            <span className="text-gray-500 mr-2">電話:</span>{' '}
+            <span className="text-gray-500 mr-2">電話:</span>
             {clientInfo.phone || '-'}
           </p>
         </div>
       </div>
 
-      {/* Table */}
+      {/* 明細表 */}
       <table className="w-full mb-6 border-collapse">
         <thead>
           <tr className="bg-gray-800 text-white">
             <th className="p-2 text-left rounded-l">項目</th>
             <th className="p-2 text-right">單價</th>
-            <th className="p-2 text-right">數量</th>
+            <th className="p-2 text-right">人數</th>
             <th className="p-2 text-right rounded-r">小計</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {items.map((item, i) => (
-            <React.Fragment key={i}>
-              <tr className="break-inside-avoid">
-                <td className="p-3">
-                  <div className="font-bold text-gray-800">
-                    {item.courseName}
-                  </div>
-                  {item.itemNote && (
-                    <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
-                      備註: {item.itemNote}
+          {items.map((item, idx) => {
+            const timeText =
+              item.timeRange ||
+              (item.startTime && item.endTime
+                ? `${item.startTime}-${item.endTime}`
+                : item.startTime || '');
+
+            return (
+              <React.Fragment key={idx}>
+                <tr className="break-inside-avoid">
+                  <td className="p-3">
+                    <div className="font-bold text-gray-800">
+                      {item.courseName}
                     </div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
-                    {(item.eventDate || item.startTime) && (
-                      <div>
-                        時間：{item.eventDate} {item.startTime}{' '}
-                        {item.endTime ? `- ${item.endTime}` : ''}
+                    {item.itemNote && (
+                      <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
+                        備註: {item.itemNote}
                       </div>
                     )}
-                    {item.address && <div>地點：{item.address}</div>}
-                  </div>
-                </td>
-                <td className="p-3 text-right text-gray-600">
-                  ${item.price.toLocaleString()}
-                </td>
-                <td className="p-3 text-right text-gray-600">
-                  {item.peopleCount}
-                </td>
-                <td className="p-3 text-right font-medium">
-                  ${item.calc.subTotal.toLocaleString()}
-                </td>
-              </tr>
+                    <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
+                      {(item.eventDate || timeText) && (
+                        <div>
+                          時間：{item.eventDate}{' '}
+                          {timeText ? ` ${timeText}` : ''}
+                        </div>
+                      )}
+                      {item.address && <div>地點：{item.address}</div>}
+                    </div>
+                  </td>
+                  <td className="p-3 text-right text-gray-600">
+                    ${Number(item.price || 0).toLocaleString()}
+                  </td>
+                  <td className="p-3 text-right text-gray-600">
+                    {item.peopleCount}
+                  </td>
+                  <td className="p-3 text-right font-medium">
+                    ${item.calc.subTotal.toLocaleString()}
+                  </td>
+                </tr>
 
-              {/* Detail Rows */}
-              {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
-                <tr className="bg-red-50 text-xs break-inside-avoid">
-                  <td
-                    colSpan={3}
-                    className="p-1 pl-4 text-right text-red-600"
-                  >
-                    折扣優惠{' '}
-                    {item.customDiscountDesc
-                      ? `(${item.customDiscountDesc})`
-                      : ''}
-                  </td>
-                  <td className="p-1 text-right text-red-600 font-bold">
-                    -
-                    {(
-                      (item.calc.discountAmount || 0) +
-                      parseInt(item.customDiscount || 0)
-                    ).toLocaleString()}
-                  </td>
-                </tr>
-              )}
-              {item.calc.transportFee > 0 && (
-                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                  <td colSpan={3} className="p-1 pl-4 text-right">
-                    車馬費 ({item.city.replace(/\(.*\)/, '')}
-                    {item.area})
-                  </td>
-                  <td className="p-1 text-right font-bold">
-                    +${item.calc.transportFee.toLocaleString()}
-                  </td>
-                </tr>
-              )}
-              {item.calc.teacherFee > 0 && (
-                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                  <td colSpan={3} className="p-1 pl-4 text-right">
-                    師資費
-                  </td>
-                  <td className="p-1 text-right font-bold">
-                    +${item.calc.teacherFee.toLocaleString()}
-                  </td>
-                </tr>
-              )}
-              {item.extraFees &&
-                item.extraFees
-                  .filter((f) => f.isEnabled)
-                  .map((fee) => (
-                    <tr
-                      key={fee.id}
-                      className="bg-green-50 text-xs text-green-900 break-inside-avoid"
+                {/* 折扣 / 加價 / 車馬費 / 稅 */}
+                {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
+                  <tr className="bg-red-50 text-xs break-inside-avoid">
+                    <td
+                      colSpan={3}
+                      className="p-1 pl-4 text-right text-red-600"
                     >
-                      <td colSpan={3} className="p-1 pl-4 text-right">
-                        額外加價 ({fee.description || '未說明'})
-                      </td>
-                      <td className="p-1 text-right font-bold">
-                        +${parseInt(fee.amount).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-              {item.hasInvoice && (
-                <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                  <td colSpan={3} className="p-1 pl-4 text-right">
-                    營業稅 (5%)
+                      折扣優惠{' '}
+                      {item.customDiscountDesc
+                        ? `(${item.customDiscountDesc})`
+                        : ''}
+                    </td>
+                    <td className="p-1 text-right text-red-600 font-bold">
+                      -$
+                      {(
+                        (item.calc.discountAmount || 0) +
+                        (parseInt(item.customDiscount || 0) || 0)
+                      ).toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+
+                {item.calc.transportFee > 0 && (
+                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-4 text-right">
+                      車馬費 ({item.city.replace(/\(.*\)/, '')}
+                      {item.area})
+                    </td>
+                    <td className="p-1 text-right font-bold">
+                      +${item.calc.transportFee.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+
+                {item.calc.teacherFee > 0 && (
+                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-4 text-right">
+                      師資費
+                    </td>
+                    <td className="p-1 text-right font-bold">
+                      +${item.calc.teacherFee.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+
+                {item.extraFees &&
+                  item.extraFees
+                    .filter((f) => f.isEnabled)
+                    .map((fee) => (
+                      <tr
+                        key={fee.id}
+                        className="bg-green-50 text-xs text-green-900 break-inside-avoid"
+                      >
+                        <td colSpan={3} className="p-1 pl-4 text-right">
+                          額外加價 ({fee.description || '未說明'})
+                        </td>
+                        <td className="p-1 text-right font-bold">
+                          +${parseInt(fee.amount || 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+
+                {item.hasInvoice && (
+                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-4 text-right">
+                      營業稅 (5%)
+                    </td>
+                    <td className="p-1 text-right font-bold">
+                      +${item.calc.tax.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+
+                <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid">
+                  <td colSpan={3} className="p-2 text-right">
+                    項目總計
                   </td>
-                  <td className="p-1 text-right font-bold">
-                    +${item.calc.tax.toLocaleString()}
+                  <td className="p-2 text-right">
+                    ${item.calc.finalTotal.toLocaleString()}
                   </td>
                 </tr>
-              )}
-              <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid">
-                <td colSpan={3} className="p-2 text-right">
-                  項目總計
-                </td>
-                <td className="p-2 text-right">
-                  ${item.calc.finalTotal.toLocaleString()}
-                </td>
-              </tr>
-            </React.Fragment>
-          ))}
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
 
-      {/* Total Block */}
-      <div className="flex justify-end mt-4">
+      {/* 總金額 */}
+      <div className="flex justify-end mt-4 break-inside-avoid">
         <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200">
           <div className="flex justify-between items-center text-2xl font-bold text-blue-900">
             <span>總金額</span>
@@ -793,8 +834,8 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* Notes */}
-      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed">
+      {/* 注意事項 */}
+      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
         <ol className="list-decimal list-inside space-y-1">
           <li>
@@ -807,8 +848,8 @@ const QuotePreview = ({
             教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。
           </li>
           <li>
-            客戶確認訂單簽章後，回覆Mail: xiabenhow@gmail.com。 或官方Line
-            :@xiabenhow下班隨手作
+            客戶確認訂單簽章後，回傳Mail:
+            xiabenhow@gmail.com。 或官方Line :@xiabenhow下班隨手作
           </li>
           <li className="text-red-600 font-bold">
             付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。
@@ -819,15 +860,17 @@ const QuotePreview = ({
         </ol>
         <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
           <p className="font-bold text-sm">
-            銀行：玉山銀行 永安分行 808 &nbsp;&nbsp;&nbsp; 戶名：下班文化國際有限公司
-            &nbsp;&nbsp;&nbsp; 帳號：1115-940-021201
+            銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
           </p>
         </div>
       </div>
 
-      {/* Footer Sign */}
-      <div className="mt-4 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative">
-        {/* 左邊：下班隨手作代表 + 印章 */}
+      {/* 簽章區：避免換頁 */}
+      <div
+        className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
+        style={{ pageBreakInside: 'avoid' }}
+      >
+        {/* 左邊：公司代表 + 印章 */}
         <div className="relative flex items-end h-[110px]">
           {isSigned && (
             <img
@@ -836,14 +879,11 @@ const QuotePreview = ({
               crossOrigin="anonymous"
               className="absolute top-0 left-16 w-28 opacity-90 rotate-[-5deg] pointer-events-none"
               style={{ mixBlendMode: 'multiply' }}
-              onError={() => {
-                console.warn(
-                  'Stamp load failed (likely CORS). PDF might miss stamp.',
-                );
-              }}
+              onError={() =>
+                console.warn('Stamp load failed，PDF 可能看不到印章（CORS 問題）')
+              }
             />
           )}
-          {/* 保留上方空間給印章，簽名在線下方 */}
           <p className="z-10 relative mt-10">
             下班隨手作代表：_________________
           </p>
@@ -858,13 +898,11 @@ const QuotePreview = ({
   );
 };
 
-// --- PreviewModal ---
+// ========== 報價單預覽 Modal（含下載 PDF） ==========
+
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
-
-  const displayDateStr = getSafeDate(quote.createdAt).toLocaleDateString(
-    'zh-TW',
-  );
+  const displayDateStr = formatDate(quote.createdAt || new Date());
 
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
@@ -878,33 +916,32 @@ const PreviewModal = ({ quote, onClose }) => {
         await loadScript(
           'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
         );
-      } catch (e) {
+      } catch {
         alert('無法載入 PDF 產生器，請檢查網路連線。');
         return;
       }
     }
 
-    if (window.html2pdf) {
-      const opt = {
-        margin: 5,
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        // 移除 avoid-all，避免整塊內容被硬丟到下一頁
-        pagebreak: { mode: ['css', 'legacy'] },
-      };
-      window.html2pdf().from(element).set(opt).save();
-    }
+    const opt = {
+      margin: 5,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+    };
+
+    window.html2pdf().from(element).set(opt).save();
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
       <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
-        {/* Toolbar */}
+        {/* 工具列 */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
           <h3 className="font-bold text-lg text-gray-700 flex items-center">
-            <Printer className="w-5 h-5 mr-2" /> 報價單預覽
+            <Printer className="w-5 h-5 mr-2" />
+            報價單預覽
           </h3>
           <div className="flex gap-2 items-center flex-wrap">
             <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
@@ -914,15 +951,19 @@ const PreviewModal = ({ quote, onClose }) => {
                 onChange={(e) => setIsSigned(e.target.checked)}
                 className="w-5 h-5 text-blue-600"
               />
-              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
+              <span className="text-sm font-bold text-blue-800">
+                蓋上印章
+              </span>
             </label>
 
             <button
               onClick={handleDownload}
               className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
             >
-              <Download className="w-4 h-4 mr-2" /> 下載 PDF
+              <Download className="w-4 h-4 mr-2" />
+              下載 PDF
             </button>
+
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
@@ -932,7 +973,7 @@ const PreviewModal = ({ quote, onClose }) => {
           </div>
         </div>
 
-        {/* Preview Content */}
+        {/* 內容 */}
         <div className="flex-1 overflow-auto p-4 bg-gray-100">
           <div className="shadow-lg mx-auto">
             <QuotePreview
@@ -951,7 +992,8 @@ const PreviewModal = ({ quote, onClose }) => {
   );
 };
 
-// --- QuoteCreator ---
+// ========== 報價單建立 / 編輯表單 ==========
+
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
@@ -963,27 +1005,43 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     },
   );
   const [status] = useState(initialData?.status || 'draft');
-
   const [isSigned, setIsSigned] = useState(false);
 
+  // 初始化 items（包含舊資料轉換成 timeRange）
   const [items, setItems] = useState(() => {
     if (initialData?.items) {
-      return initialData.items.map((item) => {
-        const newItem = { ...item };
-        if (!newItem.extraFees) newItem.extraFees = [];
-        if (newItem.extraFee > 0 && newItem.extraFees.length === 0) {
-          newItem.extraFees.push({
+      return initialData.items.map((raw) => {
+        const item = { ...raw };
+        if (!item.extraFees) item.extraFees = [];
+
+        // 舊版的 extraFee 搬到 extraFees 陣列
+        if (item.extraFee > 0 && item.extraFees.length === 0) {
+          item.extraFees.push({
             id: generateId(),
-            description: newItem.extraFeeDesc || '額外加價',
-            amount: newItem.extraFee,
+            description: item.extraFeeDesc || '額外加價',
+            amount: item.extraFee,
             isEnabled: true,
           });
-          newItem.extraFee = 0;
-          newItem.extraFeeDesc = '';
+          item.extraFee = 0;
+          item.extraFeeDesc = '';
         }
-        return newItem;
+
+        // 把舊的 startTime/endTime 轉成 timeRange 顯示
+        if (!item.timeRange) {
+          if (item.startTime && item.endTime) {
+            item.timeRange = `${item.startTime}-${item.endTime}`;
+          } else if (item.startTime) {
+            item.timeRange = item.startTime;
+          } else {
+            item.timeRange = '';
+          }
+        }
+
+        return item;
       });
     }
+
+    // 新增報價的預設一筆
     return [
       {
         id: generateId(),
@@ -997,8 +1055,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         city: '台北市',
         area: '',
         eventDate: '',
-        startTime: '',
-        endTime: '',
+        timeRange: '', // ★ 新欄位：時間區間（手動輸入）
         hasInvoice: false,
         enableDiscount90: false,
         customDiscount: 0,
@@ -1012,10 +1069,15 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     ];
   });
 
-  const calculatedItems = useMemo(
-    () => items.map((item) => ({ ...item, calc: calculateItem(item) })),
-    [items],
-  );
+  // 先逐筆計算 → 再做「車馬費去重」
+  const calculatedItems = useMemo(() => {
+    const withCalc = items.map((item) => ({
+      ...item,
+      calc: calculateItem(item),
+    }));
+    return applyTransportDedup(withCalc);
+  }, [items]);
+
   const totalAmount = calculatedItems.reduce(
     (sum, item) => sum + (item.calc.finalTotal || 0),
     0,
@@ -1025,6 +1087,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
 
+    // 課程選單連動單價
     if (field === 'courseName') {
       const series = COURSE_DATA[newItems[index].courseSeries];
       const course = series.find((c) => c.name === value);
@@ -1042,10 +1105,29 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       newItems[index].city = available[0] || '';
       newItems[index].area = '';
     }
-    if (field === 'city') newItems[index].area = '';
+    if (field === 'city') {
+      newItems[index].area = '';
+    }
 
     setItems(newItems);
   };
+
+  const addItem = () =>
+    setItems((prev) => [
+      ...prev,
+      {
+        ...prev[prev.length - 1],
+        id: generateId(),
+        itemNote: '',
+        enableDiscount90: false,
+        extraFees: [],
+        extraFee: 0,
+        timeRange: '',
+      },
+    ]);
+
+  const removeItem = (index) =>
+    setItems((prev) => prev.filter((_, i) => i !== index));
 
   const addExtraFee = (index) => {
     const newItems = [...items];
@@ -1078,34 +1160,23 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     }
   };
 
-  const addItem = () =>
-    setItems([
-      ...items,
-      {
-        ...items[items.length - 1],
-        id: generateId(),
-        itemNote: '',
-        enableDiscount90: false,
-        extraFees: [],
-        extraFee: 0,
-      },
-    ]);
-
-  const removeItem = (index) =>
-    setItems(items.filter((_, i) => i !== index));
-
   const handleSave = () => {
     const hasError = calculatedItems.some((i) => i.calc.error);
     if (hasError) {
       alert('報價單中有項目不符合規則，請修正後再儲存。');
       return;
     }
-    onSave({ clientInfo, items: calculatedItems, totalAmount, status });
+    onSave({
+      clientInfo,
+      items: calculatedItems,
+      totalAmount,
+      status,
+    });
   };
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8">
-      {/* Input Form Section */}
+      {/* 客戶資訊 */}
       <div className="print:hidden space-y-6">
         <section className={SECTION_CLASS}>
           <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
@@ -1120,7 +1191,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入名稱"
                 value={clientInfo.companyName}
                 onChange={(e) =>
-                  setClientInfo({ ...clientInfo, companyName: e.target.value })
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    companyName: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -1131,7 +1205,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="選填"
                 value={clientInfo.taxId}
                 onChange={(e) =>
-                  setClientInfo({ ...clientInfo, taxId: e.target.value })
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    taxId: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -1142,10 +1219,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入聯絡人"
                 value={clientInfo.contactPerson}
                 onChange={(e) =>
-                  setClientInfo({
-                    ...clientInfo,
+                  setClientInfo((prev) => ({
+                    ...prev,
                     contactPerson: e.target.value,
-                  })
+                  }))
                 }
               />
             </div>
@@ -1156,117 +1233,118 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入電話"
                 value={clientInfo.phone}
                 onChange={(e) =>
-                  setClientInfo({ ...clientInfo, phone: e.target.value })
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
                 }
               />
             </div>
           </div>
         </section>
 
-        {items.map((item, idx) => (
-          <div
-            key={item.id}
-            className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
-              </h3>
-              {items.length > 1 && (
-                <button
-                  onClick={() => removeItem(idx)}
-                  className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              )}
-            </div>
+        {/* 課程項目 */}
+        {items.map((item, idx) => {
+          const calcItem = calculatedItems[idx];
 
-            {/* Course Select */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className={LABEL_CLASS}>課程系列</label>
-                <select
-                  className={INPUT_CLASS}
-                  value={item.courseSeries}
-                  onChange={(e) =>
-                    updateItem(idx, 'courseSeries', e.target.value)
-                  }
-                >
-                  {Object.keys(COURSE_DATA).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+          return (
+            <div
+              key={item.id}
+              className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-blue-800 flex items-center">
+                  <Plus className="w-5 h-5 mr-2" />
+                  課程項目 ({idx + 1})
+                </h3>
+                {items.length > 1 && (
+                  <button
+                    onClick={() => removeItem(idx)}
+                    className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </div>
-              <div className="md:col-span-2">
-                <label className={LABEL_CLASS}>
-                  課程名稱 (單價: ${item.price})
-                </label>
-                <select
-                  className={INPUT_CLASS}
-                  value={item.courseName}
-                  onChange={(e) =>
-                    updateItem(idx, 'courseName', e.target.value)
-                  }
-                >
-                  {COURSE_DATA[item.courseSeries]?.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} (${c.price})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            {/* Date/Time/Count */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className={LABEL_CLASS}>人數</label>
-                <input
-                  type="number"
-                  className={INPUT_CLASS}
-                  value={item.peopleCount}
-                  onChange={(e) =>
-                    updateItem(idx, 'peopleCount', e.target.value)
-                  }
-                />
+              {/* 課程選擇 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className={LABEL_CLASS}>課程系列</label>
+                  <select
+                    className={INPUT_CLASS}
+                    value={item.courseSeries}
+                    onChange={(e) =>
+                      updateItem(idx, 'courseSeries', e.target.value)
+                    }
+                  >
+                    {Object.keys(COURSE_DATA).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className={LABEL_CLASS}>
+                    課程名稱 （單價: ${item.price}）
+                  </label>
+                  <select
+                    className={INPUT_CLASS}
+                    value={item.courseName}
+                    onChange={(e) =>
+                      updateItem(idx, 'courseName', e.target.value)
+                    }
+                  >
+                    {COURSE_DATA[item.courseSeries]?.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.name} (${c.price})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className={LABEL_CLASS}>日期</label>
-                <input
-                  type="date"
-                  className={INPUT_CLASS}
-                  value={item.eventDate}
-                  onChange={(e) =>
-                    updateItem(idx, 'eventDate', e.target.value)
-                  }
-                />
+
+              {/* 日期 + 時間（手動） + 人數 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className={LABEL_CLASS}>人數</label>
+                  <input
+                    type="number"
+                    className={INPUT_CLASS}
+                    value={item.peopleCount}
+                    onChange={(e) =>
+                      updateItem(idx, 'peopleCount', e.target.value)
+                    }
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>日期</label>
+                  <input
+                    type="date"
+                    className={INPUT_CLASS}
+                    value={item.eventDate}
+                    onChange={(e) =>
+                      updateItem(idx, 'eventDate', e.target.value)
+                    }
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>時間（手動輸入）</label>
+                  <input
+                    type="text"
+                    className={INPUT_CLASS}
+                    placeholder="例如：12:00-14:00"
+                    value={item.timeRange || ''}
+                    onChange={(e) =>
+                      updateItem(idx, 'timeRange', e.target.value)
+                    }
+                  />
+                </div>
               </div>
-              <div>
-                <label className={LABEL_CLASS}>開始時間</label>
-                <input
-                  type="time"
-                  className={INPUT_CLASS}
-                  value={item.startTime}
-                  onChange={(e) =>
-                    updateItem(idx, 'startTime', e.target.value)
-                  }
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>結束時間</label>
-                <input
-                  type="time"
-                  className={INPUT_CLASS}
-                  value={item.endTime}
-                  onChange={(e) =>
-                    updateItem(idx, 'endTime', e.target.value)
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-2 pt-6 md:col-span-4">
+
+              {/* 發票、九折 */}
+              <div className="flex flex-col gap-2 mb-4">
                 <div className="flex gap-4">
                   <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
                     <input
@@ -1278,7 +1356,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       }
                     />
                     <span className="text-sm font-medium text-gray-700">
-                      是否開立發票? (5%)
+                      是否開立發票？（加 5%）
                     </span>
                   </label>
                   <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
@@ -1287,302 +1365,329 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       className="mr-2 w-4 h-4"
                       checked={item.enableDiscount90 || false}
                       onChange={(e) =>
-                        updateItem(idx, 'enableDiscount90', e.target.checked)
+                        updateItem(
+                          idx,
+                          'enableDiscount90',
+                          e.target.checked,
+                        )
                       }
                     />
                     <span className="text-sm font-medium text-red-700">
-                      套用九折優惠 (10% Off)
+                      套用九折優惠
                     </span>
                   </label>
                 </div>
               </div>
-            </div>
 
-            {/* Location */}
-            <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
-              <div className="flex gap-6 mb-4">
-                <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                  <input
-                    type="radio"
-                    name={`mode-${item.id}`}
-                    className="mr-2 w-4 h-4"
-                    checked={item.locationMode === 'outing'}
-                    onChange={() => updateItem(idx, 'locationMode', 'outing')}
-                  />
-                  外派教學
-                </label>
-                <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                  <input
-                    type="radio"
-                    name={`mode-${item.id}`}
-                    className="mr-2 w-4 h-4"
-                    checked={item.locationMode === 'store'}
-                    onChange={() => updateItem(idx, 'locationMode', 'store')}
-                  />
-                  店內包班
-                </label>
-              </div>
-              {item.locationMode === 'outing' ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className={LABEL_CLASS}>車馬費計算區域</label>
-                    <select
-                      className={INPUT_CLASS}
-                      value={item.outingRegion}
-                      onChange={(e) =>
-                        updateItem(idx, 'outingRegion', e.target.value)
+              {/* 地點 / 車馬費設定 */}
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
+                <div className="flex gap-6 mb-4">
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name={`mode-${item.id}`}
+                      className="mr-2 w-4 h-4"
+                      checked={item.locationMode === 'outing'}
+                      onChange={() =>
+                        updateItem(idx, 'locationMode', 'outing')
                       }
-                    >
-                      <option value="North">北部出課</option>
-                      <option value="Central">中部老師出課</option>
-                      <option value="South">南部老師出課</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>
-                      縣市{' '}
-                      {calculatedItems[idx].calc.transportFee > 0 &&
-                        !calculatedItems[idx].area && (
-                          <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                            預估: ${calculatedItems[idx].calc.transportFee}
-                          </span>
-                        )}
-                    </label>
-                    <select
-                      className={INPUT_CLASS}
-                      value={item.city}
-                      onChange={(e) =>
-                        updateItem(idx, 'city', e.target.value)
+                    />
+                    外派教學
+                  </label>
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name={`mode-${item.id}`}
+                      className="mr-2 w-4 h-4"
+                      checked={item.locationMode === 'store'}
+                      onChange={() =>
+                        updateItem(idx, 'locationMode', 'store')
                       }
-                    >
-                      {getAvailableCities(item.outingRegion).map((c) => (
-                        <option key={c} value={c}>
-                          {c
-                            .replace('(北部出發)', '')
-                            .replace('(中部出發)', '')
-                            .replace('(南部出發)', '')}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {TRANSPORT_FEES[item.city]?.zones &&
-                    Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
-                      <div>
-                        <label className={LABEL_CLASS}>
-                          選擇區域{' '}
-                          {calculatedItems[idx].calc.transportFee > 0 && (
+                    />
+                    店內包班
+                  </label>
+                </div>
+
+                {item.locationMode === 'outing' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={LABEL_CLASS}>車馬費計算區域</label>
+                      <select
+                        className={INPUT_CLASS}
+                        value={item.outingRegion}
+                        onChange={(e) =>
+                          updateItem(idx, 'outingRegion', e.target.value)
+                        }
+                      >
+                        <option value="North">北部出課</option>
+                        <option value="Central">中部老師出課</option>
+                        <option value="South">南部老師出課</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={LABEL_CLASS}>
+                        縣市{' '}
+                        {calcItem.calc.transportFee > 0 &&
+                          !calcItem.area && (
                             <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                              +${calculatedItems[idx].calc.transportFee}
+                              預估: $
+                              {calcItem.calc.transportFee.toLocaleString()}
                             </span>
                           )}
-                        </label>
-                        <select
-                          className={INPUT_CLASS}
-                          value={item.area}
-                          onChange={(e) =>
-                            updateItem(idx, 'area', e.target.value)
-                          }
-                        >
-                          <option value="">選擇區域...</option>
-                          {Object.entries(
-                            TRANSPORT_FEES[item.city].zones,
-                          ).map(([zone, fee]) => (
-                            <option key={zone} value={zone}>
-                              {zone} (+${fee})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  <div className="md:col-span-3">
-                    <label className={LABEL_CLASS}>詳細地址</label>
-                    <input
-                      className={INPUT_CLASS}
-                      placeholder="請輸入詳細地址"
-                      value={item.address}
-                      onChange={(e) =>
-                        updateItem(idx, 'address', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-4">
-                  <div>
-                    <label className={LABEL_CLASS}>店內區域</label>
-                    <select
-                      className={INPUT_CLASS}
-                      value={item.regionType}
-                      onChange={(e) =>
-                        updateItem(idx, 'regionType', e.target.value)
-                      }
-                    >
-                      <option value="North">北部店內</option>
-                      <option value="Central">中部店內</option>
-                      <option value="South">南部店內</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4">
-              <label className={LABEL_CLASS}>該堂課備註說明 (選填)</label>
-              <input
-                type="text"
-                className={INPUT_CLASS}
-                placeholder="例如: 需提前半小時進場、特殊需求..."
-                value={item.itemNote}
-                onChange={(e) =>
-                  updateItem(idx, 'itemNote', e.target.value)
-                }
-              />
-            </div>
-
-            {/* Extras */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-red-50 p-4 rounded border border-red-100">
-                <label className={LABEL_CLASS + ' text-red-800'}>
-                  手動折扣 (減項)
-                </label>
-                <div className="flex flex-col gap-2">
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500 font-bold">
-                      -
-                    </span>
-                    <input
-                      type="number"
-                      className={INPUT_CLASS + ' pl-6'}
-                      placeholder="金額"
-                      value={item.customDiscount}
-                      onChange={(e) =>
-                        updateItem(idx, 'customDiscount', e.target.value)
-                      }
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    className={INPUT_CLASS}
-                    placeholder="折扣說明"
-                    value={item.customDiscountDesc || ''}
-                    onChange={(e) =>
-                      updateItem(idx, 'customDiscountDesc', e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                <div className="flex justify-between items-center mb-2">
-                  <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>
-                    額外加價 (加項)
-                  </label>
-                  <button
-                    onClick={() => addExtraFee(idx)}
-                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
-                  >
-                    <Plus className="w-3 h-3 mr-1" /> 新增
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {item.extraFees &&
-                    item.extraFees.map((fee) => (
-                      <div
-                        key={fee.id}
-                        className="flex gap-2 items-center"
+                      </label>
+                      <select
+                        className={INPUT_CLASS}
+                        value={item.city}
+                        onChange={(e) =>
+                          updateItem(idx, 'city', e.target.value)
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 cursor-pointer accent-blue-600"
-                          checked={fee.isEnabled}
-                          onChange={(e) =>
-                            updateExtraFee(
-                              idx,
-                              fee.id,
-                              'isEnabled',
-                              e.target.checked,
-                            )
-                          }
-                        />
-                        <input
-                          type="text"
-                          className={
-                            INPUT_CLASS +
-                            ' flex-1 ' +
-                            (!fee.isEnabled ? 'opacity-50' : '')
-                          }
-                          placeholder="加價說明"
-                          value={fee.description}
-                          onChange={(e) =>
-                            updateExtraFee(
-                              idx,
-                              fee.id,
-                              'description',
-                              e.target.value,
-                            )
-                          }
-                          disabled={!fee.isEnabled}
-                        />
-                        <div className="relative w-32">
-                          <span className="absolute left-2 top-2 text-gray-500 font-bold">
-                            +
-                          </span>
-                          <input
-                            type="number"
-                            className={
-                              INPUT_CLASS +
-                              ' pl-5 ' +
-                              (!fee.isEnabled ? 'opacity-50' : '')
+                        {getAvailableCities(item.outingRegion).map((c) => (
+                          <option key={c} value={c}>
+                            {c
+                              .replace('(北部出發)', '')
+                              .replace('(中部出發)', '')
+                              .replace('(南部出發)', '')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {TRANSPORT_FEES[item.city]?.zones &&
+                      Object.keys(TRANSPORT_FEES[item.city].zones).length >
+                        0 && (
+                        <div>
+                          <label className={LABEL_CLASS}>
+                            區域{' '}
+                            {calcItem.calc.transportFee > 0 && (
+                              <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
+                                +$
+                                {calcItem.calc.transportFee.toLocaleString()}
+                              </span>
+                            )}
+                          </label>
+                          <select
+                            className={INPUT_CLASS}
+                            value={item.area}
+                            onChange={(e) =>
+                              updateItem(idx, 'area', e.target.value)
                             }
-                            placeholder="金額"
-                            value={fee.amount}
+                          >
+                            <option value="">選擇區域...</option>
+                            {Object.entries(
+                              TRANSPORT_FEES[item.city].zones,
+                            ).map(([zone, fee]) => (
+                              <option key={zone} value={zone}>
+                                {zone} (+${fee})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                    <div className="md:col-span-3">
+                      <label className={LABEL_CLASS}>詳細地址</label>
+                      <input
+                        className={INPUT_CLASS}
+                        placeholder="請輸入詳細地址"
+                        value={item.address || ''}
+                        onChange={(e) =>
+                          updateItem(idx, 'address', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    <div>
+                      <label className={LABEL_CLASS}>店內區域</label>
+                      <select
+                        className={INPUT_CLASS}
+                        value={item.regionType || 'North'}
+                        onChange={(e) =>
+                          updateItem(idx, 'regionType', e.target.value)
+                        }
+                      >
+                        <option value="North">北部店內</option>
+                        <option value="Central">中部店內</option>
+                        <option value="South">南部店內</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 備註 */}
+              <div className="mb-4">
+                <label className={LABEL_CLASS}>該堂課備註說明（選填）</label>
+                <input
+                  type="text"
+                  className={INPUT_CLASS}
+                  placeholder="例如：需提前半小時進場、特殊需求..."
+                  value={item.itemNote || ''}
+                  onChange={(e) =>
+                    updateItem(idx, 'itemNote', e.target.value)
+                  }
+                />
+              </div>
+
+              {/* 折扣 & 額外收費 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 手動折扣 */}
+                <div className="bg-red-50 p-4 rounded border border-red-100">
+                  <label className={LABEL_CLASS + ' text-red-800'}>
+                    手動折扣（減項）
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500 font-bold">
+                        -
+                      </span>
+                      <input
+                        type="number"
+                        className={INPUT_CLASS + ' pl-6'}
+                        placeholder="金額"
+                        value={item.customDiscount}
+                        onChange={(e) =>
+                          updateItem(
+                            idx,
+                            'customDiscount',
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      className={INPUT_CLASS}
+                      placeholder="折扣說明"
+                      value={item.customDiscountDesc || ''}
+                      onChange={(e) =>
+                        updateItem(
+                          idx,
+                          'customDiscountDesc',
+                          e.target.value,
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* 額外加價 */}
+                <div className="bg-blue-50 p-4 rounded border border-blue-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>
+                      額外加價（加項）
+                    </label>
+                    <button
+                      onClick={() => addExtraFee(idx)}
+                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      新增
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {item.extraFees &&
+                      item.extraFees.map((fee) => (
+                        <div
+                          key={fee.id}
+                          className="flex gap-2 items-center"
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-5 h-5 cursor-pointer accent-blue-600"
+                            checked={fee.isEnabled}
                             onChange={(e) =>
                               updateExtraFee(
                                 idx,
                                 fee.id,
-                                'amount',
+                                'isEnabled',
+                                e.target.checked,
+                              )
+                            }
+                          />
+                          <input
+                            type="text"
+                            className={
+                              INPUT_CLASS +
+                              ' flex-1 ' +
+                              (!fee.isEnabled ? 'opacity-50' : '')
+                            }
+                            placeholder="加價說明"
+                            value={fee.description}
+                            onChange={(e) =>
+                              updateExtraFee(
+                                idx,
+                                fee.id,
+                                'description',
                                 e.target.value,
                               )
                             }
                             disabled={!fee.isEnabled}
                           />
+                          <div className="relative w-32">
+                            <span className="absolute left-2 top-2 text-gray-500 font-bold">
+                              +
+                            </span>
+                            <input
+                              type="number"
+                              className={
+                                INPUT_CLASS +
+                                ' pl-5 ' +
+                                (!fee.isEnabled ? 'opacity-50' : '')
+                              }
+                              placeholder="金額"
+                              value={fee.amount}
+                              onChange={(e) =>
+                                updateExtraFee(
+                                  idx,
+                                  fee.id,
+                                  'amount',
+                                  e.target.value,
+                                )
+                              }
+                              disabled={!fee.isEnabled}
+                            />
+                          </div>
+                          <button
+                            onClick={() => removeExtraFee(idx, fee.id)}
+                            className="text-red-400 hover:text-red-600 p-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeExtraFee(idx, fee.id)}
-                          className="text-red-400 hover:text-red-600 p-2"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Error */}
-            {calculatedItems[idx].calc.error && (
-              <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                <span className="font-bold">
-                  {calculatedItems[idx].calc.error}
-                </span>
-              </div>
-            )}
-          </div>
-        ))}
+              {/* 規則錯誤提示 */}
+              {calcItem.calc.error && (
+                <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  <span className="font-bold">{calcItem.calc.error}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         <button
           onClick={addItem}
           className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
         >
-          <Plus className="w-6 h-6 mr-2" /> 增加更多課程
+          <Plus className="w-6 h-6 mr-2" />
+          增加更多課程
         </button>
       </div>
 
-      {/* REAL-TIME PREVIEW SECTION */}
+      {/* 下方即時預覽 + 儲存 */}
       <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
         <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
           <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-            <Eye className="mr-2" /> 即時報價單預覽
+            <Eye className="mr-2" />
+            即時報價單預覽
           </h3>
           <div className="flex gap-4 items-center flex-wrap">
             <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
@@ -1601,7 +1706,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
               onClick={handleSave}
               className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
             >
-              <Save className="w-4 h-4 mr-2" /> 儲存至資料庫
+              <Save className="w-4 h-4 mr-2" />
+              儲存至資料庫
             </button>
             <button
               onClick={onCancel}
@@ -1612,7 +1718,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           </div>
         </div>
 
-        {/* Embed the preview directly here */}
         <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
           <QuotePreview
             idName="creator-preview-area"
@@ -1629,23 +1734,27 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-// --- StatsView Component ---
+// ========== 統計頁面 ==========
+
 const StatsView = ({ quotes }) => {
   const availableMonths = useMemo(() => {
     const months = new Set();
     quotes.forEach((q) => {
       if (q.status !== 'draft') {
-        const date = getSafeDate(q.createdAt);
-        const key = `${date.getFullYear()}-${String(
-          date.getMonth() + 1,
-        ).padStart(2, '0')}`;
+        const d = getSafeDate(q.createdAt);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}`;
         months.add(key);
       }
     });
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
+  const [selectedMonth, setSelectedMonth] = useState(
+    availableMonths[0] || '',
+  );
 
   useEffect(() => {
     if (!selectedMonth && availableMonths.length > 0) {
@@ -1659,7 +1768,12 @@ const StatsView = ({ quotes }) => {
       totalOrders: 0,
       regions: {
         North: { name: '北部', revenue: 0, count: 0, color: 'bg-blue-500' },
-        Central: { name: '中部', revenue: 0, count: 0, color: 'bg-yellow-500' },
+        Central: {
+          name: '中部',
+          revenue: 0,
+          count: 0,
+          color: 'bg-yellow-500',
+        },
         South: { name: '南部', revenue: 0, count: 0, color: 'bg-green-500' },
       },
       statuses: {
@@ -1689,30 +1803,28 @@ const StatsView = ({ quotes }) => {
     if (!selectedMonth) return result;
 
     quotes.forEach((q) => {
-      const date = getSafeDate(q.createdAt);
-      const qMonth = `${date.getFullYear()}-${String(
-        date.getMonth() + 1,
-      ).padStart(2, '0')}`;
+      if (q.status === 'draft') return;
+      const d = getSafeDate(q.createdAt);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        '0',
+      )}`;
+      if (monthKey !== selectedMonth) return;
 
-      if (q.status !== 'draft' && qMonth === selectedMonth) {
-        let regionKey = 'North';
-        if (q.items && q.items.length > 0) {
-          const firstItem = q.items[0];
-          const r = firstItem.outingRegion || firstItem.regionType;
-          if (r && result.regions[r]) {
-            regionKey = r;
-          }
-        }
+      let regionKey = 'North';
+      if (q.items && q.items.length > 0) {
+        const r = q.items[0].outingRegion || q.items[0].regionType;
+        if (r && result.regions[r]) regionKey = r;
+      }
 
-        const amount = q.totalAmount || 0;
-        result.totalRevenue += amount;
-        result.totalOrders += 1;
-        result.regions[regionKey].revenue += amount;
-        result.regions[regionKey].count += 1;
+      const amount = q.totalAmount || 0;
+      result.totalRevenue += amount;
+      result.totalOrders += 1;
+      result.regions[regionKey].revenue += amount;
+      result.regions[regionKey].count += 1;
 
-        if (result.statuses[q.status]) {
-          result.statuses[q.status].count += 1;
-        }
+      if (result.statuses[q.status]) {
+        result.statuses[q.status].count += 1;
       }
     });
 
@@ -1732,10 +1844,11 @@ const StatsView = ({ quotes }) => {
     <div className="max-w-5xl mx-auto p-4 md:p-8">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-          <TrendingUp className="mr-3 text-blue-600" /> 業績統計儀表板
+          <TrendingUp className="mr-3 text-blue-600" />
+          業績統計儀表板
         </h2>
         <div className="flex items-center gap-2">
-          <span className="text-gray-600 font-medium">選擇月份:</span>
+          <span className="text-gray-600 font-medium">選擇月份：</span>
           <select
             className={INPUT_CLASS + ' w-40'}
             value={selectedMonth}
@@ -1750,6 +1863,7 @@ const StatsView = ({ quotes }) => {
         </div>
       </div>
 
+      {/* 總業績 */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 text-white shadow-lg mb-8">
         <div className="flex justify-between items-start">
           <div>
@@ -1763,21 +1877,28 @@ const StatsView = ({ quotes }) => {
           <div className="text-right">
             <p className="text-blue-100 font-medium mb-1">總成交案件</p>
             <h3 className="text-3xl font-bold">
-              {stats.totalOrders}{' '}
-              <span className="text-base font-normal opacity-80">件</span>
+              {stats.totalOrders}
+              <span className="text-base font-normal opacity-80">
+                {' '}
+                件
+              </span>
             </h3>
           </div>
         </div>
       </div>
 
+      {/* 狀態分佈 */}
       <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-        <PieChart className="w-5 h-5 mr-2" /> 案件狀態分佈
+        <PieChart className="w-5 h-5 mr-2" />
+        案件狀態分佈
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {Object.keys(stats.statuses).map((key) => (
           <div
             key={key}
-            className={`p-4 rounded-lg border ${stats.statuses[key].color
+            className={`p-4 rounded-lg border ${stats.statuses[
+              key
+            ].color
               .replace('bg-', 'border-')
               .replace('100', '200')} ${stats.statuses[key].color}`}
           >
@@ -1791,8 +1912,10 @@ const StatsView = ({ quotes }) => {
         ))}
       </div>
 
+      {/* 地區佔比 */}
       <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-        <MapPin className="w-5 h-5 mr-2" /> 地區業績佔比
+        <MapPin className="w-5 h-5 mr-2" />
+        地區業績佔比
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {Object.keys(stats.regions).map((key) => {
@@ -1801,7 +1924,6 @@ const StatsView = ({ quotes }) => {
             stats.totalRevenue > 0
               ? Math.round((region.revenue / stats.totalRevenue) * 100)
               : 0;
-
           return (
             <div
               key={key}
@@ -1844,7 +1966,8 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// --- CalendarView Component ---
+// ========== 行事曆視圖 ==========
+
 const CalendarView = ({ quotes, publicMode = false }) => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
@@ -1865,36 +1988,9 @@ const CalendarView = ({ quotes, publicMode = false }) => {
     });
   };
 
-  const copyLink = (region) => {
-    const baseUrl = window.location.href.split('?')[0];
-    const link = `${baseUrl}?view=calendar&filter=${region}&mode=public`;
-
-    const textArea = document.createElement('textarea');
-    textArea.value = link;
-    textArea.style.position = 'fixed';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-
-    try {
-      const successful = document.execCommand('copy');
-      if (successful) {
-        alert(`已複製行程公開連結！\n${link}`);
-      } else {
-        // 退而求其次
-        // eslint-disable-next-line no-alert
-        prompt('無法自動複製，請手動複製行程連結：', link);
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-alert
-      prompt('無法自動複製，請手動複製行程連結：', link);
-    }
-
-    document.body.removeChild(textArea);
-  };
-
   const getDaysInMonth = (year, month) =>
     new Date(year, month + 1, 0).getDate();
+
   const firstDayOfMonth = new Date(
     currentDate.getFullYear(),
     currentDate.getMonth(),
@@ -1902,16 +1998,15 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   ).getDay();
 
   const nextPeriod = () => {
-    if (viewMode === 'month')
+    if (viewMode === 'month') {
       setCurrentDate(
         new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
       );
-    if (viewMode === 'week') {
+    } else if (viewMode === 'week') {
       const d = new Date(currentDate);
       d.setDate(d.getDate() + 7);
       setCurrentDate(d);
-    }
-    if (viewMode === 'day') {
+    } else {
       const d = new Date(currentDate);
       d.setDate(d.getDate() + 1);
       setCurrentDate(d);
@@ -1919,16 +2014,15 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   };
 
   const prevPeriod = () => {
-    if (viewMode === 'month')
+    if (viewMode === 'month') {
       setCurrentDate(
         new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1),
       );
-    if (viewMode === 'week') {
+    } else if (viewMode === 'week') {
       const d = new Date(currentDate);
       d.setDate(d.getDate() - 7);
       setCurrentDate(d);
-    }
-    if (viewMode === 'day') {
+    } else {
       const d = new Date(currentDate);
       d.setDate(d.getDate() - 1);
       setCurrentDate(d);
@@ -1936,12 +2030,12 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   };
 
   const handleDayClick = (day) => {
-    const newDate = new Date(
+    const d = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth(),
       day,
     );
-    setCurrentDate(newDate);
+    setCurrentDate(d);
     setViewMode('day');
   };
 
@@ -1961,10 +2055,38 @@ const CalendarView = ({ quotes, publicMode = false }) => {
     return getFilteredEvents(events);
   };
 
+  const copyLink = (region) => {
+    const baseUrl = window.location.href.split('?')[0];
+    const link = `${baseUrl}?view=calendar&filter=${region}&mode=public`;
+
+    const textarea = document.createElement('textarea');
+    textarea.value = link;
+    textarea.style.position = 'fixed';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      const ok = document.execCommand('copy');
+      if (ok) {
+        alert(`已複製行程公開連結：\n${link}`);
+      } else {
+        // eslint-disable-next-line no-alert
+        prompt('無法自動複製，請手動複製：', link);
+      }
+    } catch {
+      // eslint-disable-next-line no-alert
+      prompt('無法自動複製，請手動複製：', link);
+    }
+    document.body.removeChild(textarea);
+  };
+
   const regionColors = {
-    North: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
-    Central: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
-    South: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
+    North:
+      'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+    Central:
+      'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
+    South:
+      'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
   };
 
   const renderHeader = () => (
@@ -1973,12 +2095,16 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         <h2 className="text-2xl font-bold flex items-center">
           <Calendar className="mr-2" />
           {viewMode === 'month' &&
-            `${currentDate.getFullYear()}年 ${currentDate.getMonth() + 1}月`}
+            `${currentDate.getFullYear()}年 ${
+              currentDate.getMonth() + 1
+            }月`}
           {viewMode === 'week' &&
-            `週視圖 (${currentDate.toLocaleDateString()})`}
+            `週視圖 (${currentDate.toLocaleDateString('zh-TW')})`}
           {viewMode === 'day' &&
-            `${currentDate.toLocaleDateString()} (${
-              ['日', '一', '二', '三', '四', '五', '六'][currentDate.getDay()]
+            `${currentDate.toLocaleDateString('zh-TW')} (${
+              ['日', '一', '二', '三', '四', '五', '六'][
+                currentDate.getDay()
+              ]
             })`}
         </h2>
         <div className="flex bg-gray-100 rounded-lg p-1">
@@ -2085,6 +2211,7 @@ const CalendarView = ({ quotes, publicMode = false }) => {
       (_, i) => i + 1,
     );
     const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+
     return (
       <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200">
         {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
@@ -2105,6 +2232,7 @@ const CalendarView = ({ quotes, publicMode = false }) => {
             day,
           );
           const events = getEventsForDay(date);
+
           return (
             <div
               key={day}
@@ -2116,14 +2244,20 @@ const CalendarView = ({ quotes, publicMode = false }) => {
               </span>
               <div className="mt-4 space-y-1">
                 {events.map((q) => {
-                  const region = q.items[0]?.outingRegion || 'North';
+                  const first = q.items[0] || {};
+                  const region =
+                    first.outingRegion || first.regionType || 'North';
+                  const timeText =
+                    first.timeRange ||
+                    first.startTime?.slice(0, 5) ||
+                    '';
                   return (
                     <div
                       key={q.id}
                       className={`text-xs p-1 rounded border truncate ${regionColors[region]}`}
                       title={`${q.clientInfo.companyName}`}
                     >
-                      {q.items[0]?.startTime?.slice(0, 5)}{' '}
+                      {timeText && `${timeText} `}
                       {q.clientInfo.companyName}
                     </div>
                   );
@@ -2150,23 +2284,29 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         {weekDays.map((date, i) => (
           <div key={i} className="bg-white flex flex-col h-full">
             <div className="p-2 border-b bg-gray-50 text-center font-bold">
-              <div>{['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}</div>
+              <div>
+                {['日', '一', '二', '三', '四', '五', '六'][date.getDay()]}
+              </div>
               <div className="text-2xl">{date.getDate()}</div>
             </div>
             <div className="flex-1 p-2 space-y-2 overflow-auto">
               {getEventsForDay(date).map((q) => {
-                const region = q.items[0]?.outingRegion || 'North';
+                const first = q.items[0] || {};
+                const region =
+                  first.outingRegion || first.regionType || 'North';
+                const timeText =
+                  first.timeRange ||
+                  first.startTime?.slice(0, 5) ||
+                  '';
                 return (
                   <div
                     key={q.id}
                     className={`text-xs p-2 rounded border shadow-sm ${regionColors[region]}`}
                   >
-                    <div className="font-bold">
-                      {q.items[0]?.startTime?.slice(0, 5)}
-                    </div>
+                    <div className="font-bold">{timeText}</div>
                     <div>{q.clientInfo.companyName}</div>
                     <div className="text-[10px] mt-1 opacity-75">
-                      {q.items[0]?.courseName}
+                      {first.courseName}
                     </div>
                   </div>
                 );
@@ -2179,11 +2319,16 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   };
 
   const renderDayView = () => {
-    const events = getEventsForDay(currentDate).sort((a, b) =>
-      (a.items[0]?.startTime || '').localeCompare(
-        b.items[0]?.startTime || '',
-      ),
-    );
+    const events = getEventsForDay(currentDate).sort((a, b) => {
+      const aItem = a.items[0] || {};
+      const bItem = b.items[0] || {};
+      const aKey =
+        (aItem.timeRange || aItem.startTime || '').slice(0, 5) || '00:00';
+      const bKey =
+        (bItem.timeRange || bItem.startTime || '').slice(0, 5) || '00:00';
+      return aKey.localeCompare(bKey);
+    });
+
     return (
       <div className="border rounded-lg bg-white min-h-[500px] p-6">
         <h3 className="text-xl font-bold mb-6 border-b pb-4">行程列表</h3>
@@ -2194,7 +2339,12 @@ const CalendarView = ({ quotes, publicMode = false }) => {
         ) : (
           <div className="space-y-4">
             {events.map((q) => {
-              const region = q.items[0]?.outingRegion || 'North';
+              const first = q.items[0] || {};
+              const region =
+                first.outingRegion || first.regionType || 'North';
+              const timeText =
+                first.timeRange || first.startTime || '';
+
               return (
                 <div
                   key={q.id}
@@ -2208,7 +2358,7 @@ const CalendarView = ({ quotes, publicMode = false }) => {
                 >
                   <div className="mr-6 text-center min-w-[80px]">
                     <div className="text-xl font-bold text-gray-800">
-                      {q.items[0]?.startTime}
+                      {timeText}
                     </div>
                     <div
                       className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${regionColors[region]}`}
@@ -2225,17 +2375,17 @@ const CalendarView = ({ quotes, publicMode = false }) => {
                       {q.clientInfo.companyName}
                     </h4>
                     <div className="text-gray-600 mt-1 flex items-center">
-                      <FileText className="w-4 h-4 mr-1" />{' '}
-                      {q.items[0]?.courseName} ({q.items[0]?.peopleCount}人)
+                      <FileText className="w-4 h-4 mr-1" />
+                      {first.courseName} ({first.peopleCount} 人)
                     </div>
                     <div className="text-gray-500 mt-1 text-sm flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />{' '}
-                      {q.items[0]?.city} {q.items[0]?.address}
+                      <MapPin className="w-4 h-4 mr-1" />
+                      {first.city} {first.address}
                     </div>
                     {!publicMode && (
                       <div className="mt-2 text-sm text-gray-500">
-                        聯絡人: {q.clientInfo.contactPerson} (
-                        {q.clientInfo.phone})
+                        聯絡人：{q.clientInfo.contactPerson}（
+                        {q.clientInfo.phone}）
                       </div>
                     )}
                   </div>
@@ -2259,21 +2409,29 @@ const CalendarView = ({ quotes, publicMode = false }) => {
 
       {renderHeader()}
 
+      {/* 內部模式下：複製分享連結按鈕 */}
       {!publicMode && (
-        <div className="mb-4 flex justify-end gap-2">
+        <div className="flex justify-end mb-4 gap-2">
+          <button
+            onClick={() => copyLink('North')}
+            className="px-3 py-1 text-xs bg-blue-50 text-blue-800 rounded border border-blue-200 hover:bg-blue-100 flex items-center"
+          >
+            <LinkIcon className="w-3 h-3 mr-1" />
+            複製北部行程連結
+          </button>
           <button
             onClick={() => copyLink('Central')}
-            className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-bold flex items-center hover:bg-yellow-200 transition"
-            title="複製中部行程連結"
+            className="px-3 py-1 text-xs bg-yellow-50 text-yellow-800 rounded border border-yellow-200 hover:bg-yellow-100 flex items-center"
           >
-            <LinkIcon className="w-3 h-3 mr-1" /> 複製連結
+            <LinkIcon className="w-3 h-3 mr-1" />
+            複製中部行程連結
           </button>
           <button
             onClick={() => copyLink('South')}
-            className="px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full font-bold flex items-center hover:bg-green-200 transition"
-            title="複製南部行程連結"
+            className="px-3 py-1 text-xs bg-green-50 text-green-800 rounded border border-green-200 hover:bg-green-100 flex items-center"
           >
-            <LinkIcon className="w-3 h-3 mr-1" /> 複製連結
+            <LinkIcon className="w-3 h-3 mr-1" />
+            複製南部行程連結
           </button>
         </div>
       )}
@@ -2281,709 +2439,465 @@ const CalendarView = ({ quotes, publicMode = false }) => {
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
-
-      {!publicMode && (
-        <div className="mt-4 flex gap-4 text-xs text-gray-500 justify-end">
-          <span className="flex items-center">
-            <div className="w-3 h-3 bg-blue-100 border border-blue-200 mr-1" />{' '}
-            北部行程
-          </span>
-          <span className="flex items-center">
-            <div className="w-3 h-3 bg-yellow-100 border border-yellow-200 mr-1" />{' '}
-            中部行程
-          </span>
-          <span className="flex items-center">
-            <div className="w-3 h-3 bg-green-100 border border-green-200 mr-1" />{' '}
-            南部行程
-          </span>
-        </div>
-      )}
     </div>
   );
 };
 
-// --- ListView Component ---
-const ListView = ({
+// ========== 報價單列表 ==========
+
+const QuoteList = ({
   quotes,
+  onCreateNew,
   onEdit,
-  onDelete,
-  onPayment,
   onPreview,
-  onStatusChange,
-  onExport,
-  onCreate,
+  onDelete,
+  onChangeStatus,
+  onSwitchView,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [monthFilter, setMonthFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
-  const groupedQuotes = useMemo(() => {
-    const groups = {};
-    quotes.forEach((q) => {
-      const date = getSafeDate(q.createdAt);
-      const key = `${date.getFullYear()}-${String(
-        date.getMonth() + 1,
-      ).padStart(2, '0')}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(q);
-    });
-    return groups;
-  }, [quotes]);
-
-  const filteredMonths = Object.keys(groupedQuotes)
-    .sort()
-    .reverse()
-    .filter((m) => !monthFilter || m === monthFilter);
-
-  return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h2 className="text-2xl font-bold text-gray-800">報價單管理</h2>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={onExport}
-            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-600 hover:bg-gray-50 flex items-center shadow-sm font-medium"
-          >
-            <FileText className="w-4 h-4 mr-2" /> 匯出報表 (CSV)
-          </button>
-          <button
-            onClick={onCreate}
-            className="md:hidden px-4 py-2 bg-teal-600 text-white rounded font-medium shadow-sm"
-          >
-            新增
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div
-        className={
-          SECTION_CLASS +
-          ' mb-6 flex flex-col md:flex-row gap-4 items-center'
-        }
-      >
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="搜尋客戶名稱、電話..."
-            className={INPUT_CLASS + ' pl-10'}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Month Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 whitespace-nowrap">月份:</span>
-          <select
-            className={INPUT_CLASS + ' md:w-40'}
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-          >
-            <option value="">全部月份</option>
-            {Object.keys(groupedQuotes)
-              .sort()
-              .reverse()
-              .map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 whitespace-nowrap">
-            狀態:
-          </span>
-          <select
-            className={INPUT_CLASS + ' md:w-40'}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">全部狀態</option>
-            <option value="draft">草稿</option>
-            <option value="pending">報價中</option>
-            <option value="confirmed">已回簽 (未付訂)</option>
-            <option value="paid">已付訂 (未結清)</option>
-            <option value="closed">已結案</option>
-          </select>
-        </div>
-      </div>
-
-      {/* List */}
-      <div className="space-y-6">
-        {filteredMonths.map((month) => {
-          const monthQuotes = groupedQuotes[month].filter((q) => {
-            const matchesSearch =
-              q.clientInfo?.companyName?.includes(searchTerm) ||
-              q.clientInfo?.phone?.includes(searchTerm);
-            const matchesStatus =
-              statusFilter === 'all' || q.status === statusFilter;
-            return matchesSearch && matchesStatus;
-          });
-
-          if (monthQuotes.length === 0) return null;
-
-          return (
-            <div
-              key={month}
-              className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden"
-            >
-              <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex items-center font-semibold text-gray-700">
-                <Folder className="w-5 h-5 mr-2 text-yellow-500" />
-                {month} ({monthQuotes.length})
-              </div>
-              <div className="divide-y divide-gray-100">
-                {monthQuotes.map((quote) => (
-                  <div
-                    key={quote.id}
-                    className="p-4 hover:bg-blue-50 transition flex flex-col md:flex-row justify-between items-center gap-4"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <StatusSelector
-                          status={quote.status}
-                          onChange={(val) =>
-                            onStatusChange(quote.id, val)
-                          }
-                        />
-                        <span className="font-bold text-lg text-gray-900 truncate">
-                          {quote.clientInfo.companyName}
-                        </span>
-                        <span className="text-xs text-gray-400 font-mono">
-                          #{quote.id.slice(-4)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600 truncate">
-                        <span className="mr-3">
-                          聯絡人: {quote.clientInfo.contactPerson}
-                        </span>
-                        <span>
-                          課程: {quote.items[0]?.courseName}{' '}
-                          {quote.items.length > 1
-                            ? `(+${quote.items.length - 1})`
-                            : ''}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        建立於: {formatDate(quote.createdAt)}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 min-w-[150px]">
-                      <div className="text-xl font-bold text-blue-600">
-                        ${quote.totalAmount?.toLocaleString()}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onPreview(quote)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded tooltip transition-colors"
-                          title="預覽報價單"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        {quote.status === 'paid' && (
-                          <button
-                            onClick={() => onPayment(quote)}
-                            className="p-2 text-orange-600 hover:bg-orange-100 rounded tooltip transition-colors"
-                            title="款項管理"
-                          >
-                            <DollarSign className="w-5 h-5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onEdit(quote)}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                          title="編輯"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => onDelete(quote.id)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                          title="刪除"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const PaymentModal = ({ quote, onClose, onSave }) => {
-  const [details, setDetails] = useState({
-    depositAmount: 0,
-    depositNote: '',
-    additionalPayment: 0,
-    additionalPaymentNote: '',
-    finalPayment: 0,
-    finalPaymentNote: '',
+  const filtered = quotes.filter((q) => {
+    if (!search.trim()) return true;
+    const kw = search.trim();
+    const firstItem = q.items[0] || {};
+    return (
+      (q.clientInfo.companyName || '').includes(kw) ||
+      (firstItem.courseName || '').includes(kw)
+    );
   });
 
-  useEffect(() => {
-    if (quote.paymentDetails) setDetails(quote.paymentDetails);
-  }, [quote]);
-
-  const actualTotal =
-    (quote.totalAmount || 0) + parseInt(details.additionalPayment || 0);
-  const paidTotal =
-    parseInt(details.depositAmount || 0) +
-    parseInt(details.finalPayment || 0);
-  const remaining = actualTotal - paidTotal;
-
-  const handleSave = () => {
-    onSave(quote.id, {
-      paymentDetails: details,
-      status: remaining === 0 ? 'closed' : quote.status,
-      closedAt:
-        remaining === 0 ? new Date().toISOString() : quote.closedAt,
-    });
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 overflow-auto max-h-[90vh]">
-        <h2 className="text-xl font-bold mb-4">款項管理</h2>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-gray-50 p-4 rounded">
-            原始: ${quote.totalAmount}
-          </div>
-          <div className="bg-blue-50 p-4 rounded">應收: ${actualTotal}</div>
+    <div className="max-w-6xl mx-auto p-4 md:p-8">
+      {/* 上方工具列 */}
+      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Folder className="w-6 h-6 mr-2 text-blue-600" />
+            報價單管理
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            已建立 {quotes.length} 筆報價單
+          </p>
         </div>
 
-        <div className="space-y-4">
-          <div className="border p-4 rounded-lg">
-            <h4 className="font-bold mb-3 flex items-center">
-              <Check className="w-4 h-4 mr-2 text-green-500" /> 1. 訂金
-              (Deposit)
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL_CLASS}>金額</label>
-                <input
-                  type="number"
-                  className={INPUT_CLASS}
-                  value={details.depositAmount}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      depositAmount: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>備註</label>
-                <input
-                  type="text"
-                  className={INPUT_CLASS}
-                  value={details.depositNote}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      depositNote: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+            <input
+              className="pl-8 pr-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              placeholder="搜尋公司名稱 / 課程名稱"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <div className="border p-4 rounded-lg border-orange-200 bg-orange-50">
-            <h4 className="font-bold mb-3 flex items-center text-orange-800">
-              <Plus className="w-4 h-4 mr-2" /> 2. 追加款項 (Additional)
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL_CLASS}>金額</label>
-                <input
-                  type="number"
-                  className={INPUT_CLASS}
-                  value={details.additionalPayment}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      additionalPayment: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>原因說明</label>
-                <input
-                  type="text"
-                  className={INPUT_CLASS}
-                  value={details.additionalPaymentNote}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      additionalPaymentNote: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-          <div className="border p-4 rounded-lg">
-            <h4 className="font-bold mb-3 flex items-center">
-              <DollarSign className="w-4 h-4 mr-2 text-green-500" /> 3. 尾款
-              (Final)
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={LABEL_CLASS}>金額</label>
-                <input
-                  type="number"
-                  className={INPUT_CLASS}
-                  value={details.finalPayment}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      finalPayment: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLASS}>備註</label>
-                <input
-                  type="text"
-                  className={INPUT_CLASS}
-                  value={details.finalPaymentNote}
-                  onChange={(e) =>
-                    setDetails({
-                      ...details,
-                      finalPaymentNote: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="mt-6 flex justify-between items-center p-4 bg-gray-100 rounded-lg">
-          <div>
-            <span className="text-gray-600">剩餘未付金額：</span>
-            <span
-              className={`text-xl font-bold ${
-                remaining > 0 ? 'text-red-600' : 'text-green-600'
-              }`}
-            >
-              ${remaining.toLocaleString()}
-            </span>
-          </div>
-          <div className="space-x-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold flex items-center"
-            >
-              <Save className="w-4 h-4 mr-2" /> 儲存並更新狀態
-            </button>
-          </div>
+          <button
+            onClick={() => onSwitchView('calendar')}
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <Calendar className="w-4 h-4 mr-1" />
+            行事曆
+          </button>
+          <button
+            onClick={() => onSwitchView('stats')}
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <BarChart3 className="w-4 h-4 mr-1" />
+            統計
+          </button>
+          <button
+            onClick={onCreateNew}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            新增報價單
+          </button>
         </div>
+      </div>
+
+      {/* 列表 */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-2 text-left text-gray-500 font-medium">
+                建立日期
+              </th>
+              <th className="px-4 py-2 text-left text-gray-500 font-medium">
+                客戶名稱
+              </th>
+              <th className="px-4 py-2 text-left text-gray-500 font-medium">
+                課程摘要
+              </th>
+              <th className="px-4 py-2 text-right text-gray-500 font-medium">
+                總金額
+              </th>
+              <th className="px-4 py-2 text-center text-gray-500 font-medium">
+                地區
+              </th>
+              <th className="px-4 py-2 text-center text-gray-500 font-medium">
+                狀態
+              </th>
+              <th className="px-4 py-2 text-right text-gray-500 font-medium">
+                操作
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-8 text-center text-gray-400"
+                >
+                  尚無符合條件的報價單
+                </td>
+              </tr>
+            )}
+
+            {filtered.map((q) => {
+              const first = q.items[0] || {};
+              const region =
+                first.outingRegion || first.regionType || 'North';
+              const regionText =
+                region === 'North'
+                  ? '北部'
+                  : region === 'Central'
+                  ? '中部'
+                  : '南部';
+
+              return (
+                <tr
+                  key={q.id}
+                  className="border-t border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="px-4 py-2 align-middle">
+                    {formatDate(q.createdAt)}
+                  </td>
+                  <td className="px-4 py-2 align-middle">
+                    <div className="font-medium text-gray-800">
+                      {q.clientInfo.companyName || '-'}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {q.clientInfo.contactPerson || ''}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 align-middle">
+                    <div className="text-gray-800">
+                      {first.courseName || '-'}
+                    </div>
+                    {q.items.length > 1 && (
+                      <div className="text-xs text-gray-500">
+                        + 其他 {q.items.length - 1} 堂課
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right align-middle font-bold text-gray-800">
+                    ${Number(q.totalAmount || 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2 text-center align-middle">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        region === 'North'
+                          ? 'bg-blue-50 text-blue-700'
+                          : region === 'Central'
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'bg-green-50 text-green-700'
+                      }`}
+                    >
+                      {regionText}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-center align-middle">
+                    <StatusSelector
+                      status={q.status || 'draft'}
+                      onChange={(value) => onChangeStatus(q, value)}
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-right align-middle">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => onPreview(q)}
+                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 flex items-center"
+                      >
+                        <Printer className="w-3 h-3 mr-1" />
+                        預覽
+                      </button>
+                      <button
+                        onClick={() => onEdit(q)}
+                        className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        編輯
+                      </button>
+                      <button
+                        onClick={() => onDelete(q)}
+                        className="px-2 py-1 text-xs bg-white border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        刪除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 };
 
-// --- App Container ---
+// ========== App 主元件 ==========
+
 const App = () => {
-  const [activeTab, setActiveTab] = useState('list');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlView = urlParams.get('view');
+  const urlMode = urlParams.get('mode');
+
   const [quotes, setQuotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentView, setCurrentView] = useState(
+    urlView === 'calendar' ? 'calendar' : 'list',
+  );
   const [editingQuote, setEditingQuote] = useState(null);
-  const [selectedQuoteForPayment, setSelectedQuoteForPayment] =
-    useState(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [previewQuote, setPreviewQuote] = useState(null);
 
-  const [selectedQuoteForPreview, setSelectedQuoteForPreview] =
-    useState(null);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [isPublicMode, setIsPublicMode] = useState(false);
+  const publicCalendarMode = urlMode === 'public' && urlView === 'calendar';
 
-  // 1. URL Parsing for Public Mode
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const mode = urlParams.get('mode');
-
-    if (mode === 'public') {
-      setIsPublicMode(true);
-      setActiveTab('calendar');
-    }
-  }, []);
-
-  // FIREBASE SYNC
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, 'quotes'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const quotesData = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-      const uniqueQuotes = Array.from(
-        new Map(quotesData.map((item) => [item.id, item])).values(),
-      );
-      setQuotes(uniqueQuotes);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleCreateNew = () => {
-    setEditingQuote(null);
-    setActiveTab('create');
-  };
-  const handleEdit = (quote) => {
-    setEditingQuote(quote);
-    setActiveTab('create');
-  };
-
-  const handleSaveQuote = async (quoteData) => {
     if (!db) {
-      alert(
-        '【演示模式】儲存成功！\n(因為未設定 API Key，資料僅暫存於記憶體，重整後會消失)',
-      );
-      const mockId = 'mock_' + generateId();
-      const mockQuote = {
-        ...quoteData,
-        id: mockId,
-        createdAt: { seconds: Date.now() / 1000 },
-      };
-      setQuotes([mockQuote, ...quotes]);
-      setActiveTab('list');
+      setLoading(false);
       return;
     }
+
+    const q = query(
+      collection(db, 'quotes'),
+      orderBy('createdAt', 'desc'),
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+        setQuotes(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('取得 quotes 失敗', err);
+        setLoading(false);
+      },
+    );
+
+    return () => unsub();
+  }, []);
+
+  const handleSaveQuote = async (data) => {
     try {
-      if (editingQuote) {
+      if (!db) {
+        alert('沒有連線 Firebase，僅在前端參考使用。');
+        setQuotes((prev) => {
+          if (editingQuote?.id) {
+            return prev.map((q) =>
+              q.id === editingQuote.id ? { ...q, ...data } : q,
+            );
+          }
+          return [
+            {
+              id: generateId(),
+              ...data,
+              createdAt: new Date(),
+            },
+            ...prev,
+          ];
+        });
+      } else if (editingQuote?.id) {
         await updateDoc(doc(db, 'quotes', editingQuote.id), {
-          ...quoteData,
+          ...data,
           updatedAt: serverTimestamp(),
         });
       } else {
         await addDoc(collection(db, 'quotes'), {
-          ...quoteData,
+          ...data,
+          status: data.status || 'pending',
           createdAt: serverTimestamp(),
-          status: 'draft',
+          updatedAt: serverTimestamp(),
         });
       }
-      setActiveTab('list');
-    } catch (error) {
-      console.error('Error saving document: ', error);
-      alert('儲存失敗，請檢查網路連線');
+
+      setEditingQuote(null);
+      setCurrentView('list');
+    } catch (err) {
+      console.error('儲存報價單失敗', err);
+      alert('儲存失敗，請稍後再試。');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!db) {
-      setQuotes(quotes.filter((q) => q.id !== id));
+  const handleDeleteQuote = async (q) => {
+    if (!window.confirm(`確定要刪除「${q.clientInfo.companyName}」這筆報價單？`))
       return;
-    }
-    if (window.confirm('確定要刪除此報價單嗎？')) {
-      await deleteDoc(doc(db, 'quotes', id));
-    }
-  };
 
-  const handleUpdatePayment = async (id, updates) => {
-    if (!db) return;
     try {
-      await updateDoc(doc(db, 'quotes', id), updates);
-    } catch (error) {
-      console.error('Error updating payment: ', error);
-      alert('更新失敗');
+      if (db) {
+        await deleteDoc(doc(db, 'quotes', q.id));
+      }
+      setQuotes((prev) => prev.filter((x) => x.id !== q.id));
+    } catch (err) {
+      console.error('刪除失敗', err);
+      alert('刪除失敗，請稍後再試。');
     }
   };
 
-  const handleStatusChange = async (id, newStatus) => {
-    if (!db) return;
+  const handleChangeStatus = async (quote, newStatus) => {
     try {
-      await updateDoc(doc(db, 'quotes', id), { status: newStatus });
-    } catch (error) {
-      console.error('Error updating status: ', error);
-      alert('狀態更新失敗');
+      if (db) {
+        await updateDoc(doc(db, 'quotes', quote.id), {
+          status: newStatus,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      setQuotes((prev) =>
+        prev.map((q) =>
+          q.id === quote.id ? { ...q, status: newStatus } : q,
+        ),
+      );
+    } catch (err) {
+      console.error('更新狀態失敗', err);
+      alert('更新狀態失敗，請稍後再試。');
     }
   };
 
-  const handleOpenPreview = (quote) => {
-    const safeItems = (quote.items || []).map((item) => {
-      if (item.calc) return item;
-      return { ...item, calc: calculateItem(item) };
-    });
-
-    setSelectedQuoteForPreview({ ...quote, items: safeItems });
-    setShowPreviewModal(true);
-  };
-
-  const exportCSV = () => {
-    const headers = [
-      '報價單ID',
-      '建立日期',
-      '狀態',
-      '客戶名稱',
-      '統編',
-      '聯絡人',
-      '電話',
-      '課程系列',
-      '課程名稱',
-      '課程日期',
-      '開始時間',
-      '結束時間',
-      '人數',
-      '單價',
-      '折扣金額',
-      '加價總額',
-      '是否開發票',
-      '總金額',
-    ];
-
-    const rows = quotes.flatMap((q) => {
-      const items = q.items || [];
-      return items.map((item) => [
-        q.id,
-        formatDate(q.createdAt),
-        q.status,
-        q.clientInfo?.companyName || '',
-        q.clientInfo?.taxId || '',
-        q.clientInfo?.contactPerson || '',
-        q.clientInfo?.phone || '',
-        item.courseSeries || '',
-        item.courseName || '',
-        item.eventDate || '',
-        item.startTime || '',
-        item.endTime || '',
-        item.peopleCount || 0,
-        item.price || 0,
-        item.calc?.discountAmount || 0,
-        item.calc?.totalExtraFee || 0,
-        item.hasInvoice ? '是' : '否',
-        item.calc?.finalTotal || 0,
-      ]);
-    });
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers, ...rows].map((e) => e.join(',')).join('\n');
-    const link = document.createElement('a');
-    link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', '詳細報價單報表.csv');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
+  // 公開行事曆模式（只顯示 CalendarView）
+  if (publicCalendarMode) {
+    return (
+      <div className="min-h-screen bg-gray-100 py-4">
+        <CalendarView quotes={quotes} publicMode />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex flex-col">
-      {!isPublicMode && (
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm print:hidden">
-          <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-            <div className="flex items-center font-bold text-xl text-gray-800">
-              <FileText className="w-6 h-6 mr-2" /> 下班隨手作報價系統
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
+              下
             </div>
-            <div className="flex space-x-4">
-              <button
-                onClick={() => setActiveTab('create')}
-                className={`px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'create'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                報價計算
-              </button>
-              <button
-                onClick={() => setActiveTab('list')}
-                className={`px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                追蹤清單
-              </button>
-              <button
-                onClick={() => setActiveTab('calendar')}
-                className={`px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'calendar'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                行事曆
-              </button>
-              <button
-                onClick={() => setActiveTab('stats')}
-                className={`px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'stats'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                業績統計
-              </button>
+            <div>
+              <div className="font-bold text-gray-800">
+                下班隨手作｜企業報價系統
+              </div>
+              <div className="text-xs text-gray-500">
+                Firestore + React 版本（內部使用）
+              </div>
             </div>
           </div>
-        </header>
-      )}
 
-      <main className="flex-1 overflow-auto bg-gray-50 p-4 md:p-8">
-        {!isPublicMode && activeTab === 'list' && (
-          <ListView
+          <nav className="flex gap-2 text-sm">
+            <button
+              onClick={() => {
+                setEditingQuote(null);
+                setCurrentView('list');
+              }}
+              className={`px-3 py-1 rounded-full ${
+                currentView === 'list'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              報價列表
+            </button>
+            <button
+              onClick={() => {
+                setEditingQuote(null);
+                setCurrentView('create');
+              }}
+              className={`px-3 py-1 rounded-full ${
+                currentView === 'create'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              新增報價
+            </button>
+            <button
+              onClick={() => setCurrentView('calendar')}
+              className={`px-3 py-1 rounded-full ${
+                currentView === 'calendar'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              行事曆
+            </button>
+            <button
+              onClick={() => setCurrentView('stats')}
+              className={`px-3 py-1 rounded-full ${
+                currentView === 'stats'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              統計
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main className="py-6">
+        {loading && (
+          <div className="max-w-6xl mx-auto p-8 text-center text-gray-500">
+            載入中…
+          </div>
+        )}
+
+        {!loading && currentView === 'list' && (
+          <QuoteList
             quotes={quotes}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onPayment={(q) => {
-              setSelectedQuoteForPayment(q);
-              setShowPaymentModal(true);
+            onCreateNew={() => {
+              setEditingQuote(null);
+              setCurrentView('create');
             }}
-            onPreview={handleOpenPreview}
-            onStatusChange={handleStatusChange}
-            onExport={exportCSV}
-            onCreate={handleCreateNew}
+            onEdit={(q) => {
+              setEditingQuote(q);
+              setCurrentView('create');
+            }}
+            onPreview={(q) => setPreviewQuote(q)}
+            onDelete={handleDeleteQuote}
+            onChangeStatus={handleChangeStatus}
+            onSwitchView={(v) => setCurrentView(v)}
           />
         )}
-        {!isPublicMode && activeTab === 'create' && (
+
+        {!loading && currentView === 'create' && (
           <QuoteCreator
             initialData={editingQuote}
             onSave={handleSaveQuote}
-            onCancel={() => setActiveTab('list')}
+            onCancel={() => {
+              setEditingQuote(null);
+              setCurrentView('list');
+            }}
           />
         )}
-        {activeTab === 'calendar' && (
-          <CalendarView quotes={quotes} publicMode={isPublicMode} />
+
+        {!loading && currentView === 'calendar' && (
+          <CalendarView quotes={quotes} />
         )}
-        {!isPublicMode && activeTab === 'stats' && (
-          <StatsView quotes={quotes} />
-        )}
+
+        {!loading && currentView === 'stats' && <StatsView quotes={quotes} />}
       </main>
 
-      {showPaymentModal && selectedQuoteForPayment && (
-        <PaymentModal
-          quote={selectedQuoteForPayment}
-          onClose={() => setShowPaymentModal(false)}
-          onSave={handleUpdatePayment}
-        />
-      )}
-
-      {showPreviewModal && selectedQuoteForPreview && (
+      {previewQuote && (
         <PreviewModal
-          quote={selectedQuoteForPreview}
-          onClose={() => setShowPreviewModal(false)}
+          quote={previewQuote}
+          onClose={() => setPreviewQuote(null)}
         />
       )}
     </div>
