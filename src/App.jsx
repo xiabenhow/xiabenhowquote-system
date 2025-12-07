@@ -590,27 +590,34 @@ const QuotePreview = ({ clientInfo, items, totalAmount, dateStr, isSigned, stamp
                 </div>
             </div>
 
-            {/* Footer Sign */}
-            <div className="mt-8 pt-8 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid">
-                <div className="relative">
-                    <p className="z-10 relative">下班隨手作代表：_________________</p>
+                        {/* Footer Sign */}
+                        <div className="mt-16 pt-10 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid min-h-[140px]">
+                {/* 左邊：下班隨手作代表 + 印章 */}
+                <div className="relative h-[120px] flex items-end">
                     {isSigned && (
                         <img 
                             src={stampUrl || STAMP_URL} 
                             alt="Company Stamp" 
                             crossOrigin="anonymous" 
-                            className="absolute -top-20 left-24 w-32 opacity-90 rotate-[-5deg] pointer-events-none z-20"
+                            className="absolute top-0 left-20 w-32 opacity-90 rotate-[-5deg] pointer-events-none z-10"
                             style={{ mixBlendMode: 'multiply' }}
                             onError={() => {
                                 console.warn("Stamp load failed (likely CORS). PDF might miss stamp.");
                             }}
                         />
                     )}
+                    {/* 多留一點上方空間，讓印章在上、簽名在下 */}
+                    <p className="z-20 relative mt-10">
+                        下班隨手作代表：_________________
+                    </p>
                 </div>
-                <div>
+
+                {/* 右邊：客戶簽章 */}
+                <div className="flex items-end h-[120px]">
                     <p>客戶確認簽章：_________________</p>
                 </div>
             </div>
+
         </div>
     );
 };
