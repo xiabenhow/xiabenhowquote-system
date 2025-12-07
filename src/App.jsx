@@ -1057,7 +1057,9 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
           {/* 結果試算 */}
           <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
-            <span className="text-orange-800 font-bold">待付款金額 (尾款)</span>
+            <span className="text-orange-800 font-bold">
+              待付款金額 (尾款)
+            </span>
             <span className="text-2xl font-bold text-orange-600">
               ${remaining.toLocaleString()}
             </span>
@@ -1189,7 +1191,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       address: '',
     },
   );
-  const [status, setStatus] = useState(initialData?.status || 'draft');
+  const [status] = useState(initialData?.status || 'draft');
   const [isSigned, setIsSigned] = useState(false);
 
   // 初始化 items
@@ -1240,7 +1242,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         city: '台北市',
         area: '',
         eventDate: '',
-        timeRange: '',
+        timeRange: '', // ★ 新欄位：時間區間（手動輸入）
         hasInvoice: false,
         enableDiscount90: false,
         customDiscount: 0,
@@ -3186,7 +3188,9 @@ const App = () => {
     });
 
     // 2. 監聽常態課 (★ 新增)
-    const qRegular = query(collection(db, 'regularClasses')); // 可加 orderBy date
+    const qRegular = query(
+      collection(db, 'regularClasses'),
+    ); // 可加 orderBy date
     const unsubRegular = onSnapshot(qRegular, (snapshot) => {
       setRegularClasses(
         snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
