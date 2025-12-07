@@ -636,6 +636,141 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
+// ========== 1. 新增：款項管理 Modal (PaymentModal) ==========
+
+const PaymentModal = ({ quote, onClose, onSave }) => {
+  const [data, setData] = useState({
+    depositAmount: quote.depositAmount || '',
+    depositNote: quote.depositNote || '',
+    adjustmentAmount: quote.adjustmentAmount || '',
+    adjustmentNote: quote.adjustmentNote || '',
+  });
+
+  const total = quote.totalAmount || 0;
+  const deposit = parseInt(data.depositAmount || 0);
+  const adjustment = parseInt(data.adjustmentAmount || 0);
+  const remaining = total - deposit + adjustment;
+
+  const handleSubmit = () => {
+    onSave(quote.id, data);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+        <div className="bg-orange-500 p-4 flex justify-between items-center text-white">
+          <h3 className="font-bold text-lg flex items-center">
+            <Wallet className="w-5 h-5 mr-2" />
+            款項管理 - {quote.clientInfo.companyName}
+          </h3>
+          <button
+            onClick={onClose}
+            className="hover:bg-orange-600 p-1 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* 總金額顯示 */}
+          <div className="flex justify-between items-center border-b pb-4">
+            <span className="text-gray-500 font-medium">報價總額</span>
+            <span className="text-2xl font-bold text-gray-800">
+              ${total.toLocaleString()}
+            </span>
+          </div>
+
+          {/* 訂金區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              預收訂金 (減項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.depositAmount}
+                onChange={(e) =>
+                  setData({ ...data, depositAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="訂金備註 (如: 匯款後五碼)"
+              value={data.depositNote}
+              onChange={(e) =>
+                setData({ ...data, depositNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 追加區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              追加金額 (加項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.adjustmentAmount}
+                onChange={(e) =>
+                  setData({ ...data, adjustmentAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="追加備註 (如: 現場加人)"
+              value={data.adjustmentNote}
+              onChange={(e) =>
+                setData({ ...data, adjustmentNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 結果試算 */}
+          <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
+            <span className="text-orange-800 font-bold">
+              待付款金額 (尾款)
+            </span>
+            <span className="text-2xl font-bold text-orange-600">
+              ${remaining.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700"
+          >
+            儲存款項資訊
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ========== 報價單預覽（含印章） ==========
 
 const QuotePreview = ({
@@ -944,141 +1079,6 @@ const QuotePreview = ({
         {/* 右邊：客戶簽章 */}
         <div className="flex items-end h-[110px]">
           <p>客戶確認簽章：_________________</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ========== 1. 新增：款項管理 Modal (PaymentModal) ==========
-
-const PaymentModal = ({ quote, onClose, onSave }) => {
-  const [data, setData] = useState({
-    depositAmount: quote.depositAmount || '',
-    depositNote: quote.depositNote || '',
-    adjustmentAmount: quote.adjustmentAmount || '',
-    adjustmentNote: quote.adjustmentNote || '',
-  });
-
-  const total = quote.totalAmount || 0;
-  const deposit = parseInt(data.depositAmount || 0);
-  const adjustment = parseInt(data.adjustmentAmount || 0);
-  const remaining = total - deposit + adjustment;
-
-  const handleSubmit = () => {
-    onSave(quote.id, data);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-        <div className="bg-orange-500 p-4 flex justify-between items-center text-white">
-          <h3 className="font-bold text-lg flex items-center">
-            <Wallet className="w-5 h-5 mr-2" />
-            款項管理 - {quote.clientInfo.companyName}
-          </h3>
-          <button
-            onClick={onClose}
-            className="hover:bg-orange-600 p-1 rounded"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* 總金額顯示 */}
-          <div className="flex justify-between items-center border-b pb-4">
-            <span className="text-gray-500 font-medium">報價總額</span>
-            <span className="text-2xl font-bold text-gray-800">
-              ${total.toLocaleString()}
-            </span>
-          </div>
-
-          {/* 訂金區塊 */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              預收訂金 (減項)
-            </label>
-            <div className="flex gap-2 mb-2">
-              <span className="flex items-center text-gray-500 font-bold px-2">
-                $
-              </span>
-              <input
-                type="number"
-                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
-                placeholder="0"
-                value={data.depositAmount}
-                onChange={(e) =>
-                  setData({ ...data, depositAmount: e.target.value })
-                }
-              />
-            </div>
-            <input
-              type="text"
-              className="w-full border rounded p-2 text-sm"
-              placeholder="訂金備註 (如: 匯款後五碼)"
-              value={data.depositNote}
-              onChange={(e) =>
-                setData({ ...data, depositNote: e.target.value })
-              }
-            />
-          </div>
-
-          {/* 追加區塊 */}
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              追加金額 (加項)
-            </label>
-            <div className="flex gap-2 mb-2">
-              <span className="flex items-center text-gray-500 font-bold px-2">
-                $
-              </span>
-              <input
-                type="number"
-                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
-                placeholder="0"
-                value={data.adjustmentAmount}
-                onChange={(e) =>
-                  setData({ ...data, adjustmentAmount: e.target.value })
-                }
-              />
-            </div>
-            <input
-              type="text"
-              className="w-full border rounded p-2 text-sm"
-              placeholder="追加備註 (如: 現場加人)"
-              value={data.adjustmentNote}
-              onChange={(e) =>
-                setData({ ...data, adjustmentNote: e.target.value })
-              }
-            />
-          </div>
-
-          {/* 結果試算 */}
-          <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
-            <span className="text-orange-800 font-bold">
-              待付款金額 (尾款)
-            </span>
-            <span className="text-2xl font-bold text-orange-600">
-              ${remaining.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-4 bg-gray-100 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700"
-          >
-            儲存款項資訊
-          </button>
         </div>
       </div>
     </div>
