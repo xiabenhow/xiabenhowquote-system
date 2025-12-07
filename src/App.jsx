@@ -25,11 +25,11 @@ import {
   PieChart,
   Link as LinkIcon,
   Lock,
-  Wallet, // 錢包圖示
-  User,   // 老師圖示
-  Clock,  // 時間圖示
-  Store,  // 商店圖示
-  Filter, // 過濾圖示
+  Wallet,
+  User,
+  Clock,
+  Store,
+  Filter,
 } from 'lucide-react';
 
 // ==========  Firebase 設定  ==========
@@ -574,7 +574,6 @@ const calculateItem = (item) => {
   };
 };
 
-// ★★★ 車馬費去重：同日 + 縣市 + 區域 + 地址，只收一次車馬費 ★★★
 const applyTransportDedup = (itemsWithCalc) => {
   const seenKeys = new Set();
 
@@ -950,6 +949,139 @@ const QuotePreview = ({
   );
 };
 
+// ========== 1. 新增：款項管理 Modal (PaymentModal) ==========
+
+const PaymentModal = ({ quote, onClose, onSave }) => {
+  const [data, setData] = useState({
+    depositAmount: quote.depositAmount || '',
+    depositNote: quote.depositNote || '',
+    adjustmentAmount: quote.adjustmentAmount || '',
+    adjustmentNote: quote.adjustmentNote || '',
+  });
+
+  const total = quote.totalAmount || 0;
+  const deposit = parseInt(data.depositAmount || 0);
+  const adjustment = parseInt(data.adjustmentAmount || 0);
+  const remaining = total - deposit + adjustment;
+
+  const handleSubmit = () => {
+    onSave(quote.id, data);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+        <div className="bg-orange-500 p-4 flex justify-between items-center text-white">
+          <h3 className="font-bold text-lg flex items-center">
+            <Wallet className="w-5 h-5 mr-2" />
+            款項管理 - {quote.clientInfo.companyName}
+          </h3>
+          <button
+            onClick={onClose}
+            className="hover:bg-orange-600 p-1 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* 總金額顯示 */}
+          <div className="flex justify-between items-center border-b pb-4">
+            <span className="text-gray-500 font-medium">報價總額</span>
+            <span className="text-2xl font-bold text-gray-800">
+              ${total.toLocaleString()}
+            </span>
+          </div>
+
+          {/* 訂金區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              預收訂金 (減項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.depositAmount}
+                onChange={(e) =>
+                  setData({ ...data, depositAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="訂金備註 (如: 匯款後五碼)"
+              value={data.depositNote}
+              onChange={(e) =>
+                setData({ ...data, depositNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 追加區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              追加金額 (加項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.adjustmentAmount}
+                onChange={(e) =>
+                  setData({ ...data, adjustmentAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="追加備註 (如: 現場加人)"
+              value={data.adjustmentNote}
+              onChange={(e) =>
+                setData({ ...data, adjustmentNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 結果試算 */}
+          <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
+            <span className="text-orange-800 font-bold">待付款金額 (尾款)</span>
+            <span className="text-2xl font-bold text-orange-600">
+              ${remaining.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700"
+          >
+            儲存款項資訊
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ========== 報價單預覽 Modal（含下載 PDF） ==========
 
 const PreviewModal = ({ quote, onClose }) => {
@@ -1047,9 +1179,6 @@ const PreviewModal = ({ quote, onClose }) => {
 // ========== 報價單建立 / 編輯表單 ==========
 
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
-  // ★ 新增：內部排程模式（不開報價單）
-  const [isInternal, setIsInternal] = useState(initialData?.type === 'internal' || false);
-
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
       companyName: '',
@@ -1059,18 +1188,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       address: '',
     },
   );
-  const [status, setStatus] = useState(initialData?.status || 'draft'); // 改為 useState 才能即時切換
+  const [status] = useState(initialData?.status || 'draft');
   const [isSigned, setIsSigned] = useState(false);
 
-  // ★ 新增：款項管理（訂金 / 追加）
-  const [paymentInfo, setPaymentInfo] = useState({
-    depositAmount: initialData?.depositAmount || '',
-    depositNote: initialData?.depositNote || '',
-    adjustmentAmount: initialData?.adjustmentAmount || '',
-    adjustmentNote: initialData?.adjustmentNote || '',
-  });
-
-  // 初始化 items
+  // 初始化 items（包含舊資料轉換成 timeRange）
   const [items, setItems] = useState(() => {
     if (initialData?.items) {
       return initialData.items.map((raw) => {
@@ -1118,7 +1239,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         city: '台北市',
         area: '',
         eventDate: '',
-        timeRange: '',
+        timeRange: '', // ★ 新欄位：時間區間（手動輸入）
         hasInvoice: false,
         enableDiscount90: false,
         customDiscount: 0,
@@ -1134,41 +1255,17 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
   // 先逐筆計算 → 再做「車馬費去重」
   const calculatedItems = useMemo(() => {
-    if (isInternal) {
-      // 內部排程模式：不計算金額
-      return items.map(item => ({
-        ...item,
-        calc: {
-          subTotal: 0,
-          discountAmount: 0,
-          isDiscountApplied: false,
-          tax: 0,
-          transportFee: 0,
-          teacherFee: 0,
-          finalTotal: 0,
-          totalExtraFee: 0,
-          error: null
-        }
-      }));
-    }
     const withCalc = items.map((item) => ({
       ...item,
       calc: calculateItem(item),
     }));
     return applyTransportDedup(withCalc);
-  }, [items, isInternal]);
+  }, [items]);
 
-  const totalAmount = isInternal ? 0 : calculatedItems.reduce(
+  const totalAmount = calculatedItems.reduce(
     (sum, item) => sum + (item.calc.finalTotal || 0),
     0,
   );
-
-  // ★ 計算剩餘尾款
-  const remainingBalance = useMemo(() => {
-    const dep = parseInt(paymentInfo.depositAmount) || 0;
-    const adj = parseInt(paymentInfo.adjustmentAmount) || 0;
-    return totalAmount - dep + adj;
-  }, [totalAmount, paymentInfo.depositAmount, paymentInfo.adjustmentAmount]);
 
   const updateItem = (index, field, value) => {
     const newItems = [...items];
@@ -1249,60 +1346,26 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
   const handleSave = () => {
     const hasError = calculatedItems.some((i) => i.calc.error);
-    if (hasError && !isInternal) {
+    if (hasError) {
       alert('報價單中有項目不符合規則，請修正後再儲存。');
       return;
     }
     onSave({
-      type: isInternal ? 'internal' : 'quote', // ★ 儲存類型
       clientInfo,
       items: calculatedItems,
       totalAmount,
-      status: isInternal ? 'confirmed' : status, // 內部排程預設確認
-      ...paymentInfo, // ★ 儲存款項資訊
+      status,
     });
   };
 
-  // 判斷是否顯示款項欄位：狀態為 paid 或 closed
-  const showPaymentFields = status === 'paid' || status === 'closed';
-
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8">
-      {/* ★ 內部排程開關 */}
-      <div className="bg-gray-800 text-white p-4 rounded-lg flex items-center justify-between">
-        <div className="flex items-center">
-            <Calendar className="w-6 h-6 mr-3 text-yellow-400"/>
-            <div>
-                <h3 className="font-bold text-lg">新增模式設定</h3>
-                <p className="text-xs text-gray-300">若此活動為內部老師排課（不需開報價單），請勾選此項目</p>
-            </div>
-        </div>
-        <label className="flex items-center space-x-3 cursor-pointer select-none bg-gray-700 px-4 py-2 rounded border border-gray-600 hover:bg-gray-600 transition">
-            <input
-            type="checkbox"
-            className="w-5 h-5 accent-yellow-500"
-            checked={isInternal}
-            onChange={(e) => setIsInternal(e.target.checked)}
-            />
-            <span className="font-bold text-yellow-400">這是內部排課（不產出報價單）</span>
-        </label>
-      </div>
-
       {/* 客戶資訊 */}
       <div className="print:hidden space-y-6">
         <section className={SECTION_CLASS}>
-          <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center justify-between">
-            <div className="flex items-center">
-                <div className="w-1 h-6 bg-slate-800 mr-2 rounded" />
-                客戶基本資料 {isInternal ? '(內部排課可簡填)' : '(報價單抬頭)'}
-            </div>
-            {/* 這裡也可以切換狀態 */}
-            {!isInternal && (
-                <div className="flex items-center text-sm font-normal">
-                    <span className="mr-2">目前狀態：</span>
-                    <StatusSelector status={status} onChange={setStatus} />
-                </div>
-            )}
+          <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
+            <div className="w-1 h-6 bg-slate-800 mr-2 rounded" />
+            客戶基本資料 (報價單抬頭)
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -1319,53 +1382,48 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 }
               />
             </div>
-            {/* 內部排程隱藏詳細客戶資料 */}
-            {!isInternal && (
-              <>
-                <div>
-                  <label className={LABEL_CLASS}>統一編號</label>
-                  <input
-                    className={INPUT_CLASS}
-                    placeholder="選填"
-                    value={clientInfo.taxId}
-                    onChange={(e) =>
-                      setClientInfo((prev) => ({
-                        ...prev,
-                        taxId: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>聯絡人</label>
-                  <input
-                    className={INPUT_CLASS}
-                    placeholder="請輸入聯絡人"
-                    value={clientInfo.contactPerson}
-                    onChange={(e) =>
-                      setClientInfo((prev) => ({
-                        ...prev,
-                        contactPerson: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>電話</label>
-                  <input
-                    className={INPUT_CLASS}
-                    placeholder="請輸入電話"
-                    value={clientInfo.phone}
-                    onChange={(e) =>
-                      setClientInfo((prev) => ({
-                        ...prev,
-                        phone: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </>
-            )}
+            <div>
+              <label className={LABEL_CLASS}>統一編號</label>
+              <input
+                className={INPUT_CLASS}
+                placeholder="選填"
+                value={clientInfo.taxId}
+                onChange={(e) =>
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    taxId: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>聯絡人</label>
+              <input
+                className={INPUT_CLASS}
+                placeholder="請輸入聯絡人"
+                value={clientInfo.contactPerson}
+                onChange={(e) =>
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    contactPerson: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>電話</label>
+              <input
+                className={INPUT_CLASS}
+                placeholder="請輸入電話"
+                value={clientInfo.phone}
+                onChange={(e) =>
+                  setClientInfo((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
+                }
+              />
+            </div>
           </div>
         </section>
 
@@ -1376,12 +1434,12 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           return (
             <div
               key={item.id}
-              className={`bg-white p-6 rounded-lg shadow-md border-l-4 relative ${isInternal ? 'border-yellow-500' : 'border-blue-500'}`}
+              className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative"
             >
               <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-lg font-bold flex items-center ${isInternal ? 'text-yellow-700' : 'text-blue-800'}`}>
+                <h3 className="text-lg font-bold text-blue-800 flex items-center">
                   <Plus className="w-5 h-5 mr-2" />
-                  {isInternal ? '排程項目' : '課程項目'} ({idx + 1})
+                  課程項目 ({idx + 1})
                 </h3>
                 {items.length > 1 && (
                   <button
@@ -1413,7 +1471,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 </div>
                 <div className="md:col-span-2">
                   <label className={LABEL_CLASS}>
-                    課程名稱 {isInternal ? '' : `（單價: $${item.price}）`}
+                    課程名稱 （單價: ${item.price}）
                   </label>
                   <select
                     className={INPUT_CLASS}
@@ -1424,7 +1482,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                   >
                     {COURSE_DATA[item.courseSeries]?.map((c) => (
                       <option key={c.name} value={c.name}>
-                        {c.name} {isInternal ? '' : `($${c.price})`}
+                        {c.name} (${c.price})
                       </option>
                     ))}
                   </select>
@@ -1469,43 +1527,37 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 </div>
               </div>
 
-              {/* 內部排程隱藏：發票、九折 */}
-              {!isInternal && (
-                  <div className="flex flex-col gap-2 mb-4">
-                    <div className="flex gap-4">
-                      <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
-                        <input
-                          type="checkbox"
-                          className="mr-2 w-4 h-4"
-                          checked={item.hasInvoice}
-                          onChange={(e) =>
-                            updateItem(idx, 'hasInvoice', e.target.checked)
-                          }
-                        />
-                        <span className="text-sm font-medium text-gray-700">
-                          是否開立發票？（加 5%）
-                        </span>
-                      </label>
-                      <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
-                        <input
-                          type="checkbox"
-                          className="mr-2 w-4 h-4"
-                          checked={item.enableDiscount90 || false}
-                          onChange={(e) =>
-                            updateItem(
-                              idx,
-                              'enableDiscount90',
-                              e.target.checked,
-                            )
-                          }
-                        />
-                        <span className="text-sm font-medium text-red-700">
-                          套用九折優惠
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-              )}
+              {/* 發票、九折 */}
+              <div className="flex flex-col gap-2 mb-4">
+                <div className="flex gap-4">
+                  <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
+                    <input
+                      type="checkbox"
+                      className="mr-2 w-4 h-4"
+                      checked={item.hasInvoice}
+                      onChange={(e) =>
+                        updateItem(idx, 'hasInvoice', e.target.checked)
+                      }
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      是否開立發票？（加 5%）
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
+                    <input
+                      type="checkbox"
+                      className="mr-2 w-4 h-4"
+                      checked={item.enableDiscount90 || false}
+                      onChange={(e) =>
+                        updateItem(idx, 'enableDiscount90', e.target.checked)
+                      }
+                    />
+                    <span className="text-sm font-medium text-red-700">
+                      套用九折優惠
+                    </span>
+                  </label>
+                </div>
+              </div>
 
               {/* 地點 / 車馬費設定 */}
               <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
@@ -1516,21 +1568,18 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       name={`mode-${item.id}`}
                       className="mr-2 w-4 h-4"
                       checked={item.locationMode === 'outing'}
-                      onChange={() =>
-                        updateItem(idx, 'locationMode', 'outing')
-                      }
+                      onChange={() => updateItem(idx, 'locationMode', 'outing')}
                     />
                     外派教學
                   </label>
+
                   <label className="flex items-center cursor-pointer font-bold text-gray-700">
                     <input
                       type="radio"
                       name={`mode-${item.id}`}
                       className="mr-2 w-4 h-4"
                       checked={item.locationMode === 'store'}
-                      onChange={() =>
-                        updateItem(idx, 'locationMode', 'store')
-                      }
+                      onChange={() => updateItem(idx, 'locationMode', 'store')}
                     />
                     店內包班
                   </label>
@@ -1555,13 +1604,12 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     <div>
                       <label className={LABEL_CLASS}>
                         縣市{' '}
-                        {calcItem.calc.transportFee > 0 && !isInternal &&
-                          !calcItem.area && (
-                            <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                              預估: $
-                              {calcItem.calc.transportFee.toLocaleString()}
-                            </span>
-                          )}
+                        {calcItem.calc.transportFee > 0 && !calcItem.area && (
+                          <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
+                            預估: $
+                            {calcItem.calc.transportFee.toLocaleString()}
+                          </span>
+                        )}
                       </label>
                       <select
                         className={INPUT_CLASS}
@@ -1587,7 +1635,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                         <div>
                           <label className={LABEL_CLASS}>
                             區域{' '}
-                            {calcItem.calc.transportFee > 0 && !isInternal && (
+                            {calcItem.calc.transportFee > 0 && (
                               <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
                                 +$
                                 {calcItem.calc.transportFee.toLocaleString()}
@@ -1606,7 +1654,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                               TRANSPORT_FEES[item.city].zones,
                             ).map(([zone, fee]) => (
                               <option key={zone} value={zone}>
-                                {zone} {isInternal ? '' : `(+$${fee})`}
+                                {zone} (+${fee})
                               </option>
                             ))}
                           </select>
@@ -1653,147 +1701,135 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                   className={INPUT_CLASS}
                   placeholder="例如：需提前半小時進場、特殊需求..."
                   value={item.itemNote || ''}
-                  onChange={(e) =>
-                    updateItem(idx, 'itemNote', e.target.value)
-                  }
+                  onChange={(e) => updateItem(idx, 'itemNote', e.target.value)}
                 />
               </div>
 
-              {/* 內部排程隱藏：折扣 & 額外收費 */}
-              {!isInternal && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* 手動折扣 */}
-                    <div className="bg-red-50 p-4 rounded border border-red-100">
-                      <label className={LABEL_CLASS + ' text-red-800'}>
-                        手動折扣（減項）
-                      </label>
-                      <div className="flex flex-col gap-2">
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-gray-500 font-bold">
-                            -
-                          </span>
+              {/* 折扣 & 額外收費 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 手動折扣 */}
+                <div className="bg-red-50 p-4 rounded border border-red-100">
+                  <label className={LABEL_CLASS + ' text-red-800'}>
+                    手動折扣（減項）
+                  </label>
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500 font-bold">
+                        -
+                      </span>
+                      <input
+                        type="number"
+                        className={INPUT_CLASS + ' pl-6'}
+                        placeholder="金額"
+                        value={item.customDiscount}
+                        onChange={(e) =>
+                          updateItem(idx, 'customDiscount', e.target.value)
+                        }
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      className={INPUT_CLASS}
+                      placeholder="折扣說明"
+                      value={item.customDiscountDesc || ''}
+                      onChange={(e) =>
+                        updateItem(idx, 'customDiscountDesc', e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* 額外加價 */}
+                <div className="bg-blue-50 p-4 rounded border border-blue-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>
+                      額外加價（加項）
+                    </label>
+                    <button
+                      onClick={() => addExtraFee(idx)}
+                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      新增
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {item.extraFees &&
+                      item.extraFees.map((fee) => (
+                        <div
+                          key={fee.id}
+                          className="flex gap-2 items-center"
+                        >
                           <input
-                            type="number"
-                            className={INPUT_CLASS + ' pl-6'}
-                            placeholder="金額"
-                            value={item.customDiscount}
+                            type="checkbox"
+                            className="w-5 h-5 cursor-pointer accent-blue-600"
+                            checked={fee.isEnabled}
                             onChange={(e) =>
-                              updateItem(
+                              updateExtraFee(
                                 idx,
-                                'customDiscount',
-                                e.target.value,
+                                fee.id,
+                                'isEnabled',
+                                e.target.checked,
                               )
                             }
                           />
+                          <input
+                            type="text"
+                            className={
+                              INPUT_CLASS +
+                              ' flex-1 ' +
+                              (!fee.isEnabled ? 'opacity-50' : '')
+                            }
+                            placeholder="加價說明"
+                            value={fee.description}
+                            onChange={(e) =>
+                              updateExtraFee(
+                                idx,
+                                fee.id,
+                                'description',
+                                e.target.value,
+                              )
+                            }
+                            disabled={!fee.isEnabled}
+                          />
+                          <div className="relative w-32">
+                            <span className="absolute left-2 top-2 text-gray-500 font-bold">
+                              +
+                            </span>
+                            <input
+                              type="number"
+                              className={
+                                INPUT_CLASS +
+                                ' pl-5 ' +
+                                (!fee.isEnabled ? 'opacity-50' : '')
+                              }
+                              placeholder="金額"
+                              value={fee.amount}
+                              onChange={(e) =>
+                                updateExtraFee(
+                                  idx,
+                                  fee.id,
+                                  'amount',
+                                  e.target.value,
+                                )
+                              }
+                              disabled={!fee.isEnabled}
+                            />
+                          </div>
+                          <button
+                            onClick={() => removeExtraFee(idx, fee.id)}
+                            className="text-red-400 hover:text-red-600 p-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <input
-                          type="text"
-                          className={INPUT_CLASS}
-                          placeholder="折扣說明"
-                          value={item.customDiscountDesc || ''}
-                          onChange={(e) =>
-                            updateItem(
-                              idx,
-                              'customDiscountDesc',
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    {/* 額外加價 */}
-                    <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                      <div className="flex justify-between items-center mb-2">
-                        <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>
-                          額外加價（加項）
-                        </label>
-                        <button
-                          onClick={() => addExtraFee(idx)}
-                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
-                        >
-                          <Plus className="w-3 h-3 mr-1" />
-                          新增
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {item.extraFees &&
-                          item.extraFees.map((fee) => (
-                            <div
-                              key={fee.id}
-                              className="flex gap-2 items-center"
-                            >
-                              <input
-                                type="checkbox"
-                                className="w-5 h-5 cursor-pointer accent-blue-600"
-                                checked={fee.isEnabled}
-                                onChange={(e) =>
-                                  updateExtraFee(
-                                    idx,
-                                    fee.id,
-                                    'isEnabled',
-                                    e.target.checked,
-                                  )
-                                }
-                              />
-                              <input
-                                type="text"
-                                className={
-                                  INPUT_CLASS +
-                                  ' flex-1 ' +
-                                  (!fee.isEnabled ? 'opacity-50' : '')
-                                }
-                                placeholder="加價說明"
-                                value={fee.description}
-                                onChange={(e) =>
-                                  updateExtraFee(
-                                    idx,
-                                    fee.id,
-                                    'description',
-                                    e.target.value,
-                                  )
-                                }
-                                disabled={!fee.isEnabled}
-                              />
-                              <div className="relative w-32">
-                                <span className="absolute left-2 top-2 text-gray-500 font-bold">
-                                  +
-                                </span>
-                                <input
-                                  type="number"
-                                  className={
-                                    INPUT_CLASS +
-                                    ' pl-5 ' +
-                                    (!fee.isEnabled ? 'opacity-50' : '')
-                                  }
-                                  placeholder="金額"
-                                  value={fee.amount}
-                                  onChange={(e) =>
-                                    updateExtraFee(
-                                      idx,
-                                      fee.id,
-                                      'amount',
-                                      e.target.value,
-                                    )
-                                  }
-                                  disabled={!fee.isEnabled}
-                                />
-                              </div>
-                              <button
-                                onClick={() => removeExtraFee(idx, fee.id)}
-                                className="text-red-400 hover:text-red-600 p-2"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
+                      ))}
                   </div>
-              )}
+                </div>
+              </div>
 
               {/* 規則錯誤提示 */}
-              {calcItem.calc.error && !isInternal && (
+              {calcItem.calc.error && (
                 <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
                   <AlertCircle className="w-5 h-5 mr-2" />
                   <span className="font-bold">{calcItem.calc.error}</span>
@@ -1812,103 +1848,32 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         </button>
       </div>
 
-      {/* ★ 款項管理區塊 (當狀態是 paid 或 closed 時顯示) */}
-      {showPaymentFields && !isInternal && (
-        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 animate-fade-in">
-            <h3 className="text-lg font-bold text-orange-800 flex items-center mb-4">
-                <Wallet className="w-5 h-5 mr-2" />
-                款項管理（訂金與尾款）
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 訂金 */}
-                <div className="bg-white p-4 rounded border border-orange-100 shadow-sm">
-                    <div className="flex justify-between mb-2">
-                        <label className="font-bold text-gray-700">預付訂金 (減項)</label>
-                        <span className="text-red-500 font-bold">- ${parseInt(paymentInfo.depositAmount || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex gap-2 mb-2">
-                        <span className="flex items-center text-gray-500 font-bold">$</span>
-                        <input 
-                            type="number" 
-                            className={INPUT_CLASS} 
-                            placeholder="輸入訂金金額"
-                            value={paymentInfo.depositAmount}
-                            onChange={e => setPaymentInfo({...paymentInfo, depositAmount: e.target.value})}
-                        />
-                    </div>
-                    <input 
-                        type="text" 
-                        className={INPUT_CLASS} 
-                        placeholder="訂金備註 (例: 後五碼 12345)"
-                        value={paymentInfo.depositNote}
-                        onChange={e => setPaymentInfo({...paymentInfo, depositNote: e.target.value})}
-                    />
-                </div>
-
-                {/* 追加款項 */}
-                <div className="bg-white p-4 rounded border border-orange-100 shadow-sm">
-                    <div className="flex justify-between mb-2">
-                        <label className="font-bold text-gray-700">追加金額 (加項)</label>
-                        <span className="text-green-600 font-bold">+ ${parseInt(paymentInfo.adjustmentAmount || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex gap-2 mb-2">
-                        <span className="flex items-center text-gray-500 font-bold">$</span>
-                        <input 
-                            type="number" 
-                            className={INPUT_CLASS} 
-                            placeholder="輸入追加金額"
-                            value={paymentInfo.adjustmentAmount}
-                            onChange={e => setPaymentInfo({...paymentInfo, adjustmentAmount: e.target.value})}
-                        />
-                    </div>
-                    <input 
-                        type="text" 
-                        className={INPUT_CLASS} 
-                        placeholder="追加備註 (例: 現場加人費)"
-                        value={paymentInfo.adjustmentNote}
-                        onChange={e => setPaymentInfo({...paymentInfo, adjustmentNote: e.target.value})}
-                    />
-                </div>
-            </div>
-            
-            {/* 試算結果 */}
-            <div className="mt-4 pt-4 border-t border-orange-200 flex justify-end items-end flex-col">
-                <div className="text-sm text-gray-600">報價總額: ${totalAmount.toLocaleString()}</div>
-                <div className="text-2xl font-bold text-orange-900 mt-1">
-                    剩餘尾款: ${remainingBalance.toLocaleString()}
-                </div>
-            </div>
-        </div>
-      )}
-
       {/* 下方即時預覽 + 儲存 */}
       <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
         <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
           <h3 className="text-2xl font-bold text-gray-800 flex items-center">
             <Eye className="mr-2" />
-            {isInternal ? '內部排程確認' : '即時報價單預覽'}
+            即時報價單預覽
           </h3>
           <div className="flex gap-4 items-center flex-wrap">
-            {!isInternal && (
-                <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-                <input
-                    type="checkbox"
-                    checked={isSigned}
-                    onChange={(e) => setIsSigned(e.target.checked)}
-                    className="w-5 h-5 text-blue-600"
-                />
-                <span className="text-sm font-bold text-blue-800">
-                    蓋上印章
-                </span>
-                </label>
-            )}
+            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+              <input
+                type="checkbox"
+                checked={isSigned}
+                onChange={(e) => setIsSigned(e.target.checked)}
+                className="w-5 h-5 text-blue-600"
+              />
+              <span className="text-sm font-bold text-blue-800">
+                蓋上印章
+              </span>
+            </label>
 
             <button
               onClick={handleSave}
-              className={`px-8 py-2 text-white rounded font-bold shadow flex items-center ${isInternal ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
             >
               <Save className="w-4 h-4 mr-2" />
-              {isInternal ? '儲存至行事曆' : '儲存至資料庫'}
+              儲存至資料庫
             </button>
             <button
               onClick={onCancel}
@@ -1919,40 +1884,28 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           </div>
         </div>
 
-        {/* 內部排程不顯示預覽，只顯示簡單確認框 */}
-        {isInternal ? (
-            <div className="p-8 bg-gray-100 rounded text-center border-2 border-dashed border-gray-300">
-                <p className="text-gray-500 font-bold mb-2">此模式為內部排程，不會產生報價單預覽。</p>
-                <p className="text-sm text-gray-400">儲存後將直接更新至行事曆系統。</p>
-            </div>
-        ) : (
-            <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-            <QuotePreview
-                idName="creator-preview-area"
-                clientInfo={clientInfo}
-                items={calculatedItems}
-                totalAmount={totalAmount}
-                dateStr={new Date().toISOString().slice(0, 10)}
-                isSigned={isSigned}
-                stampUrl={STAMP_URL}
-            />
-            </div>
-        )}
-
+        <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
+          <QuotePreview
+            idName="creator-preview-area"
+            clientInfo={clientInfo}
+            items={calculatedItems}
+            totalAmount={totalAmount}
+            dateStr={new Date().toISOString().slice(0, 10)}
+            isSigned={isSigned}
+            stampUrl={STAMP_URL}
+          />
+        </div>
       </div>
     </div>
   );
 };
 
-// ========== 統計頁面 (略微修改以排除 Internal 類型) ==========
+// ========== 統計頁面 ==========
 
 const StatsView = ({ quotes }) => {
-  // 過濾掉內部排程
-  const validQuotes = quotes.filter(q => q.type !== 'internal');
-
   const availableMonths = useMemo(() => {
     const months = new Set();
-    validQuotes.forEach((q) => {
+    quotes.forEach((q) => {
       if (q.status !== 'draft') {
         const d = getSafeDate(q.createdAt);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
@@ -1963,7 +1916,7 @@ const StatsView = ({ quotes }) => {
       }
     });
     return Array.from(months).sort().reverse();
-  }, [validQuotes]);
+  }, [quotes]);
 
   const [selectedMonth, setSelectedMonth] = useState(
     availableMonths[0] || '',
@@ -2015,7 +1968,7 @@ const StatsView = ({ quotes }) => {
 
     if (!selectedMonth) return result;
 
-    validQuotes.forEach((q) => {
+    quotes.forEach((q) => {
       if (q.status === 'draft') return;
       const d = getSafeDate(q.createdAt);
       const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
@@ -2042,7 +1995,7 @@ const StatsView = ({ quotes }) => {
     });
 
     return result;
-  }, [validQuotes, selectedMonth]);
+  }, [quotes, selectedMonth]);
 
   if (availableMonths.length === 0) {
     return (
@@ -2099,7 +2052,82 @@ const StatsView = ({ quotes }) => {
           </div>
         </div>
       </div>
-      {/* (...省略圖表部分以節省篇幅，邏輯不變...) */}
+
+      {/* 狀態分佈 */}
+      <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+        <PieChart className="w-5 h-5 mr-2" />
+        案件狀態分佈
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {Object.keys(stats.statuses).map((key) => (
+          <div
+            key={key}
+            className={`p-4 rounded-lg border ${stats.statuses[
+              key
+            ].color
+              .replace('bg-', 'border-')
+              .replace('100', '200')} ${stats.statuses[key].color}`}
+          >
+            <p className="text-xs font-bold uppercase opacity-70">
+              {stats.statuses[key].name}
+            </p>
+            <p className="text-2xl font-bold mt-1">
+              {stats.statuses[key].count}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* 地區佔比 */}
+      <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+        <MapPin className="w-5 h-5 mr-2" />
+        地區業績佔比
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {Object.keys(stats.regions).map((key) => {
+          const region = stats.regions[key];
+          const percentage =
+            stats.totalRevenue > 0
+              ? Math.round((region.revenue / stats.totalRevenue) * 100)
+              : 0;
+          return (
+            <div
+              key={key}
+              className="bg-white p-6 rounded-xl shadow border border-gray-100 relative overflow-hidden"
+            >
+              <div
+                className={`absolute top-0 left-0 w-2 h-full ${region.color}`}
+              />
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-bold text-gray-700">
+                  {region.name}區域
+                </h4>
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                  {percentage}% 佔比
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wider">
+                    區域營收
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${region.revenue.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wider">
+                    案件數量
+                  </p>
+                  <p className="text-lg font-semibold text-gray-700">
+                    {region.count} 件
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -2123,53 +2151,46 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
     time: '',
     region: 'North', // North, Central, South
     location: '台北店', // 實際據點
-    teacher: '',
-    note: ''
   });
 
-  // --- 資料合併邏輯 ---
-  // 1. 處理企業報價單 (排除 draft)
-  const quoteEvents = useMemo(() => {
-    return quotes
+  // --- 資料合併邏輯 (白屏修復：增加 ?. 和預設值) ---
+  const allEvents = useMemo(() => {
+    // 1. 處理企業報價單 (排除 draft)
+    const quoteEvents = quotes
       .filter(q => q.status !== 'draft')
       .map(q => {
-        const first = q.items[0] || {};
+        const first = q.items?.[0] || {};
         return {
           id: q.id,
-          type: q.type === 'internal' ? 'internal' : 'quote', // 企業 or 內部排程
+          type: 'quote',
           date: first.eventDate, // YYYY-MM-DD
           time: first.timeRange || first.startTime || '',
-          title: q.clientInfo.companyName,
-          subTitle: `${first.courseName} (${first.peopleCount}人)`,
+          title: q.clientInfo?.companyName || '未知客戶',
+          subTitle: `${first.courseName || '未定課程'} (${first.peopleCount || 0}人)`,
           region: first.outingRegion || first.regionType || 'North',
-          location: `${first.city} ${first.address}`,
+          location: `${first.city || ''} ${first.address || ''}`,
           raw: q
         };
       });
-  }, [quotes]);
 
-  // 2. 處理老師常態課
-  const regularEvents = useMemo(() => {
-    return regularClasses.map(r => ({
+    // 2. 處理老師常態課
+    const regularEvents = regularClasses.map(r => ({
       id: r.id,
-      type: 'regular', // 常態課標記
+      type: 'regular',
       date: r.date,
       time: r.time,
-      title: r.courseName,
-      subTitle: r.teacher ? `老師: ${r.teacher}` : '(未定)',
-      region: r.region,
-      location: r.location,
-      note: r.note,
+      title: r.courseName || r.title,
+      subTitle: '常態課',
+      region: r.region || 'North',
+      location: r.location || '台北店',
       raw: r
     }));
-  }, [regularClasses]);
 
-  // 3. 合併所有事件並過濾區域
-  const allEvents = useMemo(() => {
+    // 3. 合併所有事件並過濾區域
     const combined = [...quoteEvents, ...regularEvents];
     if (filterRegion === 'all') return combined;
     return combined.filter(e => e.region === filterRegion);
-  }, [quoteEvents, regularEvents, filterRegion]);
+  }, [quotes, regularClasses, filterRegion]);
 
   // --- 日期操作 ---
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -2197,8 +2218,9 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
     setViewMode('day');
   };
 
-  // --- 取得特定日期的事件 ---
+  // --- 取得特定日期的事件 (修復白屏：確保日期有效) ---
   const getEventsForDay = (date) => {
+    if (!date) return [];
     return allEvents.filter(e => {
       if (!e.date) return false;
       const d = new Date(e.date);
@@ -2213,12 +2235,7 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
   // --- 顏色樣式 ---
   const getEventStyle = (event) => {
     if (event.type === 'regular') {
-      // 常態課：紫色
       return 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200';
-    }
-    if (event.type === 'internal') {
-      // 內部排程：灰色
-      return 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200';
     }
     // 企業報價：依照區域
     const map = {
@@ -2232,7 +2249,7 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
   // --- 處理新增/修改常態課 ---
   const handleOpenAddModal = () => {
       setRegularForm({
-        courseName: '', date: '', time: '', region: 'North', location: '台北店', teacher: '', note: ''
+        courseName: '', date: '', time: '', region: 'North', location: '台北店'
       });
       setIsEditingRegular(false);
       setEditingRegularId(null);
@@ -2245,10 +2262,23 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
       return;
     }
     
+    // 根據地點自動判斷區域
+    let region = 'North';
+    if (regularForm.location.includes('台中')) region = 'Central';
+    if (regularForm.location.includes('高雄')) region = 'South';
+
+    const data = {
+        courseName: regularForm.courseName,
+        date: regularForm.date,
+        time: regularForm.time,
+        location: regularForm.location,
+        region: region
+    };
+    
     if (isEditingRegular && editingRegularId) {
-        onUpdateRegularClass(editingRegularId, regularForm);
+        onUpdateRegularClass(editingRegularId, data);
     } else {
-        onAddRegularClass(regularForm);
+        onAddRegularClass(data);
     }
     
     setShowAddModal(false);
@@ -2271,17 +2301,14 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
           courseName: r.courseName || '',
           date: r.date || '',
           time: r.time || '',
-          region: r.region || 'North',
           location: r.location || '台北店',
-          teacher: r.teacher || '',
-          note: r.note || ''
+          region: r.region || 'North'
       });
       setEditingRegularId(r.id);
       setIsEditingRegular(true);
       setShowAddModal(true);
 
     } else if (!publicMode) {
-      // 企業報價單點擊顯示簡單資訊
       alert(`企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`);
     }
   };
@@ -2296,7 +2323,7 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
         {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
           <div key={d} className="bg-gray-50 p-2 text-center font-bold text-gray-500">{d}</div>
         ))}
-        {blanks.map((b) => <div key={`blank-${b}`} className="bg-white min-h-[100px]" />)}
+        {blanks.map((b, i) => <div key={`blank-${i}`} className="bg-white min-h-[100px]" />)}
         {days.map((day) => {
           const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
           const events = getEventsForDay(date);
@@ -2333,7 +2360,7 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
                 <div className="mr-6 text-center min-w-[80px]">
                   <div className="text-xl font-bold text-gray-800">{evt.time || '全天'}</div>
                   <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${evt.type === 'regular' ? 'bg-purple-200 text-purple-800' : 'bg-gray-200 text-gray-700'}`}>
-                    {evt.type === 'regular' ? '常態課' : (evt.type === 'internal' ? '內部' : '企業')}
+                    {evt.type === 'regular' ? '常態課' : '企業'}
                   </div>
                 </div>
                 <div>
@@ -2346,11 +2373,6 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
                   <div className="text-gray-500 mt-1 text-sm flex items-center">
                     <MapPin className="w-4 h-4 mr-1"/>{evt.location}
                   </div>
-                  {evt.note && (
-                    <div className="text-gray-500 mt-1 text-sm bg-yellow-50 px-2 py-1 rounded inline-block">
-                      備註: {evt.note}
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
@@ -2383,7 +2405,7 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
               className="flex items-center gap-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 shadow text-sm font-bold mr-2"
             >
               <Plus className="w-4 h-4" />
-              新增老師常態課
+              新增常態課
             </button>
            )}
 
@@ -2413,14 +2435,14 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'day' && renderDayView()}
 
-      {/* --- 新增/編輯常態課 Modal --- */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+      {/* --- 新增/編輯常態課 Modal (簡化版) --- */}
+      {showAddModal && !publicMode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
-              <h3 className="text-xl font-bold text-purple-800 flex items-center">
-                <Plus className="w-5 h-5 mr-2" />
-                {isEditingRegular ? '編輯常態課' : '新增常態課'}
+              <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                {isEditingRegular ? '編輯常態課' : '新增常態課'} (老師排課)
               </h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X />
@@ -2429,18 +2451,18 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
 
             <div className="space-y-4">
               <div>
-                <label className={LABEL_CLASS}>課程名稱 (必填)</label>
+                <label className={LABEL_CLASS}>課程名稱</label>
                 <input
                   className={INPUT_CLASS}
                   value={regularForm.courseName}
                   onChange={e => setRegularForm({...regularForm, courseName: e.target.value})}
-                  placeholder="例如：流體畫體驗"
+                  placeholder="例如：水晶手鍊常態班"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={LABEL_CLASS}>日期 (必填)</label>
+                  <label className={LABEL_CLASS}>日期</label>
                   <input
                     type="date"
                     className={INPUT_CLASS}
@@ -2449,84 +2471,187 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLASS}>時間 (必填)</label>
+                  <label className={LABEL_CLASS}>時間 (選填)</label>
                   <input
-                    type="time"
+                    type="text"
                     className={INPUT_CLASS}
                     value={regularForm.time}
                     onChange={e => setRegularForm({...regularForm, time: e.target.value})}
+                    placeholder="14:00-16:00"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                   <label className={LABEL_CLASS}>地區分類</label>
-                   <select
-                     className={INPUT_CLASS}
-                     value={regularForm.region}
-                     onChange={e => setRegularForm({...regularForm, region: e.target.value})}
-                   >
-                     <option value="North">北部店內</option>
-                     <option value="Central">中部店內</option>
-                     <option value="South">南部店內</option>
-                   </select>
-                </div>
-                <div>
-                   <label className={LABEL_CLASS}>實際據點</label>
+              <div>
+                   <label className={LABEL_CLASS}>地區 (店內)</label>
                    <select
                      className={INPUT_CLASS}
                      value={regularForm.location}
                      onChange={e => setRegularForm({...regularForm, location: e.target.value})}
                    >
-                     <option value="台北店">台北店</option>
-                     <option value="台中店">台中店</option>
-                     <option value="高雄店">高雄店</option>
-                     <option value="其他">其他</option>
+                     <option value="台北店">台北店內 (北部)</option>
+                     <option value="台中店">台中店內 (中部)</option>
+                     <option value="高雄店">高雄店內 (南部)</option>
                    </select>
-                </div>
               </div>
+            </div>
 
-              <div>
-                <label className={LABEL_CLASS}>老師 (選填)</label>
-                <input
-                  className={INPUT_CLASS}
-                  value={regularForm.teacher}
-                  onChange={e => setRegularForm({...regularForm, teacher: e.target.value})}
-                  placeholder="例如：Apple 老師"
-                />
-              </div>
-
-              <div>
-                <label className={LABEL_CLASS}>備註 (選填)</label>
-                <textarea
-                  className={INPUT_CLASS}
-                  rows="2"
-                  value={regularForm.note}
-                  onChange={e => setRegularForm({...regularForm, note: e.target.value})}
-                />
-              </div>
-
-              <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-6">
                   {isEditingRegular && (
                       <button 
                         onClick={handleDeleteCurrentRegular}
-                        className="flex-1 bg-red-100 text-red-700 font-bold py-2 rounded hover:bg-red-200 border border-red-200"
+                        className="flex-1 bg-white text-red-600 border border-red-200 font-bold py-2 rounded hover:bg-red-50"
                       >
                           刪除
                       </button>
                   )}
+                  <button onClick={() => setShowAddModal(false)} className="flex-1 bg-white border border-gray-300 rounded text-gray-700 font-bold hover:bg-gray-50">
+                    取消
+                  </button>
                   <button
                     onClick={handleSubmitClass}
-                    className="flex-[2] bg-purple-600 text-white font-bold py-2 rounded hover:bg-purple-700"
+                    className="flex-[2] bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 flex justify-center items-center"
                   >
-                    {isEditingRegular ? '確認修改' : '確認新增'}
+                    <Save className="w-4 h-4 mr-2" />
+                    {isEditingRegular ? '儲存變更' : '儲存常態課'}
                   </button>
-              </div>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ========== 1. 新增：款項管理 Modal (PaymentModal) ==========
+
+const PaymentModal = ({ quote, onClose, onSave }) => {
+  const [data, setData] = useState({
+    depositAmount: quote.depositAmount || '',
+    depositNote: quote.depositNote || '',
+    adjustmentAmount: quote.adjustmentAmount || '',
+    adjustmentNote: quote.adjustmentNote || '',
+  });
+
+  const total = quote.totalAmount || 0;
+  const deposit = parseInt(data.depositAmount || 0);
+  const adjustment = parseInt(data.adjustmentAmount || 0);
+  const remaining = total - deposit + adjustment;
+
+  const handleSubmit = () => {
+    onSave(quote.id, data);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+        <div className="bg-orange-500 p-4 flex justify-between items-center text-white">
+          <h3 className="font-bold text-lg flex items-center">
+            <Wallet className="w-5 h-5 mr-2" />
+            款項管理 - {quote.clientInfo.companyName}
+          </h3>
+          <button
+            onClick={onClose}
+            className="hover:bg-orange-600 p-1 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* 總金額顯示 */}
+          <div className="flex justify-between items-center border-b pb-4">
+            <span className="text-gray-500 font-medium">報價總額</span>
+            <span className="text-2xl font-bold text-gray-800">
+              ${total.toLocaleString()}
+            </span>
+          </div>
+
+          {/* 訂金區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              預收訂金 (減項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.depositAmount}
+                onChange={(e) =>
+                  setData({ ...data, depositAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="訂金備註 (如: 匯款後五碼)"
+              value={data.depositNote}
+              onChange={(e) =>
+                setData({ ...data, depositNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 追加區塊 */}
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              追加金額 (加項)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-orange-300 outline-none"
+                placeholder="0"
+                value={data.adjustmentAmount}
+                onChange={(e) =>
+                  setData({ ...data, adjustmentAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="追加備註 (如: 現場加人)"
+              value={data.adjustmentNote}
+              onChange={(e) =>
+                setData({ ...data, adjustmentNote: e.target.value })
+              }
+            />
+          </div>
+
+          {/* 結果試算 */}
+          <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
+            <span className="text-orange-800 font-bold">待付款金額 (尾款)</span>
+            <span className="text-2xl font-bold text-orange-600">
+              ${remaining.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 bg-orange-600 text-white rounded font-bold hover:bg-orange-700"
+          >
+            儲存款項資訊
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -2541,7 +2666,8 @@ const QuoteList = ({
   onDelete,
   onChangeStatus,
   onSwitchView,
-  onSave // 需要傳入 onSave 給 Import 使用
+  onSave, // 需要傳入 onSave 給 Import 使用
+  onOpenPayment, // ★ 開啟款項 Modal
 }) => {
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState('all'); // ★ 月份過濾
@@ -2562,7 +2688,7 @@ const QuoteList = ({
   const filtered = quotes.filter((q) => {
     // 關鍵字 (搜尋公司名、課程名、訂金備註、追加備註)
     const kw = search.trim();
-    const firstItem = q.items[0] || {};
+    const firstItem = q.items?.[0] || {};
     const matchText = !kw || 
         (q.clientInfo.companyName || '').includes(kw) || 
         (firstItem.courseName || '').includes(kw) ||
@@ -2587,7 +2713,7 @@ const QuoteList = ({
 
     filtered.forEach(q => {
         const d = formatDate(q.createdAt);
-        const first = q.items[0] || {};
+        const first = q.items?.[0] || {};
         const row = [
             q.id,
             d,
@@ -2596,7 +2722,7 @@ const QuoteList = ({
             q.clientInfo.contactPerson || '',
             q.clientInfo.phone || '',
             `"${clientInfo.address || ''}"`, // 假設有這個欄位
-            q.type === 'internal' ? '內部排程' : '報價單',
+            '報價單',
             q.status,
             q.totalAmount || 0,
             `"${first.courseName || ''}"`,
@@ -2652,8 +2778,8 @@ const QuoteList = ({
                     taxId: clean(cols[3]),
                     address: ''
                 },
-                status: status === '內部排程' ? 'confirmed' : status,
-                type: status === '內部排程' ? 'internal' : 'quote',
+                status: status,
+                type: 'quote',
                 totalAmount: amount,
                 // 為了讓舊資料能進來，我們塞一個假的 item
                 items: [{
@@ -2794,11 +2920,11 @@ const QuoteList = ({
             )}
 
             {filtered.map((q) => {
-              const first = q.items[0] || {};
-              const isInternal = q.type === 'internal';
+              const first = q.items?.[0] || {};
+              const isInternal = q.type === 'internal'; // 兼容舊資料
 
               return (
-                <tr key={q.id} className={`border-t border-gray-100 hover:bg-gray-50 ${isInternal ? 'bg-gray-50' : ''}`}>
+                <tr key={q.id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-2 align-middle">
                     {formatDate(q.createdAt)}
                   </td>
@@ -2806,7 +2932,6 @@ const QuoteList = ({
                     <div className="font-medium text-gray-800">
                       {q.clientInfo.companyName || '-'}
                     </div>
-                    {isInternal && <span className="text-xs bg-gray-200 text-gray-600 px-1 rounded">內部排程</span>}
                   </td>
                   <td className="px-4 py-2 align-middle">
                     <div className="text-gray-800">
@@ -2820,26 +2945,31 @@ const QuoteList = ({
                     {isInternal ? '-' : `$${Number(q.totalAmount || 0).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-2 text-center align-middle">
-                    {isInternal ? (
-                        <span className="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-700">已確認</span>
-                    ) : (
-                        <StatusSelector
-                        status={q.status || 'draft'}
-                        onChange={(value) => onChangeStatus(q, value)}
-                        />
-                    )}
+                    <StatusSelector
+                      status={q.status || 'draft'}
+                      onChange={(value) => onChangeStatus(q, value)}
+                    />
                   </td>
                   <td className="px-4 py-2 text-right align-middle">
                     <div className="flex justify-end gap-2">
-                      {!isInternal && (
-                          <button
-                            onClick={() => onPreview(q)}
-                            className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 flex items-center"
+                      {/* ★ 款項按鈕：已回簽/已付訂/已結案顯示 */}
+                      {['confirmed', 'paid', 'closed'].includes(q.status) && (
+                          <button 
+                            onClick={() => onOpenPayment(q)} 
+                            className="px-2 py-1 text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded hover:bg-orange-200 flex items-center font-bold"
+                            title="款項管理 (訂金/追加)"
                           >
-                            <Printer className="w-3 h-3 mr-1" />
-                            預覽
+                              $
                           </button>
                       )}
+
+                      <button
+                        onClick={() => onPreview(q)}
+                        className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 flex items-center"
+                      >
+                        <Printer className="w-3 h-3 mr-1" />
+                        預覽
+                      </button>
                       <button
                         onClick={() => onEdit(q)}
                         className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"
@@ -2881,6 +3011,7 @@ const App = () => {
   );
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
+  const [paymentQuote, setPaymentQuote] = useState(null); // 款項 Modal
 
   const publicCalendarMode = urlMode === 'public' && urlView === 'calendar';
 
@@ -2936,7 +3067,7 @@ const App = () => {
         } else {
           await addDoc(collection(db, 'quotes'), {
             ...data,
-            status: data.type === 'internal' ? 'confirmed' : (data.status || 'pending'),
+            status: data.status || 'pending', // 報價單預設
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -2962,6 +3093,12 @@ const App = () => {
         if (db) await updateDoc(doc(db, 'quotes', quote.id), { status: newStatus, updatedAt: serverTimestamp() });
         setQuotes((prev) => prev.map((q) => q.id === quote.id ? { ...q, status: newStatus } : q));
       } catch (err) { console.error('更新狀態失敗', err); }
+  };
+
+  const handleSavePayment = async (id, data) => {
+      try {
+          if(db) await updateDoc(doc(db, 'quotes', id), data);
+      } catch(err) { console.error(err); alert('儲存款項失敗'); }
   };
 
   // --- 新增常態課處理函數 (★ 新增) ---
@@ -3039,7 +3176,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v2.4 (含常態課編輯)
+                內部管理系統 v3.0 (款項/行事曆修正版)
               </div>
             </div>
           </div>
@@ -3082,7 +3219,7 @@ const App = () => {
           </div>
         )}
 
-        {!loading && currentView === 'list' && (
+        {!loading && currentView === 'list' && !editingQuote && (
           <QuoteList
             quotes={quotes}
             onCreateNew={() => { setEditingQuote({}); setCurrentView('create'); }} // 傳空物件讓 Creator 知道是全新增
@@ -3091,12 +3228,13 @@ const App = () => {
             onDelete={handleDeleteQuote}
             onChangeStatus={handleChangeStatus}
             onSwitchView={(v) => setCurrentView(v)}
-            onExportCSV={() => alert('請實作 CSV 匯出邏輯')}
-            onImportCSV={() => alert('請實作 CSV 匯入邏輯')}
+            onExportCSV={handleExportCSV} // 傳入 CSV 函數
+            onImportCSV={handleImportCSV} // 傳入 CSV 函數
+            onOpenPayment={setPaymentQuote} // ★ 傳入 Payment Modal 開啟函數
           />
         )}
 
-        {!loading && currentView === 'create' && (
+        {!loading && (currentView === 'create' || editingQuote) && (
           <QuoteCreator
             initialData={editingQuote}
             onSave={handleSaveQuote}
@@ -3123,6 +3261,14 @@ const App = () => {
           quote={previewQuote}
           onClose={() => setPreviewQuote(null)}
         />
+      )}
+
+      {paymentQuote && (
+          <PaymentModal 
+            quote={paymentQuote}
+            onClose={() => setPaymentQuote(null)}
+            onSave={handleSavePayment}
+          />
       )}
     </div>
   );
