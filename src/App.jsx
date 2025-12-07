@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
 import {
   Plus,
   Calendar,
@@ -24,7 +25,9 @@ import {
   PieChart,
   Link as LinkIcon,
   Lock,
+  Upload, // ★ 新增：CSV 匯入按鈕 icon
 } from 'lucide-react';
+
 
 // ==========  Firebase 設定  ==========
 import { initializeApp } from 'firebase/app';
@@ -42,8 +45,10 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 
+
 // ★★★ 印章圖片路徑（請放在 public/stamp.png） ★★★
 const STAMP_URL = '/stamp.png';
+
 
 // Firebase config
 const firebaseConfig = {
@@ -71,6 +76,7 @@ try {
 } catch (err) {
   console.error('Firebase 初始化失敗', err);
 }
+
 
 // ========== 共用小工具 ==========
 
@@ -108,13 +114,71 @@ const formatDate = (val) => {
   }
 };
 
+// ★ 新增：items 陣列在 CSV 裡的 Base64 編碼／解碼，方便匯入匯出 ★
+const encodeItemsToBase64 = (items) => {
+  try {
+    const json = JSON.stringify(items || []);
+    if (typeof window === 'undefined' || !window.btoa) return json;
+    // 處理中文
+    return window.btoa(unescape(encodeURIComponent(json)));
+  } catch {
+    return '';
+  }
+};
+
+const decodeItemsFromBase64 = (str) => {
+  if (!str) return [];
+  try {
+    if (typeof window === 'undefined' || !window.atob) {
+      return JSON.parse(str);
+    }
+    const json = decodeURIComponent(escape(window.atob(str)));
+    return JSON.parse(json);
+  } catch {
+    // 如果不是 base64，就當作 JSON 試著 parse
+    try {
+      return JSON.parse(str);
+    } catch {
+      return [];
+    }
+  }
+};
+
+// ★ 新增：簡單 CSV 每行解析（支援欄位加上引號與跳脫 "） ★
+const parseCsvLine = (line) => {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === '"') {
+      // 連續兩個 "" 視為一個 "
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur);
+  return result;
+};
+
 const INPUT_CLASS =
   'w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white';
 const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
 const SECTION_CLASS = 'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
-// ========== 課程資料 ==========
 
+// ========== 課程資料 ==========
 const COURSE_DATA = {
   平板課程: [
     { name: '平板課程-招財水晶樹', price: 690 },
@@ -278,8 +342,8 @@ const COURSE_DATA = {
   ],
 };
 
-// ========== 車馬費表 ==========
 
+// ========== 車馬費表 ==========
 const TRANSPORT_FEES = {
   台北市: {
     default: 0,
@@ -458,8 +522,8 @@ const getAvailableCities = (region) => {
   return [];
 };
 
-// ========== 價格計算邏輯 ==========
 
+// ========== 價格計算邏輯 ==========
 const calculateItem = (item) => {
   const {
     price,
@@ -595,8 +659,8 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
-// ========== UI 小元件 ==========
 
+// ========== UI 小元件 ==========
 const StatusSelector = ({ status, onChange }) => {
   const options = [
     { value: 'draft', label: '草稿', color: 'bg-gray-100 text-gray-800' },
@@ -629,8 +693,8 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（含印章） ==========
 
+// ========== 報價單預覽（含印章） ==========
 const QuotePreview = ({
   clientInfo,
   items,
@@ -643,7 +707,7 @@ const QuotePreview = ({
   return (
     <div
       id={idName}
-      className="bg-white w-[210mm] max-w-full shadow-none px-8 py-8 text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
+      className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-8 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full" // ★ 上方只留 5px
     >
       {/* 標題 */}
       <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
@@ -658,28 +722,44 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 客戶資料（不顯示 email） */}
-      <div className="mb-6 bg-gray-50 p-4 rounded border border-gray-100">
-        <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
-          客戶資料
-        </h2>
-        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-          <p>
-            <span className="text-gray-500 mr-2">名稱:</span>
-            {clientInfo.companyName || '-'}
-          </p>
-          <p>
-            <span className="text-gray-500 mr-2">統編:</span>
-            {clientInfo.taxId || '-'}
-          </p>
-          <p>
-            <span className="text-gray-500 mr-2">聯絡人:</span>
-            {clientInfo.contactPerson || '-'}
-          </p>
-          <p>
-            <span className="text-gray-500 mr-2">電話:</span>
-            {clientInfo.phone || '-'}
-          </p>
+      {/* ★ 公司資料 + 客戶資料，左邊固定品牌單位，右邊是客戶 */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 公司固定資料 */}
+        <div className="bg-gray-50 p-4 rounded border border-gray-100">
+          <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+            品牌 / 公司資料
+          </h2>
+          <div className="space-y-1 text-sm text-gray-700">
+            <p>公司行號：下班文化國際有限公司</p>
+            <p>統一編號：83475827</p>
+            <p>聯絡電話：02-2371-4171</p>
+            <p>聯絡人：下班隨手作</p>
+          </div>
+        </div>
+
+        {/* 客戶資料（不顯示 email） */}
+        <div className="bg-gray-50 p-4 rounded border border-gray-100">
+          <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+            客戶資料
+          </h2>
+          <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+            <p>
+              <span className="text-gray-500 mr-2">名稱:</span>
+              {clientInfo.companyName || '-'}
+            </p>
+            <p>
+              <span className="text-gray-500 mr-2">統編:</span>
+              {clientInfo.taxId || '-'}
+            </p>
+            <p>
+              <span className="text-gray-500 mr-2">聯絡人:</span>
+              {clientInfo.contactPerson || '-'}
+            </p>
+            <p>
+              <span className="text-gray-500 mr-2">電話:</span>
+              {clientInfo.phone || '-'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -898,8 +978,8 @@ const QuotePreview = ({
   );
 };
 
-// ========== 報價單預覽 Modal（含下載 PDF） ==========
 
+// ========== 報價單預覽 Modal（含下載 PDF） ==========
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
@@ -992,8 +1072,8 @@ const PreviewModal = ({ quote, onClose }) => {
   );
 };
 
-// ========== 報價單建立 / 編輯表單 ==========
 
+// ========== 報價單建立 / 編輯表單 ==========
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
@@ -1734,8 +1814,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-// ========== 統計頁面 ==========
 
+// ========== 統計頁面 ==========
 const StatsView = ({ quotes }) => {
   const availableMonths = useMemo(() => {
     const months = new Set();
@@ -1966,8 +2046,8 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ========== 行事曆視圖 ==========
 
+// ========== 行事曆視圖 ==========
 const CalendarView = ({ quotes, publicMode = false }) => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
@@ -2443,8 +2523,8 @@ const CalendarView = ({ quotes, publicMode = false }) => {
   );
 };
 
-// ========== 報價單列表 ==========
 
+// ========== 報價單列表 ==========
 const QuoteList = ({
   quotes,
   onCreateNew,
@@ -2455,8 +2535,44 @@ const QuoteList = ({
   onSwitchView,
 }) => {
   const [search, setSearch] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('all'); // ★ 追蹤清單：月份篩選
+  const [selectedStatus, setSelectedStatus] = useState('all'); // ★ 追蹤清單：狀態篩選
+  const fileInputRef = useRef<HTMLInputElement | null>(null); // ★ CSV 匯入
 
+  // ★ 可選月份列表（用建立日期）
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    quotes.forEach((q) => {
+      if (!q.createdAt) return;
+      const d = getSafeDate(q.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        '0',
+      )}`;
+      months.add(key);
+    });
+    return Array.from(months).sort().reverse();
+  }, [quotes]);
+
+  // ★ 依「月份 + 狀態 + 搜尋字」做篩選
   const filtered = quotes.filter((q) => {
+    // 月份
+    if (selectedMonth !== 'all') {
+      if (!q.createdAt) return false;
+      const d = getSafeDate(q.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        '0',
+      )}`;
+      if (key !== selectedMonth) return false;
+    }
+
+    // 狀態
+    if (selectedStatus !== 'all') {
+      if ((q.status || 'draft') !== selectedStatus) return false;
+    }
+
+    // 搜尋
     if (!search.trim()) return true;
     const kw = search.trim();
     const firstItem = q.items[0] || {};
@@ -2466,12 +2582,182 @@ const QuoteList = ({
     );
   });
 
+  // ★ 匯出 CSV
+  const handleExportCsv = () => {
+    if (!quotes || quotes.length === 0) {
+      alert('目前沒有報價單可以匯出。');
+      return;
+    }
+
+    const header = [
+      'id',
+      'createdAt',
+      'status',
+      'companyName',
+      'taxId',
+      'contactPerson',
+      'phone',
+      'address',
+      'totalAmount',
+      'itemsBase64',
+    ];
+    const lines: string[] = [];
+    lines.push(header.join(','));
+
+    quotes.forEach((q) => {
+      const d = q.createdAt ? getSafeDate(q.createdAt) : new Date();
+      const createdAtStr = d.toISOString();
+      const client = q.clientInfo || {};
+      const itemsBase64 = encodeItemsToBase64(q.items || []);
+      const row = [
+        q.id || '',
+        createdAtStr,
+        q.status || '',
+        client.companyName || '',
+        client.taxId || '',
+        client.contactPerson || '',
+        client.phone || '',
+        client.address || '',
+        String(q.totalAmount || 0),
+        itemsBase64,
+      ].map((value) => {
+        const v = value == null ? '' : String(value);
+        const escaped = v.replace(/"/g, '""');
+        return `"${escaped}"`;
+      });
+      lines.push(row.join(','));
+    });
+
+    const csvContent = lines.join('\n');
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quotes_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // ★ 匯入 CSV
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!db) {
+      alert('目前未連線 Firebase，無法匯入資料。');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .filter((line) => line.trim() !== '');
+      if (lines.length <= 1) {
+        alert('CSV 檔案沒有資料。');
+        return;
+      }
+
+      const header = parseCsvLine(lines[0]);
+      const idxId = header.indexOf('id');
+      const idxCreatedAt = header.indexOf('createdAt');
+      const idxStatus = header.indexOf('status');
+      const idxCompanyName = header.indexOf('companyName');
+      const idxTaxId = header.indexOf('taxId');
+      const idxContactPerson = header.indexOf('contactPerson');
+      const idxPhone = header.indexOf('phone');
+      const idxAddress = header.indexOf('address');
+      const idxTotalAmount = header.indexOf('totalAmount');
+      const idxItemsBase64 = header.indexOf('itemsBase64');
+
+      let importedCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line.trim()) continue;
+        const cols = parseCsvLine(line);
+
+        const id = idxId >= 0 ? cols[idxId] : '';
+        const createdAtStr = idxCreatedAt >= 0 ? cols[idxCreatedAt] : '';
+        const status = idxStatus >= 0 ? cols[idxStatus] : '';
+        const companyName = idxCompanyName >= 0 ? cols[idxCompanyName] : '';
+        const taxId = idxTaxId >= 0 ? cols[idxTaxId] : '';
+        const contactPerson =
+          idxContactPerson >= 0 ? cols[idxContactPerson] : '';
+        const phone = idxPhone >= 0 ? cols[idxPhone] : '';
+        const address = idxAddress >= 0 ? cols[idxAddress] : '';
+        const totalAmountStr =
+          idxTotalAmount >= 0 ? cols[idxTotalAmount] : '0';
+        const itemsBase64 =
+          idxItemsBase64 >= 0 ? cols[idxItemsBase64] : '';
+
+        const clientInfo = {
+          companyName,
+          taxId,
+          contactPerson,
+          phone,
+          address,
+        };
+
+        const items = decodeItemsFromBase64(itemsBase64);
+
+        const data: any = {
+          clientInfo,
+          items,
+          totalAmount: Number(totalAmountStr || 0) || 0,
+          status: status || 'pending',
+          updatedAt: serverTimestamp(),
+        };
+
+        if (createdAtStr) {
+          const d = new Date(createdAtStr);
+          if (!isNaN(d.getTime())) {
+            data.createdAt = d;
+          } else {
+            data.createdAt = serverTimestamp();
+          }
+        } else {
+          data.createdAt = serverTimestamp();
+        }
+
+        if (id) {
+          await updateDoc(doc(db, 'quotes', id), data);
+        } else {
+          await addDoc(collection(db, 'quotes'), data);
+        }
+
+        importedCount += 1;
+      }
+
+      alert(
+        `CSV 匯入完成，共處理 ${importedCount} 筆報價單。\n列表會在同步後自動更新。`,
+      );
+    } catch (err) {
+      console.error('匯入 CSV 失敗', err);
+      alert('匯入 CSV 時發生錯誤，請確認檔案格式是否正確。');
+    } finally {
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
       {/* 上方工具列 */}
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          <h1 className="text-2xl font-bold text-gray-800複製到剪貼簿 */}
             <Folder className="w-6 h-6 mr-2 text-blue-600" />
             報價單管理
           </h1>
@@ -2490,6 +2776,59 @@ const QuoteList = ({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+
+          {/* ★ 追蹤清單：月份篩選 */}
+          {availableMonths.length > 0 && (
+            <select
+              className="px-3 py-2 text-sm border border-gray-300 rounded bg-white"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            >
+              <option value="all">全部月份</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* ★ 追蹤清單：狀態篩選 */}
+          <select
+            className="px-3 py-2 text-sm border border-gray-300 rounded bg-white"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
+            <option value="all">全部狀態</option>
+            <option value="draft">草稿</option>
+            <option value="pending">報價中</option>
+            <option value="confirmed">已回簽</option>
+            <option value="paid">已付訂</option>
+            <option value="closed">已結案</option>
+          </select>
+
+          {/* ★ CSV 匯出 / 匯入 */}
+          <button
+            onClick={handleExportCsv}
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <Download className="w-4 h-4 mr-1" />
+            匯出 CSV
+          </button>
+          <button
+            onClick={handleImportClick}
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 flex items-center"
+          >
+            <Upload className="w-4 h-4 mr-1" />
+            匯入 CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
           <button
             onClick={() => onSwitchView('calendar')}
@@ -2649,8 +2988,8 @@ const QuoteList = ({
   );
 };
 
-// ========== App 主元件 ==========
 
+// ========== App 主元件 ==========
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const urlView = urlParams.get('view');
