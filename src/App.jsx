@@ -601,6 +601,8 @@ const applyTransportDedup = (itemsWithCalc) => {
     return { ...item, calc };
   });
 };
+
+
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -635,7 +637,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（含印章放大修復） ==========
+// ========== 報價單預覽（含印章絕對不截斷修復） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -914,19 +916,20 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區：避免換頁 */}
+      {/* 簽章區：避免換頁，並修復印章截斷問題 */}
       <div
         className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (★★★ 修正：w-28 -> w-44，放大約 50%) */}
-        <div className="relative flex items-end h-[110px]">
+        {/* 左邊：公司代表 + 印章 (★★★ 修正：移除高度限制，加入 overflow-visible，調整印章位置) */}
+        <div className="relative flex items-end mt-4 overflow-visible">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              className="absolute top-0 left-16 w-44 opacity-90 rotate-[-5deg] pointer-events-none"
+              // 調整 top 位置為負值，讓印章向上浮動，不被截斷
+              className="absolute -top-10 left-10 w-44 opacity-90 rotate-[-5deg] pointer-events-none select-none"
               style={{ mixBlendMode: 'multiply' }}
               onError={() =>
                 console.warn(
@@ -935,14 +938,14 @@ const QuotePreview = ({
               }
             />
           )}
-          <p className="z-10 relative mt-10">
+          <p className="z-10 relative mt-12 font-bold">
             下班隨手作代表：_________________
           </p>
         </div>
 
         {/* 右邊：客戶簽章 */}
-        <div className="flex items-end h-[110px]">
-          <p>客戶確認簽章：_________________</p>
+        <div className="flex items-end mt-4">
+          <p className="font-bold">客戶確認簽章：_________________</p>
         </div>
       </div>
     </div>
@@ -1813,93 +1816,93 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                                   fee.id,
                                   'amount',
                                   e.target.value,
-                                )
-                              }
-                              disabled={!fee.isEnabled}
-                            />
-                          </div>
-                          <button
-                            onClick={() => removeExtraFee(idx, fee.id)}
-                            className="text-red-400 hover:text-red-600 p-2"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                              )
+                            }
+                            disabled={!fee.isEnabled}
+                          />
                         </div>
-                      ))}
-                  </div>
+                        <button
+                          onClick={() => removeExtraFee(idx, fee.id)}
+                          className="text-red-400 hover:text-red-600 p-2"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                 </div>
               </div>
-
-              {/* 規則錯誤提示 */}
-              {calcItem.calc.error && (
-                <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
-                  <AlertCircle className="w-5 h-5 mr-2" />
-                  <span className="font-bold">{calcItem.calc.error}</span>
-                </div>
-              )}
             </div>
-          );
-        })}
 
-        <button
-          onClick={addItem}
-          className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
-        >
-          <Plus className="w-6 h-6 mr-2" />
-          增加更多課程
-        </button>
+            {/* 規則錯誤提示 */}
+            {calcItem.calc.error && (
+              <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                <span className="font-bold">{calcItem.calc.error}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button
+        onClick={addItem}
+        className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
+      >
+        <Plus className="w-6 h-6 mr-2" />
+        增加更多課程
+      </button>
+    </div>
+
+    {/* 下方即時預覽 + 儲存 */}
+    <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
+      <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
+        <h3 className="text-2xl font-bold text-gray-800 flex items-center">
+          <Eye className="mr-2" />
+          即時報價單預覽
+        </h3>
+        <div className="flex gap-4 items-center flex-wrap">
+          <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+            <input
+              type="checkbox"
+              checked={isSigned}
+              onChange={(e) => setIsSigned(e.target.checked)}
+              className="w-5 h-5 text-blue-600"
+            />
+            <span className="text-sm font-bold text-blue-800">
+              蓋上印章
+            </span>
+          </label>
+
+          <button
+            onClick={handleSave}
+            className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            儲存至資料庫
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          >
+            取消
+          </button>
+        </div>
       </div>
 
-      {/* 下方即時預覽 + 儲存 */}
-      <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
-        <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-            <Eye className="mr-2" />
-            即時報價單預覽
-          </h3>
-          <div className="flex gap-4 items-center flex-wrap">
-            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-              <input
-                type="checkbox"
-                checked={isSigned}
-                onChange={(e) => setIsSigned(e.target.checked)}
-                className="w-5 h-5 text-blue-600"
-              />
-              <span className="text-sm font-bold text-blue-800">
-                蓋上印章
-              </span>
-            </label>
-
-            <button
-              onClick={handleSave}
-              className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              儲存至資料庫
-            </button>
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-            >
-              取消
-            </button>
-          </div>
-        </div>
-
-        <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-          <QuotePreview
-            idName="creator-preview-area"
-            clientInfo={clientInfo}
-            items={calculatedItems}
-            totalAmount={totalAmount}
-            dateStr={new Date().toISOString().slice(0, 10)}
-            isSigned={isSigned}
-            stampUrl={STAMP_URL}
-          />
-        </div>
+      <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
+        <QuotePreview
+          idName="creator-preview-area"
+          clientInfo={clientInfo}
+          items={calculatedItems}
+          totalAmount={totalAmount}
+          dateStr={new Date().toISOString().slice(0, 10)}
+          isSigned={isSigned}
+          stampUrl={STAMP_URL}
+        />
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 // ========== 統計頁面 (★★★ 豐富版：含北中南對比圖) ==========
@@ -2735,7 +2738,7 @@ const CalendarView = ({
   );
 };
 
-// ========== 報價單列表 (含 CSV 匯出匯入、過濾器、增強搜尋) ==========
+// ========== 報價單列表 (含 CSV 匯出匯入、過濾器、增強搜尋 + ★區域篩選) ==========
 
 const QuoteList = ({
   quotes,
@@ -2749,8 +2752,9 @@ const QuoteList = ({
   onOpenPayment, // ★ 開啟款項 Modal
 }) => {
   const [search, setSearch] = useState('');
-  const [filterMonth, setFilterMonth] = useState('all'); // ★ 月份過濾
-  const [filterStatus, setFilterStatus] = useState('all'); // ★ 狀態過濾
+  const [filterMonth, setFilterMonth] = useState('all'); // 月份過濾
+  const [filterStatus, setFilterStatus] = useState('all'); // 狀態過濾
+  const [filterRegion, setFilterRegion] = useState('All'); // ★ 新增：區域過濾
   const fileInputRef = useRef(null);
 
   // 計算可用月份
@@ -2765,7 +2769,30 @@ const QuoteList = ({
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  // ★ 過濾邏輯 (增強搜尋：含備註欄位)
+  // ★ 判斷報價單區域 (只要有一個課程是該區域，就歸類在該區)
+  const getQuoteRegion = (quote) => {
+    if (!quote.items || quote.items.length === 0) return 'North';
+    
+    // 檢查是否有中部或南部課程
+    const hasCentral = quote.items.some(
+      (item) =>
+        item.outingRegion === 'Central' ||
+        item.regionType === 'Central' ||
+        (item.city && item.city.includes('台中'))
+    );
+    const hasSouth = quote.items.some(
+      (item) =>
+        item.outingRegion === 'South' ||
+        item.regionType === 'South' ||
+        (item.city && (item.city.includes('高雄') || item.city.includes('台南')))
+    );
+
+    if (hasSouth) return 'South';
+    if (hasCentral) return 'Central';
+    return 'North'; // 預設北部
+  };
+
+  // ★ 過濾邏輯 (增強搜尋：含備註欄位 + 區域)
   const filtered = quotes.filter((q) => {
     // 關鍵字 (搜尋公司名、課程名、訂金備註、追加備註)
     const kw = search.trim();
@@ -2774,8 +2801,8 @@ const QuoteList = ({
       !kw ||
       (q.clientInfo.companyName || '').includes(kw) ||
       (firstItem.courseName || '').includes(kw) ||
-      (q.depositNote || '').includes(kw) || // ★ 搜尋訂金備註
-      (q.adjustmentNote || '').includes(kw); // ★ 搜尋追加備註
+      (q.depositNote || '').includes(kw) || 
+      (q.adjustmentNote || '').includes(kw);
 
     // 月份
     const d = getSafeDate(q.createdAt);
@@ -2789,7 +2816,11 @@ const QuoteList = ({
     const matchStatus =
       filterStatus === 'all' || (q.status || 'draft') === filterStatus;
 
-    return matchText && matchMonth && matchStatus;
+    // ★ 區域
+    const qRegion = getQuoteRegion(q);
+    const matchRegion = filterRegion === 'All' ? true : qRegion === filterRegion;
+
+    return matchText && matchMonth && matchStatus && matchRegion;
   });
 
   // ★ CSV 匯出邏輯
@@ -2797,11 +2828,14 @@ const QuoteList = ({
     const bom = '\uFEFF'; // UTF-8 BOM 防止 Excel 亂碼
     let csvContent =
       bom +
-      'ID,建立日期,公司名稱,統編,聯絡人,電話,地址,類型,狀態,總金額,第一項課程,日期,時間\n';
+      'ID,建立日期,公司名稱,統編,聯絡人,電話,地址,類型,狀態,區域,總金額,第一項課程,日期,時間\n';
 
     filtered.forEach((q) => {
       const d = formatDate(q.createdAt);
       const first = q.items?.[0] || {};
+      const regionMap = { North: '北部', Central: '中部', South: '南部' };
+      const region = regionMap[getQuoteRegion(q)] || '北部';
+
       const row = [
         q.id,
         d,
@@ -2812,6 +2846,7 @@ const QuoteList = ({
         `"${clientInfo.address || ''}"`, // 假設有這個欄位
         '報價單',
         q.status,
+        region,
         q.totalAmount || 0,
         `"${first.courseName || ''}"`,
         first.eventDate || '',
@@ -2846,7 +2881,7 @@ const QuoteList = ({
 
       for (const row of rows) {
         if (!row.trim()) continue;
-        // 簡單 CSV 解析 (注意：這無法處理欄位內有逗號的情況，若需嚴謹需用 PapaParse)
+        // 簡單 CSV 解析
         const cols = row.split(',');
         if (cols.length < 5) continue;
 
@@ -2856,9 +2891,9 @@ const QuoteList = ({
         const contactPerson = clean(cols[4]);
         const phone = clean(cols[5]);
         const status = clean(cols[8]) || 'draft';
-        const amount = parseInt(cols[9]) || 0;
-        const courseName = clean(cols[10]);
-        const eventDate = clean(cols[11]);
+        const amount = parseInt(cols[10]) || 0; // 注意索引位移
+        const courseName = clean(cols[11]);
+        const eventDate = clean(cols[12]);
 
         // 建構新的 Quote 物件
         const newQuote = {
@@ -2872,7 +2907,6 @@ const QuoteList = ({
           status: status,
           type: 'quote',
           totalAmount: amount,
-          // 為了讓舊資料能進來，我們塞一個假的 item
           items: [
             {
               id: generateId(),
@@ -2927,18 +2961,40 @@ const QuoteList = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
+        {/* ★ 新增：區域連結 (Tabs) */}
+        <div className="flex bg-gray-100 p-1 rounded-lg self-start md:self-center">
+            {[
+              { id: 'All', label: '全部區域' },
+              { id: 'North', label: '北部' },
+              { id: 'Central', label: '中部' },
+              { id: 'South', label: '南部' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterRegion(tab.id)}
+                className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${
+                  filterRegion === tab.id
+                    ? 'bg-white text-orange-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center justify-end">
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             <input
               className="pl-8 pr-3 py-2 rounded border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              placeholder="搜尋公司 / 備註(後五碼)"
+              placeholder="搜尋公司 / 備註"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          {/* ★ 過濾器區域 */}
+          {/* 過濾器區域 */}
           <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
             <Filter className="w-4 h-4 text-gray-500 ml-2" />
             <select
@@ -2968,18 +3024,18 @@ const QuoteList = ({
             </select>
           </div>
 
-          {/* ★ CSV 按鈕 */}
+          {/* CSV 按鈕 */}
           <button
             onClick={handleExportCSV}
             className="px-3 py-2 text-sm bg-white border border-green-600 text-green-700 rounded hover:bg-green-50 flex items-center"
             title="匯出所有篩選後的資料"
           >
             <Download className="w-4 h-4 mr-1" />
-            CSV 匯出
+            匯出
           </button>
           <label className="px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 flex items-center cursor-pointer">
             <Upload className="w-4 h-4 mr-1" />
-            CSV 匯入
+            匯入
             <input
               type="file"
               accept=".csv"
@@ -3024,6 +3080,9 @@ const QuoteList = ({
                 總金額
               </th>
               <th className="px-4 py-2 text-center text-gray-500 font-medium">
+                區域
+              </th>
+              <th className="px-4 py-2 text-center text-gray-500 font-medium">
                 狀態
               </th>
               <th className="px-4 py-2 text-right text-gray-500 font-medium">
@@ -3035,7 +3094,7 @@ const QuoteList = ({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-8 text-center text-gray-400"
                 >
                   尚無符合條件的資料
@@ -3046,6 +3105,7 @@ const QuoteList = ({
             {filtered.map((q) => {
               const first = q.items?.[0] || {};
               const isInternal = q.type === 'internal';
+              const region = getQuoteRegion(q);
 
               return (
                 <tr
@@ -3076,6 +3136,14 @@ const QuoteList = ({
                       : `$${Number(q.totalAmount || 0).toLocaleString()}`}
                   </td>
                   <td className="px-4 py-2 text-center align-middle">
+                     <span className={`text-xs px-2 py-1 rounded ${
+                        region === 'North' ? 'bg-blue-50 text-blue-600' :
+                        region === 'Central' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'
+                     }`}>
+                        {region === 'North' ? '北部' : region === 'Central' ? '中部' : '南部'}
+                     </span>
+                  </td>
+                  <td className="px-4 py-2 text-center align-middle">
                     {isInternal ? (
                       <span className="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-700">
                         已確認
@@ -3089,7 +3157,7 @@ const QuoteList = ({
                   </td>
                   <td className="px-4 py-2 text-right align-middle">
                     <div className="flex justify-end gap-2">
-                      {/* ★ 款項按鈕：已回簽/已付訂/已結案顯示 */}
+                      {/* 款項按鈕 */}
                       {['confirmed', 'paid', 'closed'].includes(
                         q.status,
                       ) && (
@@ -3143,7 +3211,7 @@ const App = () => {
   const urlMode = urlParams.get('mode');
 
   const [quotes, setQuotes] = useState([]);
-  const [regularClasses, setRegularClasses] = useState([]); // ★ 新增狀態
+  const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(
     urlView === 'calendar' ? 'calendar' : 'list',
@@ -3170,10 +3238,10 @@ const App = () => {
       setLoading(false);
     });
 
-    // 2. 監聽常態課 (★ 新增)
+    // 2. 監聽常態課
     const qRegular = query(
       collection(db, 'regularClasses'),
-    ); // 可加 orderBy date
+    );
     const unsubRegular = onSnapshot(qRegular, (snapshot) => {
       setRegularClasses(
         snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
@@ -3267,7 +3335,7 @@ const App = () => {
     }
   };
 
-  // --- 新增常態課處理函數 (★ 新增) ---
+  // --- 新增常態課處理函數 ---
   const handleAddRegularClass = async (classData) => {
     try {
       if (db) {
@@ -3288,7 +3356,7 @@ const App = () => {
     }
   };
 
-  // --- 更新常態課 (★ 新增) ---
+  // --- 更新常態課 ---
   const handleUpdateRegularClass = async (id, classData) => {
     try {
       if (db) {
@@ -3337,7 +3405,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      {/* Header (修正後的導覽列) */}
+      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -3349,13 +3417,12 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.1 (Final)
+                內部管理系統 v3.2
               </div>
             </div>
           </div>
 
           <nav className="flex gap-2 text-sm">
-            {/* ★ 修正：點擊時強制清空 editingQuote */}
             <button
               onClick={() => {
                 setEditingQuote(null);
@@ -3426,7 +3493,7 @@ const App = () => {
             onCreateNew={() => {
               setEditingQuote({});
               setCurrentView('create');
-            }} // 傳空物件讓 Creator 知道是全新增
+            }}
             onEdit={(q) => {
               setEditingQuote(q);
               setCurrentView('create');
@@ -3435,8 +3502,8 @@ const App = () => {
             onDelete={handleDeleteQuote}
             onChangeStatus={handleChangeStatus}
             onSwitchView={(v) => setCurrentView(v)}
-            onSave={handleSaveQuote} // ★ 修正：傳入 onSave 給 Import 使用
-            onOpenPayment={setPaymentQuote} // ★ 傳入 Payment Modal 開啟函數
+            onSave={handleSaveQuote}
+            onOpenPayment={setPaymentQuote} 
           />
         )}
 
@@ -3451,13 +3518,12 @@ const App = () => {
           />
         )}
 
-        {/* 傳遞 regularClasses 與操作函數給 CalendarView */}
         {!loading && currentView === 'calendar' && (
           <CalendarView
             quotes={quotes}
             regularClasses={regularClasses}
             onAddRegularClass={handleAddRegularClass}
-            onUpdateRegularClass={handleUpdateRegularClass} // ★ 傳遞更新函數
+            onUpdateRegularClass={handleUpdateRegularClass}
             onDeleteRegularClass={handleDeleteRegularClass}
           />
         )}
@@ -3481,6 +3547,29 @@ const App = () => {
           onSave={handleSavePayment}
         />
       )}
+
+      {/* ★★★ 全域 CSS 修正：確保印章與分頁在列印時的行為 ★★★ */}
+      <style>{`
+        @media print {
+          @page { margin: 0; size: auto; }
+          body { margin: 0; padding: 0; }
+          /* 強制背景圖形列印 */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          
+          /* 確保印章容器不會切斷溢出的內容 */
+          .overflow-visible { overflow: visible !important; }
+          
+          /* 防止表格內容在不該斷的地方斷開 */
+          tr { break-inside: avoid; page-break-inside: avoid; }
+          
+          /* 隱藏所有非列印區域 */
+          .print\\:hidden { display: none !important; }
+        }
+        
+        /* 一般動畫 */
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 };
