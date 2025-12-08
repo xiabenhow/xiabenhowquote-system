@@ -31,7 +31,8 @@ import {
   Store,
   Filter,
   Copy,
-  Share2
+  Share2,
+  ShieldCheck
 } from 'lucide-react';
 
 // ==========  Firebase 設定  ==========
@@ -113,6 +114,31 @@ const formatDate = (val) => {
     return getSafeDate(val).toLocaleDateString('zh-TW');
   } catch {
     return '';
+  }
+};
+
+// ★★★ 新增：格式化日期並加上星期幾 (例如：2025-12-09 (二)) ★★★
+const formatDateWithDay = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const dayMap = ['日', '一', '二', '三', '四', '五', '六'];
+    // 檢查是否為 YYYY-MM-DD 字串格式
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        // 使用本地時間構造日期，避免時區偏差
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        return `${dateStr} (${dayMap[d.getDay()]})`;
+      }
+    }
+    // 其他情況 (Date 物件或 timestamp)
+    const d = getSafeDate(dateStr);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} (${dayMap[d.getDay()]})`;
+  } catch (e) {
+    return dateStr;
   }
 };
 
@@ -638,14 +664,13 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== ★ 新增：後台鎖定畫面 (AdminLock) ==========
+// ========== 後台鎖定畫面 (AdminLock) ==========
 const AdminLock = ({ onUnlock }) => {
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // ★ 預設通行碼：8888 (您可以在此修改)
     if (passcode === '8888') {
       onUnlock();
     } else {
@@ -683,13 +708,13 @@ const AdminLock = ({ onUnlock }) => {
             解鎖進入
           </button>
         </form>
-        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v3.8</p>
+        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v3.9</p>
       </div>
     </div>
   );
 };
 
-// ========== 報價單預覽（★ 調整：緊湊版面、印章壓字不佔位） ==========
+// ========== 報價單預覽（★ 修正：高度極致壓縮、印章右移且不佔位） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -705,8 +730,8 @@ const QuotePreview = ({
       id={idName}
       className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-4 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
-      {/* 標題 (間距壓縮 mb-3) */}
-      <div className="flex justify-between items-end border-b-2 border-gray-800 pb-2 mb-3">
+      {/* 標題 (間距 mb-6 -> mb-2) */}
+      <div className="flex justify-between items-end border-b-2 border-gray-800 pb-2 mb-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             下班隨手作活動報價單
@@ -718,12 +743,12 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 品牌單位 + 客戶資料 (間距壓縮 mb-3, padding p-3) */}
-      <div className="mb-3">
+      {/* 品牌單位 + 客戶資料 (間距 mb-6 -> mb-2, padding p-4 -> p-2) */}
+      <div className="mb-2">
         <div className="grid grid-cols-2 gap-3">
           {/* 左邊 */}
-          <div className="bg-gray-50 p-3 rounded border border-gray-100">
-            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-2 pb-1 text-xs">
+          <div className="bg-gray-50 p-2 rounded border border-gray-100">
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-1 pb-1 text-xs">
               品牌單位
             </h2>
             <div className="space-y-0.5 text-xs text-gray-700">
@@ -747,8 +772,8 @@ const QuotePreview = ({
           </div>
 
           {/* 右邊 */}
-          <div className="bg-gray-50 p-3 rounded border border-gray-100">
-            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-2 pb-1 text-xs">
+          <div className="bg-gray-50 p-2 rounded border border-gray-100">
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-1 pb-1 text-xs">
               客戶資料
             </h2>
             <div className="space-y-0.5 text-xs text-gray-700">
@@ -773,8 +798,8 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 明細表 (間距壓縮 mb-3, padding p-2) */}
-      <table className="w-full mb-3 border-collapse text-xs">
+      {/* 明細表 (間距 mb-6 -> mb-2) */}
+      <table className="w-full mb-2 border-collapse text-xs">
         <thead>
           <tr className="bg-gray-800 text-white">
             <th className="p-1.5 text-left rounded-l">項目</th>
@@ -794,6 +819,7 @@ const QuotePreview = ({
             return (
               <React.Fragment key={idx}>
                 <tr className="break-inside-avoid">
+                  {/* padding p-3 -> p-2 */}
                   <td className="p-2">
                     <div className="font-bold text-gray-800 text-sm">
                       {item.courseName}
@@ -806,7 +832,7 @@ const QuotePreview = ({
                     <div className="text-[10px] text-gray-500 mt-0.5 flex flex-col">
                       {(item.eventDate || timeText) && (
                         <div>
-                          時間：{item.eventDate}{' '}
+                          時間：{formatDateWithDay(item.eventDate)}{' '}
                           {timeText ? ` ${timeText}` : ''}
                         </div>
                       )}
@@ -910,7 +936,7 @@ const QuotePreview = ({
         </tbody>
       </table>
 
-      {/* 總金額 (間距壓縮) */}
+      {/* 總金額 (padding p-4 -> p-2) */}
       <div className="flex justify-end mt-2 break-inside-avoid">
         <div className="w-1/2 bg-gray-50 p-2 rounded border border-gray-200">
           <div className="flex justify-between items-center text-xl font-bold text-blue-900">
@@ -923,8 +949,8 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 注意事項 (間距壓縮) */}
-      <div className="mt-3 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
+      {/* 注意事項 (間距 mt-6 -> mt-2) */}
+      <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
           {[
@@ -967,20 +993,20 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區 (★ h-32 約128px，印章 w-36，位置 left-20，top-0 壓字) */}
+      {/* 簽章區 (★ h-32 約128px，印章 w-36，位置 left-36) */}
       <div
         className="mt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (容器高度 h-32 確保不換頁，但印章浮動) */}
+        {/* 左邊：公司代表 + 印章 (容器高度 h-32 確保不換頁，印章覆蓋文字) */}
         <div className="relative mt-2 h-32 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // ★ 調整：w-36 (縮小), left-20 (右移), top-0 (壓在代表文字上方)
-              className="absolute top-0 left-20 w-36 opacity-90 rotate-[-5deg]"
+              // ★ 調整：w-36 (更小), left-36 (避開文字往右), top-0
+              className="absolute top-0 left-36 w-36 opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
@@ -989,7 +1015,7 @@ const QuotePreview = ({
               }
             />
           )}
-          {/* 文字定位在底部，z-index 10 確保文字在印章上面 (或下面看需求，這裡設定印章壓字) */}
+          {/* 文字定位在底部 */}
           <div className="absolute bottom-2 left-0 z-10 w-full">
              <p className="font-bold text-sm">下班隨手作代表：_________________</p>
           </div>
@@ -2048,6 +2074,7 @@ const StatsView = ({ quotes }) => {
       )}`;
       if (monthKey !== selectedMonth) return;
 
+      // 統計時仍以第一項課程為主要區域判斷
       let regionKey = 'North';
       if (q.items && q.items.length > 0) {
         const r = q.items[0].outingRegion || q.items[0].regionType;
@@ -2284,8 +2311,8 @@ const CalendarView = ({
     const regularEvents = regularClasses.map((r) => ({
       id: r.id,
       type: 'regular',
-      date: r.date || '', // 強制轉為字串
-      time: r.time || '', // 強制轉為字串，防止 .slice 錯誤
+      date: r.date || '',
+      time: r.time || '',
       title: r.courseName || r.title || '常態課',
       subTitle: '常態課',
       region: r.region || 'North',
@@ -3261,14 +3288,14 @@ const App = () => {
   const urlRegion = urlParams.get('region'); // ★ 讀取網址中的 region 參數
 
   const [quotes, setQuotes] = useState([]);
-  const [regularClasses, setRegularClasses] = useState([]);
+  const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(
     urlView === 'calendar' ? 'calendar' : 'list',
   );
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
-  const [paymentQuote, setPaymentQuote] = useState(null);
+  const [paymentQuote, setPaymentQuote] = useState(null); // 款項 Modal
 
   // ★ 新增：解鎖狀態 (預設 false)
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -3281,6 +3308,7 @@ const App = () => {
       return;
     }
 
+    // 1. 監聽報價單
     const qQuotes = query(
       collection(db, 'quotes'),
       orderBy('createdAt', 'desc'),
@@ -3290,6 +3318,7 @@ const App = () => {
       setLoading(false);
     });
 
+    // 2. 監聽常態課
     const qRegular = query(
       collection(db, 'regularClasses'),
     );
@@ -3386,6 +3415,7 @@ const App = () => {
     }
   };
 
+  // --- 新增常態課處理函數 ---
   const handleAddRegularClass = async (classData) => {
     try {
       if (db) {
@@ -3394,6 +3424,7 @@ const App = () => {
           createdAt: serverTimestamp(),
         });
       } else {
+        // 本地模式
         setRegularClasses((prev) => [
           ...prev,
           { id: generateId(), ...classData },
@@ -3405,6 +3436,7 @@ const App = () => {
     }
   };
 
+  // --- 更新常態課 ---
   const handleUpdateRegularClass = async (id, classData) => {
     try {
       if (db) {
@@ -3446,7 +3478,7 @@ const App = () => {
           quotes={quotes}
           regularClasses={regularClasses}
           publicMode
-          publicRegion={urlRegion}
+          publicRegion={urlRegion} // ★ 傳入網址的區域參數
         />
       </div>
     );
@@ -3472,7 +3504,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.8 (Security + Layout Fix)
+                內部管理系統 v4.0 (Date Fix)
               </div>
             </div>
           </div>
