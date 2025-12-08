@@ -30,8 +30,8 @@ import {
   Clock,
   Store,
   Filter,
-  Copy,   // 新增圖示
-  Share2  // 新增圖示
+  Copy,
+  Share2
 } from 'lucide-react';
 
 // ==========  Firebase 設定  ==========
@@ -639,7 +639,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（★ 修正：印章右移、調整高度避免空白頁） ==========
+// ========== 報價單預覽（★ 調整：高度極致壓縮、印章縮小右移） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -653,31 +653,30 @@ const QuotePreview = ({
   return (
     <div
       id={idName}
-      // 這裡已經有 print:p-0 確保列印時沒有額外內距
-      className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-8 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
+      className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-4 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
-      {/* 標題 */}
-      <div className="flex justify-between items-end border-b-2 border-gray-800 pb-4 mb-6">
+      {/* 標題 (間距 mb-6 -> mb-3) */}
+      <div className="flex justify-between items-end border-b-2 border-gray-800 pb-2 mb-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900">
             下班隨手作活動報價單
           </h1>
         </div>
-        <div className="text-right text-gray-600">
+        <div className="text-right text-gray-600 text-xs">
           <p>報價日期: {dateStr}</p>
-          <p className="font-bold mt-1">有效期限：3天</p>
+          <p className="font-bold mt-0.5">有效期限：3天</p>
         </div>
       </div>
 
-      {/* 品牌單位 + 客戶資料 (左右並排) */}
-      <div className="mb-6">
-        <div className="grid grid-cols-2 gap-4">
-          {/* 左邊：品牌單位（固定公司資料） */}
-          <div className="bg-gray-50 p-4 rounded border border-gray-100">
-            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+      {/* 品牌單位 + 客戶資料 (間距 mb-6 -> mb-3, padding p-4 -> p-3) */}
+      <div className="mb-3">
+        <div className="grid grid-cols-2 gap-3">
+          {/* 左邊 */}
+          <div className="bg-gray-50 p-3 rounded border border-gray-100">
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-2 pb-1 text-xs">
               品牌單位
             </h2>
-            <div className="space-y-1 text-sm text-gray-700">
+            <div className="space-y-0.5 text-xs text-gray-700">
               <p>
                 <span className="text-gray-500 mr-2">公司行號:</span>
                 下班文化國際有限公司
@@ -697,12 +696,12 @@ const QuotePreview = ({
             </div>
           </div>
 
-          {/* 右邊：客戶資料 */}
-          <div className="bg-gray-50 p-4 rounded border border-gray-100">
-            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-3 pb-1">
+          {/* 右邊 */}
+          <div className="bg-gray-50 p-3 rounded border border-gray-100">
+            <h2 className="font-bold text-gray-800 border-b border-gray-200 mb-2 pb-1 text-xs">
               客戶資料
             </h2>
-            <div className="space-y-1 text-sm text-gray-700">
+            <div className="space-y-0.5 text-xs text-gray-700">
               <p>
                 <span className="text-gray-500 mr-2">名稱:</span>
                 {clientInfo.companyName || '-'}
@@ -724,14 +723,14 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 明細表 */}
-      <table className="w-full mb-6 border-collapse">
+      {/* 明細表 (間距 mb-6 -> mb-3) */}
+      <table className="w-full mb-3 border-collapse text-xs">
         <thead>
           <tr className="bg-gray-800 text-white">
-            <th className="p-2 text-left rounded-l">項目</th>
-            <th className="p-2 text-right">單價</th>
-            <th className="p-2 text-right">人數</th>
-            <th className="p-2 text-right rounded-r">小計</th>
+            <th className="p-1.5 text-left rounded-l">項目</th>
+            <th className="p-1.5 text-right">單價</th>
+            <th className="p-1.5 text-right">人數</th>
+            <th className="p-1.5 text-right rounded-r">小計</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -745,16 +744,17 @@ const QuotePreview = ({
             return (
               <React.Fragment key={idx}>
                 <tr className="break-inside-avoid">
-                  <td className="p-3">
-                    <div className="font-bold text-gray-800">
+                  {/* padding p-3 -> p-2 */}
+                  <td className="p-2">
+                    <div className="font-bold text-gray-800 text-sm">
                       {item.courseName}
                     </div>
                     {item.itemNote && (
-                      <div className="text-xs text-gray-500 mt-1 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
+                      <div className="text-[10px] text-gray-500 mt-0.5 font-medium bg-yellow-50 inline-block px-1 rounded border border-yellow-100">
                         備註: {item.itemNote}
                       </div>
                     )}
-                    <div className="text-xs text-gray-500 mt-1 flex flex-col gap-1">
+                    <div className="text-[10px] text-gray-500 mt-0.5 flex flex-col">
                       {(item.eventDate || timeText) && (
                         <div>
                           時間：{item.eventDate}{' '}
@@ -764,23 +764,22 @@ const QuotePreview = ({
                       {item.address && <div>地點：{item.address}</div>}
                     </div>
                   </td>
-                  <td className="p-3 text-right text-gray-600">
+                  <td className="p-2 text-right text-gray-600">
                     ${Number(item.price || 0).toLocaleString()}
                   </td>
-                  <td className="p-3 text-right text-gray-600">
+                  <td className="p-2 text-right text-gray-600">
                     {item.peopleCount}
                   </td>
-                  <td className="p-3 text-right font-medium">
+                  <td className="p-2 text-right font-medium">
                     ${item.calc.subTotal.toLocaleString()}
                   </td>
                 </tr>
 
-                {/* 折扣 / 加價 / 車馬費 / 稅 */}
                 {(item.calc.isDiscountApplied || item.customDiscount > 0) && (
-                  <tr className="bg-red-50 text-xs break-inside-avoid">
+                  <tr className="bg-red-50 text-[10px] break-inside-avoid">
                     <td
                       colSpan={3}
-                      className="p-1 pl-4 text-right text-red-600"
+                      className="p-1 pl-2 text-right text-red-600"
                     >
                       折扣優惠{' '}
                       {item.customDiscountDesc
@@ -798,8 +797,8 @@ const QuotePreview = ({
                 )}
 
                 {item.calc.transportFee > 0 && (
-                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                    <td colSpan={3} className="p-1 pl-4 text-right">
+                  <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-2 text-right">
                       車馬費 ({item.city.replace(/\(.*\)/, '')}
                       {item.area})
                     </td>
@@ -810,8 +809,8 @@ const QuotePreview = ({
                 )}
 
                 {item.calc.teacherFee > 0 && (
-                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                    <td colSpan={3} className="p-1 pl-4 text-right">
+                  <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-2 text-right">
                       師資費
                     </td>
                     <td className="p-1 text-right font-bold">
@@ -826,9 +825,9 @@ const QuotePreview = ({
                     .map((fee) => (
                       <tr
                         key={fee.id}
-                        className="bg-green-50 text-xs text-green-900 break-inside-avoid"
+                        className="bg-green-50 text-[10px] text-green-900 break-inside-avoid"
                       >
-                        <td colSpan={3} className="p-1 pl-4 text-right">
+                        <td colSpan={3} className="p-1 pl-2 text-right">
                           額外加價 ({fee.description || '未說明'})
                         </td>
                         <td className="p-1 text-right font-bold">
@@ -838,8 +837,8 @@ const QuotePreview = ({
                     ))}
 
                 {item.hasInvoice && (
-                  <tr className="bg-green-50 text-xs text-green-900 break-inside-avoid">
-                    <td colSpan={3} className="p-1 pl-4 text-right">
+                  <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-2 text-right">
                       營業稅 (5%)
                     </td>
                     <td className="p-1 text-right font-bold">
@@ -848,11 +847,11 @@ const QuotePreview = ({
                   </tr>
                 )}
 
-                <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid">
-                  <td colSpan={3} className="p-2 text-right">
+                <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid text-xs">
+                  <td colSpan={3} className="p-1.5 text-right">
                     項目總計
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="p-1.5 text-right">
                     ${item.calc.finalTotal.toLocaleString()}
                   </td>
                 </tr>
@@ -862,23 +861,23 @@ const QuotePreview = ({
         </tbody>
       </table>
 
-      {/* 總金額 */}
-      <div className="flex justify-end mt-4 break-inside-avoid">
-        <div className="w-1/2 bg-gray-50 p-4 rounded border border-gray-200">
-          <div className="flex justify-between items-center text-2xl font-bold text-blue-900">
+      {/* 總金額 (padding p-4 -> p-2) */}
+      <div className="flex justify-end mt-2 break-inside-avoid">
+        <div className="w-1/2 bg-gray-50 p-2 rounded border border-gray-200">
+          <div className="flex justify-between items-center text-xl font-bold text-blue-900">
             <span>總金額</span>
             <span>${totalAmount.toLocaleString()}</span>
           </div>
-          <p className="text-right text-xs text-gray-500 mt-2">
+          <p className="text-right text-[10px] text-gray-500 mt-1">
             含稅及所有費用
           </p>
         </div>
       </div>
 
-      {/* 注意事項 */}
-      <div className="mt-6 pt-4 border-t-2 border-gray-800 text-xs text-gray-700 leading-relaxed break-inside-avoid">
-        <h4 className="font-bold text-sm mb-2">注意事項 / 條款：</h4>
-        <div className="space-y-1">
+      {/* 注意事項 (間距 mt-6 -> mt-3) */}
+      <div className="mt-3 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
+        <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
+        <div className="space-y-0.5">
           {[
             {
               text: '本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
@@ -901,7 +900,7 @@ const QuotePreview = ({
             },
           ].map((item, index) => (
             <div key={index} className="flex items-start">
-              <div className="w-5 pr-1 text-right">{index + 1}.</div>
+              <div className="w-4 pr-1 text-right">{index + 1}.</div>
               <div
                 className={`flex-1 ${
                   item.highlight ? 'text-red-600 font-bold' : ''
@@ -912,27 +911,27 @@ const QuotePreview = ({
             </div>
           ))}
         </div>
-        <div className="mt-4 p-3 bg-gray-100 rounded border border-gray-300">
-          <p className="font-bold text-sm">
+        <div className="mt-2 p-2 bg-gray-100 rounded border border-gray-300">
+          <p className="font-bold text-[10px]">
             銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201
           </p>
         </div>
       </div>
 
-      {/* 簽章區 (★ 修復：調整高度與印章位置) */}
+      {/* 簽章區 (★ 高度縮小為 h-32，印章 w-40，位置 left-28) */}
       <div
-        className="mt-6 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
+        className="mt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (★ 高度從 h-48 改為 h-44，節省空間避免空白頁) */}
-        <div className="relative mt-4 h-44 w-1/2">
+        {/* 左邊：公司代表 + 印章 (容器高度 h-32 約128px，夠放印章但省空間) */}
+        <div className="relative mt-2 h-32 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // ★ 調整：left-10 改為 left-32，讓印章往右移，避開文字
-              className="absolute top-2 left-32 w-48 opacity-90 rotate-[-5deg]"
+              // ★ 調整：w-48 -> w-40 (縮小)，left-10 -> left-28 (右移)，top-1
+              className="absolute top-1 left-28 w-40 opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
@@ -942,15 +941,15 @@ const QuotePreview = ({
             />
           )}
           {/* 文字定位在底部 */}
-          <div className="absolute bottom-4 left-0 z-10 w-full">
-             <p className="font-bold text-base">下班隨手作代表：_________________</p>
+          <div className="absolute bottom-2 left-0 z-10 w-full">
+             <p className="font-bold text-sm">下班隨手作代表：_________________</p>
           </div>
         </div>
 
         {/* 右邊：客戶簽章 */}
-        <div className="relative mt-4 h-44 w-1/2 flex items-end justify-end">
-          <div className="absolute bottom-4 right-0">
-             <p className="font-bold text-base">客戶確認簽章：_________________</p>
+        <div className="relative mt-2 h-32 w-1/2 flex items-end justify-end">
+          <div className="absolute bottom-2 right-0">
+             <p className="font-bold text-sm">客戶確認簽章：_________________</p>
           </div>
         </div>
       </div>
@@ -995,7 +994,6 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* 總金額顯示 */}
           <div className="flex justify-between items-center border-b pb-4">
             <span className="text-gray-500 font-medium">報價總額</span>
             <span className="text-2xl font-bold text-gray-800">
@@ -1003,7 +1001,6 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
             </span>
           </div>
 
-          {/* 訂金區塊 */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               預收訂金 (減項)
@@ -1033,7 +1030,6 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
             />
           </div>
 
-          {/* 追加區塊 */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               追加金額 (加項)
@@ -1063,7 +1059,6 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
             />
           </div>
 
-          {/* 結果試算 */}
           <div className="bg-orange-50 p-4 rounded-lg flex justify-between items-center">
             <span className="text-orange-800 font-bold">
               待付款金額 (尾款)
@@ -1911,7 +1906,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 );
 };
 
-// ========== 統計頁面 (★★★ 豐富版：含北中南對比圖) ==========
+
+// ========== 統計頁面 (含北中南對比圖) ==========
 
 const StatsView = ({ quotes }) => {
   // 過濾掉內部排程
@@ -2594,10 +2590,10 @@ const CalendarView = ({
 
               {/* ★ 新增：連結生成按鈕 (只有管理者看得到) */}
               <button onClick={() => handleCopyRegionLink('Central')} className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200" title="複製連結給中部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製中部連結
+                  <LinkIcon className="w-4 h-4"/> 複製中部行事曆
               </button>
               <button onClick={() => handleCopyRegionLink('South')} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200 text-sm font-bold border border-green-200" title="複製連結給南部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製南部連結
+                  <LinkIcon className="w-4 h-4"/> 複製南部行事曆
               </button>
             </>
           )}
@@ -2659,7 +2655,7 @@ const CalendarView = ({
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'day' && renderDayView()}
 
-      {/* --- 新增/編輯常態課 Modal --- */}
+      {/* --- 新增/編輯常態課 Modal (簡化版) --- */}
       {showAddModal && !publicMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -3417,7 +3413,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.5 (Final)
+                內部管理系統 v3.6 (Final)
               </div>
             </div>
           </div>
@@ -3575,4 +3571,3 @@ const App = () => {
 };
 
 export default App;
-
