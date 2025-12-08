@@ -604,6 +604,7 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
+
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -638,7 +639,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（★ 強力修復：印章高度與截斷問題） ==========
+// ========== 報價單預覽（★ 修正：印章右移、調整高度避免空白頁） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -652,6 +653,7 @@ const QuotePreview = ({
   return (
     <div
       id={idName}
+      // 這裡已經有 print:p-0 確保列印時沒有額外內距
       className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-8 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
       {/* 標題 */}
@@ -917,20 +919,20 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區 (★ 修復：強制高度防止截斷) */}
+      {/* 簽章區 (★ 修復：調整高度與印章位置) */}
       <div
         className="mt-6 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (高度 h-48 確保印章不被切) */}
-        <div className="relative mt-4 h-48 w-1/2">
+        {/* 左邊：公司代表 + 印章 (★ 高度從 h-48 改為 h-44，節省空間避免空白頁) */}
+        <div className="relative mt-4 h-44 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // 調整：定位在容器內部，確保不超出邊界
-              className="absolute top-2 left-10 w-48 opacity-90 rotate-[-5deg]"
+              // ★ 調整：left-10 改為 left-32，讓印章往右移，避開文字
+              className="absolute top-2 left-32 w-48 opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
@@ -946,7 +948,7 @@ const QuotePreview = ({
         </div>
 
         {/* 右邊：客戶簽章 */}
-        <div className="relative mt-4 h-48 w-1/2 flex items-end justify-end">
+        <div className="relative mt-4 h-44 w-1/2 flex items-end justify-end">
           <div className="absolute bottom-4 right-0">
              <p className="font-bold text-base">客戶確認簽章：_________________</p>
           </div>
@@ -956,7 +958,7 @@ const QuotePreview = ({
   );
 };
 
-// ========== 1. 新增：款項管理 Modal (PaymentModal) - 這是唯一一次定義 ==========
+// ========== PaymentModal ==========
 
 const PaymentModal = ({ quote, onClose, onSave }) => {
   const [data, setData] = useState({
@@ -1091,7 +1093,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== 報價單預覽 Modal（含下載 PDF） ==========
+// ========== PreviewModal ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1185,7 +1187,7 @@ const PreviewModal = ({ quote, onClose }) => {
   );
 };
 
-// ========== 報價單建立 / 編輯表單 (移除內部排課開關) ==========
+// ========== QuoteCreator ==========
 
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
@@ -2031,14 +2033,6 @@ const StatsView = ({ quotes }) => {
     );
   }
 
-  // 計算比例條用
-  const maxRevenue = Math.max(
-    stats.regions.North.revenue,
-    stats.regions.Central.revenue,
-    stats.regions.South.revenue,
-    1, // 避免除以 0
-  );
-
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8">
       {/* 頂部篩選與總計 */}
@@ -2086,7 +2080,7 @@ const StatsView = ({ quotes }) => {
         </div>
       </div>
 
-      {/* ★★★ 新增：北中南業績對比圖 (Visual Bars) ★★★ */}
+      {/* 北中南業績對比圖 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* 左側：區域營收長條圖 */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -2123,7 +2117,7 @@ const StatsView = ({ quotes }) => {
           </div>
         </div>
 
-        {/* 右側：案件數量圓餅圖模擬 (簡單版) */}
+        {/* 右側：案件數量圓餅圖模擬 */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center">
             <PieChart className="w-5 h-5 mr-2" />
@@ -2184,7 +2178,7 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ========== 行事曆視圖 (支援 Internal 顯示 - 修復白屏問題版) ==========
+// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定) ==========
 
 const CalendarView = ({
   quotes,
@@ -2213,7 +2207,7 @@ const CalendarView = ({
     location: '台北店', // 實際據點
   });
 
-  // --- 資料合併邏輯 (白屏修復：增加 ?. 和預設值) ---
+  // --- 資料合併邏輯 ---
   const allEvents = useMemo(() => {
     // 1. 處理企業報價單 (排除 draft)
     const quoteEvents = quotes
@@ -2235,7 +2229,7 @@ const CalendarView = ({
         };
       });
 
-    // 2. 處理老師常態課 (★ 修復重點：防止 undefined 導致 crash)
+    // 2. 處理老師常態課
     const regularEvents = regularClasses.map((r) => ({
       id: r.id,
       type: 'regular',
@@ -2251,7 +2245,7 @@ const CalendarView = ({
     // 3. 合併所有事件並過濾區域
     const combined = [...quoteEvents, ...regularEvents];
 
-    // ★ 關鍵：如果是透過連結進入 (publicRegion 存在)，強制過濾
+    // ★ 關鍵：如果是透過連結進入 (publicRegion 存在)，強制過濾，無視 filterRegion 狀態
     if (publicRegion) {
         return combined.filter((e) => e.region === publicRegion);
     }
@@ -2295,7 +2289,7 @@ const CalendarView = ({
     setViewMode('day');
   };
 
-  // --- 取得特定日期的事件 (修復白屏：確保日期有效) ---
+  // --- 取得特定日期的事件 ---
   const getEventsForDay = (date) => {
     if (!date) return [];
     return allEvents.filter((e) => {
@@ -2408,13 +2402,21 @@ const CalendarView = ({
     }
   };
 
-  // ★ 新增：連結生成功能
+  // ★ 新增：連結生成功能 (複製連結到剪貼簿)
   const handleCopyRegionLink = (region) => {
       const baseUrl = window.location.href.split('?')[0];
       const url = `${baseUrl}?view=calendar&mode=public&region=${region}`;
-      navigator.clipboard.writeText(url).then(() => {
-          alert(`已複製「${region === 'Central' ? '中部' : '南部'}行事曆」連結！\n對方打開只能看到該區域行程。`);
-      });
+      
+      if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(url).then(() => {
+              alert(`已複製「${region === 'Central' ? '中部' : '南部'}行事曆」連結！\n\n將連結傳給老師，對方打開後只能看到該區域的行程。`);
+          }).catch(() => {
+              alert('複製失敗，請手動複製網址：\n' + url);
+          });
+      } else {
+          // 備用方案
+          prompt("請複製以下連結：", url);
+      }
   };
 
   // --- Render Views ---
@@ -2482,9 +2484,7 @@ const CalendarView = ({
     );
   };
 
-  // 簡化的週/日視圖，邏輯與月視圖相同，使用統一的 events
   const renderDayView = () => {
-    // ★ 修復重點：確保 sort 不會因為 null/undefined 而崩潰
     const events = getEventsForDay(currentDate).sort((a, b) =>
       (a.time || '').localeCompare(b.time || ''),
     );
@@ -2594,15 +2594,15 @@ const CalendarView = ({
 
               {/* ★ 新增：連結生成按鈕 (只有管理者看得到) */}
               <button onClick={() => handleCopyRegionLink('Central')} className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200" title="複製連結給中部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製中部行事曆
+                  <LinkIcon className="w-4 h-4"/> 複製中部連結
               </button>
               <button onClick={() => handleCopyRegionLink('South')} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200 text-sm font-bold border border-green-200" title="複製連結給南部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製南部行事曆
+                  <LinkIcon className="w-4 h-4"/> 複製南部連結
               </button>
             </>
           )}
 
-          {/* 如果有強制區域 (publicRegion)，就不顯示篩選器，只顯示目前區域 */}
+          {/* ★ 區域篩選邏輯：如果 publicRegion 存在，強制鎖定不顯示篩選器 */}
           {!publicRegion && !publicMode && (
              <div className="flex bg-gray-100 rounded p-1">
                {['all', 'North', 'Central', 'South'].map((r) => (
@@ -2627,7 +2627,8 @@ const CalendarView = ({
              </div>
           )}
           {publicRegion && (
-              <span className="px-3 py-1 bg-gray-800 text-white rounded text-sm font-bold">
+              <span className="px-3 py-1 bg-gray-800 text-white rounded text-sm font-bold flex items-center">
+                  <Lock className="w-3 h-3 mr-1" />
                   只顯示：{publicRegion === 'Central' ? '中部' : '南部'}行程
               </span>
           )}
@@ -2658,7 +2659,7 @@ const CalendarView = ({
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'day' && renderDayView()}
 
-      {/* --- 新增/編輯常態課 Modal (簡化版) --- */}
+      {/* --- 新增/編輯常態課 Modal --- */}
       {showAddModal && !publicMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -2773,7 +2774,7 @@ const CalendarView = ({
   );
 };
 
-// ========== 報價單列表 (含 CSV 匯出匯入、過濾器、增強搜尋) ==========
+// ========== 報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
 
 const QuoteList = ({
   quotes,
@@ -2789,7 +2790,7 @@ const QuoteList = ({
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState('all'); // 月份過濾
   const [filterStatus, setFilterStatus] = useState('all'); // 狀態過濾
-  // ★ 移除區域篩選 filterRegion
+  // ★ 已移除區域篩選 filterRegion，遵照您的要求
   const fileInputRef = useRef(null);
 
   // 計算可用月份
@@ -2804,7 +2805,7 @@ const QuoteList = ({
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  // ★ 判斷報價單區域 (僅用於 CSV 匯出，介面上不篩選)
+  // ★ 判斷報價單區域 (僅用於 CSV 匯出欄位，介面上不篩選)
   const getQuoteRegion = (quote) => {
     if (!quote.items || quote.items.length === 0) return 'North';
     
@@ -2836,8 +2837,8 @@ const QuoteList = ({
       !kw ||
       (q.clientInfo.companyName || '').includes(kw) ||
       (firstItem.courseName || '').includes(kw) ||
-      (q.depositNote || '').includes(kw) || // 搜尋訂金備註
-      (q.adjustmentNote || '').includes(kw); // 搜尋追加備註
+      (q.depositNote || '').includes(kw) || 
+      (q.adjustmentNote || '').includes(kw);
 
     // 月份
     const d = getSafeDate(q.createdAt);
@@ -2854,7 +2855,7 @@ const QuoteList = ({
     return matchText && matchMonth && matchStatus;
   });
 
-  // ★ CSV 匯出邏輯 (保留區域欄位)
+  // ★ CSV 匯出邏輯 (完整保留)
   const handleExportCSV = () => {
     const bom = '\uFEFF'; // UTF-8 BOM 防止 Excel 亂碼
     let csvContent =
@@ -2899,7 +2900,7 @@ const QuoteList = ({
     document.body.removeChild(link);
   };
 
-  // ★ CSV 匯入邏輯
+  // ★ CSV 匯入邏輯 (完整保留)
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -3388,7 +3389,7 @@ const App = () => {
     }
   };
 
-  // 公開行事曆模式 (根據網址參數 publicRegion 來決定顯示內容)
+  // 公開行事曆模式
   if (publicCalendarMode) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
@@ -3416,7 +3417,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.5
+                內部管理系統 v3.5 (Final)
               </div>
             </div>
           </div>
@@ -3574,3 +3575,4 @@ const App = () => {
 };
 
 export default App;
+
