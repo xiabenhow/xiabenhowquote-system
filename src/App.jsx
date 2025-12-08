@@ -30,6 +30,8 @@ import {
   Clock,
   Store,
   Filter,
+  Copy,   // 新增圖示
+  Share2  // 新增圖示
 } from 'lucide-react';
 
 // ==========  Firebase 設定  ==========
@@ -602,7 +604,6 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
-
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -637,7 +638,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（含印章絕對不截斷修復） ==========
+// ========== 報價單預覽（★ 強力修復：印章高度與截斷問題） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -916,21 +917,21 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區：避免換頁，並修復印章截斷問題 */}
+      {/* 簽章區 (★ 修復：強制高度防止截斷) */}
       <div
-        className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
+        className="mt-6 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (★★★ 修正：移除高度限制，加入 overflow-visible，調整印章位置) */}
-        <div className="relative flex items-end mt-4 overflow-visible">
+        {/* 左邊：公司代表 + 印章 (高度 h-48 確保印章不被切) */}
+        <div className="relative mt-4 h-48 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // 調整 top 位置為負值，讓印章向上浮動，不被截斷
-              className="absolute -top-10 left-10 w-44 opacity-90 rotate-[-5deg] pointer-events-none select-none"
-              style={{ mixBlendMode: 'multiply' }}
+              // 調整：定位在容器內部，確保不超出邊界
+              className="absolute top-2 left-10 w-48 opacity-90 rotate-[-5deg]"
+              style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
                   'Stamp load failed，PDF 可能看不到印章（CORS 問題）',
@@ -938,14 +939,17 @@ const QuotePreview = ({
               }
             />
           )}
-          <p className="z-10 relative mt-12 font-bold">
-            下班隨手作代表：_________________
-          </p>
+          {/* 文字定位在底部 */}
+          <div className="absolute bottom-4 left-0 z-10 w-full">
+             <p className="font-bold text-base">下班隨手作代表：_________________</p>
+          </div>
         </div>
 
         {/* 右邊：客戶簽章 */}
-        <div className="flex items-end mt-4">
-          <p className="font-bold">客戶確認簽章：_________________</p>
+        <div className="relative mt-4 h-48 w-1/2 flex items-end justify-end">
+          <div className="absolute bottom-4 right-0">
+             <p className="font-bold text-base">客戶確認簽章：_________________</p>
+          </div>
         </div>
       </div>
     </div>
@@ -2189,11 +2193,12 @@ const CalendarView = ({
   onUpdateRegularClass,
   onDeleteRegularClass,
   publicMode = false,
+  publicRegion = null, // ★ 接收外部傳入的強制區域 (Central/South)
 }) => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [viewMode, setViewMode] = useState('month');
-  const [filterRegion, setFilterRegion] = useState('all');
+  const [filterRegion, setFilterRegion] = useState(publicRegion || 'all'); // 如果有強制區域，預設就選它
 
   // --- 新增常態課 Modal 狀態 ---
   const [showAddModal, setShowAddModal] = useState(false);
@@ -2245,9 +2250,15 @@ const CalendarView = ({
 
     // 3. 合併所有事件並過濾區域
     const combined = [...quoteEvents, ...regularEvents];
+
+    // ★ 關鍵：如果是透過連結進入 (publicRegion 存在)，強制過濾
+    if (publicRegion) {
+        return combined.filter((e) => e.region === publicRegion);
+    }
+
     if (filterRegion === 'all') return combined;
     return combined.filter((e) => e.region === filterRegion);
-  }, [quotes, regularClasses, filterRegion]);
+  }, [quotes, regularClasses, filterRegion, publicRegion]);
 
   // --- 日期操作 ---
   const getDaysInMonth = (year, month) =>
@@ -2395,6 +2406,15 @@ const CalendarView = ({
         `企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`,
       );
     }
+  };
+
+  // ★ 新增：連結生成功能
+  const handleCopyRegionLink = (region) => {
+      const baseUrl = window.location.href.split('?')[0];
+      const url = `${baseUrl}?view=calendar&mode=public&region=${region}`;
+      navigator.clipboard.writeText(url).then(() => {
+          alert(`已複製「${region === 'Central' ? '中部' : '南部'}行事曆」連結！\n對方打開只能看到該區域行程。`);
+      });
   };
 
   // --- Render Views ---
@@ -2563,38 +2583,53 @@ const CalendarView = ({
         <div className="flex items-center gap-2 flex-wrap">
           {/* 新增常態課按鈕 (僅內部模式顯示) */}
           {!publicMode && (
-            <button
-              onClick={handleOpenAddModal}
-              className="flex items-center gap-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 shadow text-sm font-bold mr-2"
-            >
-              <Plus className="w-4 h-4" />
-              新增常態課
-            </button>
+            <>
+              <button
+                onClick={handleOpenAddModal}
+                className="flex items-center gap-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 shadow text-sm font-bold mr-2"
+              >
+                <Plus className="w-4 h-4" />
+                新增常態課
+              </button>
+
+              {/* ★ 新增：連結生成按鈕 (只有管理者看得到) */}
+              <button onClick={() => handleCopyRegionLink('Central')} className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200" title="複製連結給中部老師">
+                  <LinkIcon className="w-4 h-4"/> 複製中部行事曆
+              </button>
+              <button onClick={() => handleCopyRegionLink('South')} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200 text-sm font-bold border border-green-200" title="複製連結給南部老師">
+                  <LinkIcon className="w-4 h-4"/> 複製南部行事曆
+              </button>
+            </>
           )}
 
-          {/* 區域篩選 */}
-          {!publicMode && (
-            <div className="flex bg-gray-100 rounded p-1">
-              {['all', 'North', 'Central', 'South'].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setFilterRegion(r)}
-                  className={`px-3 py-1 text-sm rounded ${
-                    filterRegion === r
-                      ? 'bg-gray-800 text-white'
-                      : 'text-gray-600'
-                  }`}
-                >
-                  {r === 'all'
-                    ? '全部'
-                    : r === 'North'
-                    ? '北部'
-                    : r === 'Central'
-                    ? '中部'
-                    : '南部'}
-                </button>
-              ))}
-            </div>
+          {/* 如果有強制區域 (publicRegion)，就不顯示篩選器，只顯示目前區域 */}
+          {!publicRegion && !publicMode && (
+             <div className="flex bg-gray-100 rounded p-1">
+               {['all', 'North', 'Central', 'South'].map((r) => (
+                 <button
+                   key={r}
+                   onClick={() => setFilterRegion(r)}
+                   className={`px-3 py-1 text-sm rounded ${
+                     filterRegion === r
+                       ? 'bg-gray-800 text-white'
+                       : 'text-gray-600'
+                   }`}
+                 >
+                   {r === 'all'
+                     ? '全部'
+                     : r === 'North'
+                     ? '北部'
+                     : r === 'Central'
+                     ? '中部'
+                     : '南部'}
+                 </button>
+               ))}
+             </div>
+          )}
+          {publicRegion && (
+              <span className="px-3 py-1 bg-gray-800 text-white rounded text-sm font-bold">
+                  只顯示：{publicRegion === 'Central' ? '中部' : '南部'}行程
+              </span>
           )}
 
           <div className="flex gap-1">
@@ -2738,7 +2773,7 @@ const CalendarView = ({
   );
 };
 
-// ========== 報價單列表 (含 CSV 匯出匯入、過濾器、增強搜尋 + ★區域篩選) ==========
+// ========== 報價單列表 (含 CSV 匯出匯入、過濾器、增強搜尋) ==========
 
 const QuoteList = ({
   quotes,
@@ -2754,7 +2789,7 @@ const QuoteList = ({
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState('all'); // 月份過濾
   const [filterStatus, setFilterStatus] = useState('all'); // 狀態過濾
-  const [filterRegion, setFilterRegion] = useState('All'); // ★ 新增：區域過濾
+  // ★ 移除區域篩選 filterRegion
   const fileInputRef = useRef(null);
 
   // 計算可用月份
@@ -2769,7 +2804,7 @@ const QuoteList = ({
     return Array.from(months).sort().reverse();
   }, [quotes]);
 
-  // ★ 判斷報價單區域 (只要有一個課程是該區域，就歸類在該區)
+  // ★ 判斷報價單區域 (僅用於 CSV 匯出，介面上不篩選)
   const getQuoteRegion = (quote) => {
     if (!quote.items || quote.items.length === 0) return 'North';
     
@@ -2792,7 +2827,7 @@ const QuoteList = ({
     return 'North'; // 預設北部
   };
 
-  // ★ 過濾邏輯 (增強搜尋：含備註欄位 + 區域)
+  // ★ 過濾邏輯 (增強搜尋：含備註欄位)
   const filtered = quotes.filter((q) => {
     // 關鍵字 (搜尋公司名、課程名、訂金備註、追加備註)
     const kw = search.trim();
@@ -2801,8 +2836,8 @@ const QuoteList = ({
       !kw ||
       (q.clientInfo.companyName || '').includes(kw) ||
       (firstItem.courseName || '').includes(kw) ||
-      (q.depositNote || '').includes(kw) || 
-      (q.adjustmentNote || '').includes(kw);
+      (q.depositNote || '').includes(kw) || // 搜尋訂金備註
+      (q.adjustmentNote || '').includes(kw); // 搜尋追加備註
 
     // 月份
     const d = getSafeDate(q.createdAt);
@@ -2816,14 +2851,10 @@ const QuoteList = ({
     const matchStatus =
       filterStatus === 'all' || (q.status || 'draft') === filterStatus;
 
-    // ★ 區域
-    const qRegion = getQuoteRegion(q);
-    const matchRegion = filterRegion === 'All' ? true : qRegion === filterRegion;
-
-    return matchText && matchMonth && matchStatus && matchRegion;
+    return matchText && matchMonth && matchStatus;
   });
 
-  // ★ CSV 匯出邏輯
+  // ★ CSV 匯出邏輯 (保留區域欄位)
   const handleExportCSV = () => {
     const bom = '\uFEFF'; // UTF-8 BOM 防止 Excel 亂碼
     let csvContent =
@@ -2961,28 +2992,6 @@ const QuoteList = ({
           </p>
         </div>
 
-        {/* ★ 新增：區域連結 (Tabs) */}
-        <div className="flex bg-gray-100 p-1 rounded-lg self-start md:self-center">
-            {[
-              { id: 'All', label: '全部區域' },
-              { id: 'North', label: '北部' },
-              { id: 'Central', label: '中部' },
-              { id: 'South', label: '南部' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterRegion(tab.id)}
-                className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${
-                  filterRegion === tab.id
-                    ? 'bg-white text-orange-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-        </div>
-
         <div className="flex flex-wrap gap-2 items-center justify-end">
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
@@ -3080,9 +3089,6 @@ const QuoteList = ({
                 總金額
               </th>
               <th className="px-4 py-2 text-center text-gray-500 font-medium">
-                區域
-              </th>
-              <th className="px-4 py-2 text-center text-gray-500 font-medium">
                 狀態
               </th>
               <th className="px-4 py-2 text-right text-gray-500 font-medium">
@@ -3094,7 +3100,7 @@ const QuoteList = ({
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-4 py-8 text-center text-gray-400"
                 >
                   尚無符合條件的資料
@@ -3105,7 +3111,6 @@ const QuoteList = ({
             {filtered.map((q) => {
               const first = q.items?.[0] || {};
               const isInternal = q.type === 'internal';
-              const region = getQuoteRegion(q);
 
               return (
                 <tr
@@ -3134,14 +3139,6 @@ const QuoteList = ({
                     {isInternal
                       ? '-'
                       : `$${Number(q.totalAmount || 0).toLocaleString()}`}
-                  </td>
-                  <td className="px-4 py-2 text-center align-middle">
-                     <span className={`text-xs px-2 py-1 rounded ${
-                        region === 'North' ? 'bg-blue-50 text-blue-600' :
-                        region === 'Central' ? 'bg-yellow-50 text-yellow-600' : 'bg-green-50 text-green-600'
-                     }`}>
-                        {region === 'North' ? '北部' : region === 'Central' ? '中部' : '南部'}
-                     </span>
                   </td>
                   <td className="px-4 py-2 text-center align-middle">
                     {isInternal ? (
@@ -3203,12 +3200,13 @@ const QuoteList = ({
   );
 };
 
-// ========== App 主元件 (修改版：加入 regularClasses 處理) ==========
+// ========== App 主程式 ==========
 
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const urlView = urlParams.get('view');
   const urlMode = urlParams.get('mode');
+  const urlRegion = urlParams.get('region'); // ★ 讀取網址中的 region 參數
 
   const [quotes, setQuotes] = useState([]);
   const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
@@ -3390,7 +3388,7 @@ const App = () => {
     }
   };
 
-  // 公開行事曆模式
+  // 公開行事曆模式 (根據網址參數 publicRegion 來決定顯示內容)
   if (publicCalendarMode) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
@@ -3398,6 +3396,7 @@ const App = () => {
           quotes={quotes}
           regularClasses={regularClasses}
           publicMode
+          publicRegion={urlRegion} // ★ 傳入網址的區域參數
         />
       </div>
     );
@@ -3417,7 +3416,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.2
+                內部管理系統 v3.5
               </div>
             </div>
           </div>
