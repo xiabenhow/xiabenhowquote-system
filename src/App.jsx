@@ -2063,7 +2063,7 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ========== 行事曆視圖 (支援 Internal 顯示) ==========
+// ========== 行事曆視圖 (支援 Internal 顯示 - 修復白屏問題版) ==========
 
 const CalendarView = ({
   quotes,
@@ -2101,8 +2101,8 @@ const CalendarView = ({
         return {
           id: q.id,
           type: 'quote',
-          date: first.eventDate, // YYYY-MM-DD
-          time: first.timeRange || first.startTime || '',
+          date: first.eventDate || '', // 確保日期字串
+          time: first.timeRange || first.startTime || '', // 確保時間字串
           title: q.clientInfo?.companyName || '未知客戶',
           subTitle: `${first.courseName || '未定課程'} (${
             first.peopleCount || 0
@@ -2113,13 +2113,13 @@ const CalendarView = ({
         };
       });
 
-    // 2. 處理老師常態課
+    // 2. 處理老師常態課 (★ 修復重點：防止 undefined 導致 crash)
     const regularEvents = regularClasses.map((r) => ({
       id: r.id,
       type: 'regular',
-      date: r.date,
-      time: r.time,
-      title: r.courseName || r.title,
+      date: r.date || '', // 強制轉為字串
+      time: r.time || '', // 強制轉為字串，防止 .slice 錯誤
+      title: r.courseName || r.title || '常態課',
       subTitle: '常態課',
       region: r.region || 'North',
       location: r.location || '台北店',
@@ -2173,6 +2173,9 @@ const CalendarView = ({
     return allEvents.filter((e) => {
       if (!e.date) return false;
       const d = new Date(e.date);
+      // 防止 Invalid Date 導致的邏輯錯誤
+      if (isNaN(d.getTime())) return false;
+      
       return (
         d.getDate() === date.getDate() &&
         d.getMonth() === date.getMonth() &&
@@ -2328,7 +2331,7 @@ const CalendarView = ({
                   )}`}
                   title={`${evt.title} - ${evt.subTitle}`}
                 >
-                  {evt.time.slice(0, 5)}{' '}
+                  {(evt.time || '').slice(0, 5)}{' '}
                   {evt.type === 'regular' && (
                     <span className="font-bold">★</span>
                   )}{' '}
@@ -2344,8 +2347,9 @@ const CalendarView = ({
 
   // 簡化的週/日視圖，邏輯與月視圖相同，使用統一的 events
   const renderDayView = () => {
+    // ★ 修復重點：確保 sort 不會因為 null/undefined 而崩潰
     const events = getEventsForDay(currentDate).sort((a, b) =>
-      a.time.localeCompare(b.time),
+      (a.time || '').localeCompare(b.time || ''),
     );
     return (
       <div className="border rounded-lg bg-white min-h-[500px] p-6">
