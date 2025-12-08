@@ -1006,7 +1006,7 @@ const QuotePreview = ({
               alt="Company Stamp"
               crossOrigin="anonymous"
               // ★ 調整：w-36 (更小), left-36 (避開文字往右), top-0
-              className="absolute top-0 left-36 w-[152px] opacity-90 rotate-[-5deg]"
+              className="absolute top-0 left-36 w-[160px] opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
