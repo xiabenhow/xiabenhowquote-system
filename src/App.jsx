@@ -601,7 +601,6 @@ const applyTransportDedup = (itemsWithCalc) => {
     return { ...item, calc };
   });
 };
-
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -636,7 +635,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（含印章） ==========
+// ========== 報價單預覽（含印章放大修復） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -920,14 +919,14 @@ const QuotePreview = ({
         className="mt-6 pt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 */}
+        {/* 左邊：公司代表 + 印章 (★★★ 修正：w-28 -> w-44，放大約 50%) */}
         <div className="relative flex items-end h-[110px]">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              className="absolute top-0 left-16 w-28 opacity-90 rotate-[-5deg] pointer-events-none"
+              className="absolute top-0 left-16 w-44 opacity-90 rotate-[-5deg] pointer-events-none"
               style={{ mixBlendMode: 'multiply' }}
               onError={() =>
                 console.warn(
@@ -1903,7 +1902,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-// ========== 統計頁面 (略微修改以排除 Internal 類型) ==========
+// ========== 統計頁面 (★★★ 豐富版：含北中南對比圖) ==========
 
 const StatsView = ({ quotes }) => {
   // 過濾掉內部排程
@@ -1939,14 +1938,27 @@ const StatsView = ({ quotes }) => {
       totalRevenue: 0,
       totalOrders: 0,
       regions: {
-        North: { name: '北部', revenue: 0, count: 0, color: 'bg-blue-500' },
+        North: {
+          name: '北部',
+          revenue: 0,
+          count: 0,
+          color: 'bg-blue-500',
+          textColor: 'text-blue-600',
+        },
         Central: {
           name: '中部',
           revenue: 0,
           count: 0,
           color: 'bg-yellow-500',
+          textColor: 'text-yellow-600',
         },
-        South: { name: '南部', revenue: 0, count: 0, color: 'bg-green-500' },
+        South: {
+          name: '南部',
+          revenue: 0,
+          count: 0,
+          color: 'bg-green-500',
+          textColor: 'text-green-600',
+        },
       },
       statuses: {
         pending: {
@@ -2012,9 +2024,17 @@ const StatsView = ({ quotes }) => {
     );
   }
 
+  // 計算比例條用
+  const maxRevenue = Math.max(
+    stats.regions.North.revenue,
+    stats.regions.Central.revenue,
+    stats.regions.South.revenue,
+    1, // 避免除以 0
+  );
+
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8">
-      {/* (保持原本的統計視圖內容) */}
+      {/* 頂部篩選與總計 */}
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center">
           <TrendingUp className="mr-3 text-blue-600" />
@@ -2058,7 +2078,101 @@ const StatsView = ({ quotes }) => {
           </div>
         </div>
       </div>
-      {/* (...省略圖表部分以節省篇幅，邏輯不變...) */}
+
+      {/* ★★★ 新增：北中南業績對比圖 (Visual Bars) ★★★ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* 左側：區域營收長條圖 */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center">
+            <BarChart3 className="w-5 h-5 mr-2" />
+            區域營收對比
+          </h3>
+          <div className="space-y-6">
+            {Object.entries(stats.regions).map(([key, region]) => (
+              <div key={key}>
+                <div className="flex justify-between items-end mb-1">
+                  <span className="font-bold text-gray-600">{region.name}</span>
+                  <span className={`font-bold ${region.textColor}`}>
+                    ${region.revenue.toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${region.color}`}
+                    style={{
+                      width: `${(region.revenue / stats.totalRevenue) * 100}%`,
+                    }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-400 text-right mt-1">
+                  佔比{' '}
+                  {stats.totalRevenue > 0
+                    ? Math.round((region.revenue / stats.totalRevenue) * 100)
+                    : 0}
+                  %
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右側：案件數量圓餅圖模擬 (簡單版) */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-700 mb-6 flex items-center">
+            <PieChart className="w-5 h-5 mr-2" />
+            案件分佈佔比
+          </h3>
+          <div className="flex flex-col justify-center h-full pb-6">
+            <div className="flex h-8 w-full rounded-full overflow-hidden mb-6">
+              {Object.entries(stats.regions).map(([key, region]) => (
+                <div
+                  key={key}
+                  className={`${region.color} transition-all duration-1000`}
+                  style={{
+                    width: `${
+                      stats.totalOrders > 0
+                        ? (region.count / stats.totalOrders) * 100
+                        : 0
+                    }%`,
+                  }}
+                  title={`${region.name}: ${region.count}件`}
+                ></div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              {Object.entries(stats.regions).map(([key, region]) => (
+                <div key={key} className="flex flex-col items-center">
+                  <div
+                    className={`w-3 h-3 rounded-full mb-2 ${region.color}`}
+                  ></div>
+                  <span className="text-gray-500 text-sm">{region.name}</span>
+                  <span className="text-xl font-bold text-gray-800">
+                    {region.count}
+                  </span>
+                  <span className="text-xs text-gray-400">件</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 案件狀態統計 (卡片式) */}
+      <h3 className="text-lg font-bold text-gray-700 mb-4">案件狀態總覽</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {Object.entries(stats.statuses).map(([key, status]) => (
+          <div
+            key={key}
+            className={`p-4 rounded-lg border ${status.color.replace(
+              'text-',
+              'border-',
+            )} bg-opacity-50`}
+          >
+            <p className="text-sm font-bold opacity-70 mb-1">{status.name}</p>
+            <p className="text-2xl font-bold">{status.count}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
