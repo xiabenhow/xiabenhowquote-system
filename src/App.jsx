@@ -950,101 +950,7 @@ const QuotePreview = ({
   );
 };
 
-// ========== 報價單預覽 Modal（含下載 PDF） ==========
-
-const PreviewModal = ({ quote, onClose }) => {
-  const [isSigned, setIsSigned] = useState(false);
-  const displayDateStr = formatDate(quote.createdAt || new Date());
-
-  const handleDownload = async () => {
-    const element = document.getElementById('preview-modal-area');
-    if (!element) return;
-
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
-
-    if (!window.html2pdf) {
-      try {
-        await loadScript(
-          'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-        );
-      } catch {
-        alert('無法載入 PDF 產生器，請檢查網路連線。');
-        return;
-      }
-    }
-
-    const opt = {
-      margin: 5,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-    };
-
-    window.html2pdf().from(element).set(opt).save();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
-      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
-        {/* 工具列 */}
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
-          <h3 className="font-bold text-lg text-gray-700 flex items-center">
-            <Printer className="w-5 h-5 mr-2" />
-            報價單預覽
-          </h3>
-          <div className="flex gap-2 items-center flex-wrap">
-            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-              <input
-                type="checkbox"
-                checked={isSigned}
-                onChange={(e) => setIsSigned(e.target.checked)}
-                className="w-5 h-5 text-blue-600"
-              />
-              <span className="text-sm font-bold text-blue-800">
-                蓋上印章
-              </span>
-            </label>
-
-            <button
-              onClick={handleDownload}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              下載 PDF
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
-            >
-              <X />
-            </button>
-          </div>
-        </div>
-
-        {/* 內容 */}
-        <div className="flex-1 overflow-auto p-4 bg-gray-100">
-          <div className="shadow-lg mx-auto">
-            <QuotePreview
-              idName="preview-modal-area"
-              clientInfo={quote.clientInfo}
-              items={quote.items}
-              totalAmount={quote.totalAmount}
-              dateStr={displayDateStr}
-              isSigned={isSigned}
-              stampUrl={STAMP_URL}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ========== 1. 新增：款項管理 Modal (PaymentModal) ==========
+// ========== 1. 新增：款項管理 Modal (PaymentModal) - 這是唯一一次定義 ==========
 
 const PaymentModal = ({ quote, onClose, onSave }) => {
   const [data, setData] = useState({
@@ -1173,6 +1079,100 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
           >
             儲存款項資訊
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ========== 報價單預覽 Modal（含下載 PDF） ==========
+
+const PreviewModal = ({ quote, onClose }) => {
+  const [isSigned, setIsSigned] = useState(false);
+  const displayDateStr = formatDate(quote.createdAt || new Date());
+
+  const handleDownload = async () => {
+    const element = document.getElementById('preview-modal-area');
+    if (!element) return;
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
+
+    if (!window.html2pdf) {
+      try {
+        await loadScript(
+          'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+        );
+      } catch {
+        alert('無法載入 PDF 產生器，請檢查網路連線。');
+        return;
+      }
+    }
+
+    const opt = {
+      margin: 5,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+    };
+
+    window.html2pdf().from(element).set(opt).save();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
+      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
+        {/* 工具列 */}
+        <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
+          <h3 className="font-bold text-lg text-gray-700 flex items-center">
+            <Printer className="w-5 h-5 mr-2" />
+            報價單預覽
+          </h3>
+          <div className="flex gap-2 items-center flex-wrap">
+            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+              <input
+                type="checkbox"
+                checked={isSigned}
+                onChange={(e) => setIsSigned(e.target.checked)}
+                className="w-5 h-5 text-blue-600"
+              />
+              <span className="text-sm font-bold text-blue-800">
+                蓋上印章
+              </span>
+            </label>
+
+            <button
+              onClick={handleDownload}
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              下載 PDF
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+            >
+              <X />
+            </button>
+          </div>
+        </div>
+
+        {/* 內容 */}
+        <div className="flex-1 overflow-auto p-4 bg-gray-100">
+          <div className="shadow-lg mx-auto">
+            <QuotePreview
+              idName="preview-modal-area"
+              clientInfo={quote.clientInfo}
+              items={quote.items}
+              totalAmount={quote.totalAmount}
+              dateStr={displayDateStr}
+              isSigned={isSigned}
+              stampUrl={STAMP_URL}
+            />
+          </div>
         </div>
       </div>
     </div>
