@@ -604,7 +604,6 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
-
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -639,7 +638,58 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 報價單預覽（★ 調整：高度極致壓縮、印章縮小右移） ==========
+// ========== ★ 新增：後台鎖定畫面 (AdminLock) ==========
+const AdminLock = ({ onUnlock }) => {
+  const [passcode, setPasscode] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    // ★ 預設通行碼：8888 (您可以在此修改)
+    if (passcode === '8888') {
+      onUnlock();
+    } else {
+      setError(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+      <div className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
+        <div className="mx-auto bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+          <Lock className="w-8 h-8 text-blue-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">後台管理鎖定</h2>
+        <p className="text-gray-500 mb-6 text-sm">請輸入通行碼以存取內部資料</p>
+        
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input
+            type="password"
+            className={`w-full text-center text-2xl tracking-widest border-2 rounded-lg p-3 outline-none transition-colors ${error ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+            placeholder="••••"
+            maxLength={4}
+            value={passcode}
+            onChange={(e) => {
+              setPasscode(e.target.value);
+              setError(false);
+            }}
+            autoFocus
+          />
+          {error && <p className="text-red-500 text-sm font-bold">通行碼錯誤</p>}
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
+          >
+            解鎖進入
+          </button>
+        </form>
+        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v3.8</p>
+      </div>
+    </div>
+  );
+};
+
+// ========== 報價單預覽（★ 調整：緊湊版面、印章壓字不佔位） ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -655,7 +705,7 @@ const QuotePreview = ({
       id={idName}
       className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-4 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
-      {/* 標題 (間距 mb-6 -> mb-3) */}
+      {/* 標題 (間距壓縮 mb-3) */}
       <div className="flex justify-between items-end border-b-2 border-gray-800 pb-2 mb-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -668,7 +718,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 品牌單位 + 客戶資料 (間距 mb-6 -> mb-3, padding p-4 -> p-3) */}
+      {/* 品牌單位 + 客戶資料 (間距壓縮 mb-3, padding p-3) */}
       <div className="mb-3">
         <div className="grid grid-cols-2 gap-3">
           {/* 左邊 */}
@@ -723,7 +773,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 明細表 (間距 mb-6 -> mb-3) */}
+      {/* 明細表 (間距壓縮 mb-3, padding p-2) */}
       <table className="w-full mb-3 border-collapse text-xs">
         <thead>
           <tr className="bg-gray-800 text-white">
@@ -744,7 +794,6 @@ const QuotePreview = ({
             return (
               <React.Fragment key={idx}>
                 <tr className="break-inside-avoid">
-                  {/* padding p-3 -> p-2 */}
                   <td className="p-2">
                     <div className="font-bold text-gray-800 text-sm">
                       {item.courseName}
@@ -861,7 +910,7 @@ const QuotePreview = ({
         </tbody>
       </table>
 
-      {/* 總金額 (padding p-4 -> p-2) */}
+      {/* 總金額 (間距壓縮) */}
       <div className="flex justify-end mt-2 break-inside-avoid">
         <div className="w-1/2 bg-gray-50 p-2 rounded border border-gray-200">
           <div className="flex justify-between items-center text-xl font-bold text-blue-900">
@@ -874,7 +923,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 注意事項 (間距 mt-6 -> mt-3) */}
+      {/* 注意事項 (間距壓縮) */}
       <div className="mt-3 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
@@ -918,20 +967,20 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區 (★ 高度縮小為 h-32，印章 w-40，位置 left-28) */}
+      {/* 簽章區 (★ h-32 約128px，印章 w-36，位置 left-20，top-0 壓字) */}
       <div
         className="mt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (容器高度 h-32 約128px，夠放印章但省空間) */}
+        {/* 左邊：公司代表 + 印章 (容器高度 h-32 確保不換頁，但印章浮動) */}
         <div className="relative mt-2 h-32 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // ★ 調整：w-48 -> w-40 (縮小)，left-10 -> left-28 (右移)，top-1
-              className="absolute top-1 left-28 w-40 opacity-90 rotate-[-5deg]"
+              // ★ 調整：w-36 (縮小), left-20 (右移), top-0 (壓在代表文字上方)
+              className="absolute top-0 left-20 w-36 opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
@@ -940,7 +989,7 @@ const QuotePreview = ({
               }
             />
           )}
-          {/* 文字定位在底部 */}
+          {/* 文字定位在底部，z-index 10 確保文字在印章上面 (或下面看需求，這裡設定印章壓字) */}
           <div className="absolute bottom-2 left-0 z-10 w-full">
              <p className="font-bold text-sm">下班隨手作代表：_________________</p>
           </div>
@@ -1906,7 +1955,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 );
 };
 
-
 // ========== 統計頁面 (含北中南對比圖) ==========
 
 const StatsView = ({ quotes }) => {
@@ -2174,7 +2222,7 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定) ==========
+// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定 + ★修正多筆課程顯示) ==========
 
 const CalendarView = ({
   quotes,
@@ -2203,26 +2251,33 @@ const CalendarView = ({
     location: '台北店', // 實際據點
   });
 
-  // --- 資料合併邏輯 ---
+  // --- 資料合併邏輯 (★ 修正：展開每個 quote 的 items) ---
   const allEvents = useMemo(() => {
-    // 1. 處理企業報價單 (排除 draft)
+    // 1. 處理企業報價單 (★ 使用 flatMap 展開所有課程項目)
     const quoteEvents = quotes
       .filter((q) => q.status !== 'draft')
-      .map((q) => {
-        const first = q.items?.[0] || {};
-        return {
-          id: q.id,
-          type: 'quote',
-          date: first.eventDate || '', // 確保日期字串
-          time: first.timeRange || first.startTime || '', // 確保時間字串
-          title: q.clientInfo?.companyName || '未知客戶',
-          subTitle: `${first.courseName || '未定課程'} (${
-            first.peopleCount || 0
-          }人)`,
-          region: first.outingRegion || first.regionType || 'North',
-          location: `${first.city || ''} ${first.address || ''}`,
-          raw: q,
-        };
+      .flatMap((q) => {
+        // 如果 items 為空，返回空陣列
+        if (!q.items || q.items.length === 0) return [];
+        
+        // 將每個 item 轉換為一個獨立事件
+        return q.items.map((item, index) => {
+          // 確保每個事件有唯一 ID (quoteID + itemIndex)
+          return {
+            id: `${q.id}_${index}`, 
+            type: 'quote',
+            date: item.eventDate || '', // 確保日期字串
+            time: item.timeRange || item.startTime || '',
+            title: q.clientInfo?.companyName || '未知客戶',
+            subTitle: `${item.courseName || '未定課程'} (${
+              item.peopleCount || 0
+            }人)`,
+            // 優先使用該課程的區域設定
+            region: item.outingRegion || item.regionType || 'North',
+            location: `${item.city || ''} ${item.address || ''}`,
+            raw: q,
+          };
+        });
       });
 
     // 2. 處理老師常態課
@@ -3197,7 +3252,7 @@ const QuoteList = ({
   );
 };
 
-// ========== App 主程式 ==========
+// ========== App 主程式 (★ 修正：安全鎖定邏輯) ==========
 
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -3206,14 +3261,17 @@ const App = () => {
   const urlRegion = urlParams.get('region'); // ★ 讀取網址中的 region 參數
 
   const [quotes, setQuotes] = useState([]);
-  const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
+  const [regularClasses, setRegularClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(
     urlView === 'calendar' ? 'calendar' : 'list',
   );
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
-  const [paymentQuote, setPaymentQuote] = useState(null); // 款項 Modal
+  const [paymentQuote, setPaymentQuote] = useState(null);
+
+  // ★ 新增：解鎖狀態 (預設 false)
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const publicCalendarMode = urlMode === 'public' && urlView === 'calendar';
 
@@ -3223,7 +3281,6 @@ const App = () => {
       return;
     }
 
-    // 1. 監聽報價單
     const qQuotes = query(
       collection(db, 'quotes'),
       orderBy('createdAt', 'desc'),
@@ -3233,7 +3290,6 @@ const App = () => {
       setLoading(false);
     });
 
-    // 2. 監聽常態課
     const qRegular = query(
       collection(db, 'regularClasses'),
     );
@@ -3330,7 +3386,6 @@ const App = () => {
     }
   };
 
-  // --- 新增常態課處理函數 ---
   const handleAddRegularClass = async (classData) => {
     try {
       if (db) {
@@ -3339,7 +3394,6 @@ const App = () => {
           createdAt: serverTimestamp(),
         });
       } else {
-        // 本地模式
         setRegularClasses((prev) => [
           ...prev,
           { id: generateId(), ...classData },
@@ -3351,7 +3405,6 @@ const App = () => {
     }
   };
 
-  // --- 更新常態課 ---
   const handleUpdateRegularClass = async (id, classData) => {
     try {
       if (db) {
@@ -3385,7 +3438,7 @@ const App = () => {
     }
   };
 
-  // 公開行事曆模式
+  // ★ 邏輯判斷：如果是公開模式，直接顯示行事曆
   if (publicCalendarMode) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
@@ -3393,12 +3446,18 @@ const App = () => {
           quotes={quotes}
           regularClasses={regularClasses}
           publicMode
-          publicRegion={urlRegion} // ★ 傳入網址的區域參數
+          publicRegion={urlRegion}
         />
       </div>
     );
   }
 
+  // ★ 邏輯判斷：如果不是公開模式，但未解鎖，顯示鎖定畫面
+  if (!isUnlocked) {
+    return <AdminLock onUnlock={() => setIsUnlocked(true)} />;
+  }
+
+  // ★ 邏輯判斷：已解鎖，顯示完整後台
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
       {/* Header */}
@@ -3413,7 +3472,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v3.6 (Final)
+                內部管理系統 v3.8 (Security + Layout Fix)
               </div>
             </div>
           </div>
