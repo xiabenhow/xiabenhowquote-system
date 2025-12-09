@@ -944,7 +944,7 @@ const QuotePreview = ({
             <span>${totalAmount.toLocaleString()}</span>
           </div>
           <p className="text-right text-[10px] text-gray-500 mt-1">
-            含稅及所有費用
+            總金額
           </p>
         </div>
       </div>
