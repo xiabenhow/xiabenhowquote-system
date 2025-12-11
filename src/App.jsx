@@ -32,12 +32,15 @@ import {
   Filter,
   Copy,
   Share2,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardList,
+  Users,
+  CheckSquare
 } from 'lucide-react';
 
 // ==========  Firebase 設定  ==========
 import { initializeApp } from 'firebase/app';
-import { getAnalytics } from 'firebase/analytics';
+// 移除 Analytics 以簡化依賴，若您原專案有用到可自行加回
 import {
   getFirestore,
   collection,
@@ -68,13 +71,11 @@ const firebaseConfig = {
 
 let app;
 let db;
-let analytics;
 const isFirebaseReady = !!firebaseConfig.apiKey;
 
 try {
   if (isFirebaseReady) {
     app = initializeApp(firebaseConfig);
-    analytics = getAnalytics(app);
     db = getFirestore(app);
     console.log('✅ Firebase 已連線：xiabenhow-quote');
   }
@@ -312,6 +313,160 @@ const COURSE_DATA = {
     { name: '浮游花瓶', price: 780 },
   ],
 };
+
+// ========== 課程材料對照表 (新增) ==========
+const COURSE_MATERIALS = {
+  // --- 平板課程 ---
+  '平板課程-招財水晶樹': ['水晶碎石包', '銅線', '底座', '瞬間膠'],
+  '平板課程-純淨水晶礦石吊飾': ['水晶礦石', '金屬線', '吊飾頭'],
+  '平板課程-流體畫方形布畫': ['畫布(方)', '流體顏料組', '手套', '紙杯', '攪拌棒'],
+  '平板課程-Macrame星座葉片吊飾': ['棉繩', '梳子', '剪刀', '定型液'],
+  '平板課程-招財流體揪吉': ['揪吉素胚', '流體顏料', '亮粉', '紙盤'],
+  '平板課程-橙片奶昔蠟燭': ['蠟材包', '乾燥橙片', '燭芯', '玻璃杯'],
+  '平板課程-永生繡球花玻璃杯燭台': ['玻璃杯(大)', '玻璃杯(小)', '永生繡球花', '果凍蠟', '茶蠟'],
+  '平板課程-聖誕金箔浮游花瓶': ['浮游花瓶', '浮游花油', '金箔', '聖誕花材包'],
+  '平板課程-多肉盆栽造型蠟燭手把杯': ['蠟材', '燭芯', '色塊', '手把杯'],
+  '平板課程-鐵罐乾燥花香氛蠟燭': ['鐵罐', '大豆蠟', '香氛精油', '乾燥花材'],
+  '平板課程-雙棕色玻璃瓶香氛蠟燭': ['棕色玻璃瓶*2', '大豆蠟', '精油', '貼紙'],
+  '平板課程-彩虹小熊軟糖洗手皂': ['皂基', '色液', '小熊模具', '香精'],
+  '平板課程-水泥盆微景觀多肉': ['水泥盆', '多肉植物', '專用土', '鋪面石', '裝飾公仔'],
+  '平板課程-多肉雙八角水泥盆': ['八角水泥盆*2', '多肉植物*2', '種植土', '鋪面石'],
+  '平板課程-Macrame樹葉壁掛': ['棉繩', '木棍', '剪刀', '梳子'],
+  '平板課程-蒙古玻璃乾燥花香氛蠟燭': ['蒙古包玻璃罐', '大豆蠟', '花材包'],
+  '平板課程-多肉摩艾水泥盆': ['摩艾水泥盆', '多肉植物', '土'],
+  '平板課程-Macrame編織燈串': ['棉繩', '燈串', '電池'],
+  '平板課程-樹幹乾燥花香氛蠟燭': ['樹幹造型器皿', '蠟材', '花材'],
+  '平板課程-永生繡球浮游花筆': ['浮游花筆管', '繡球花', '專用油'],
+  '平板課程-水泥六角擴香花盤': ['六角盤', '擴香石粉', '模具', '花材'],
+  '平板課程-永生繡球浮游花瓶': ['浮游花瓶', '繡球花', '浮游花油'],
+  '平板課程-壓克力流體畫杯墊': ['壓克力圓片', '流體顏料', '軟木塞底'],
+  '平板課程-乾燥花香氛橢圓蠟片': ['蠟材', '模具(橢圓)', '乾燥花', '緞帶'],
+  '平板課程-紳士兔松果擴香座': ['松果', '底座', '紳士兔裝飾', '擴香液'],
+  '平板課程-雪松松果樹名片座': ['大松果', '雪松', '名片夾', '底座'],
+  '平板課程-熊熊愛上你擴香小熊': ['擴香石粉', '小熊模具', '顏料', '香氛'],
+  '平板課程-水彩暈染星空畫': ['水彩紙', '水彩顏料', '畫筆', '紙膠帶'],
+  '平板課程-工業風擴香花盆': ['大理石紋盆', '擴香花', '索拉花', '花泥'],
+  '平板課程-南瓜鐵藝香氛蠟燭': ['南瓜鐵籃', '蠟燭杯', '大豆蠟', '裝飾葉'],
+  '平板課程-水彩夜景夢幻煙火畫': ['水彩紙', '水彩', '留白膠', '畫筆'],
+  '平板課程-微景觀多肉玻璃球': ['玻璃球容器', '多肉植物', '介質', '裝飾砂'],
+  '平板課程-圓方香氛暈染手工皂': ['皂基', '染料', '方圓模具', '精油'],
+  '平板課程-工業風永生花': ['水泥盆', '永生玫瑰', '繡球', '鐵絲'],
+  '平板課程-拼色水磨石吸水雙杯墊': ['石膏粉', '色漿', '模具', '磨砂紙'],
+  '平板課程-流體畫啤酒開瓶器與啤酒墊': ['開瓶器胚體', '杯墊胚體', '流體顏料'],
+  '平板課程-工業流金擴香片': ['石膏粉', '金箔', '模具', '緞帶'],
+  '平板課程-乾燥花圈精油手工皂': ['皂基', '乾燥花圈', '精油', '圓形模具'],
+  '平板課程-月牙多肉三角玻璃屋': ['幾何玻璃屋', '多肉植物', '鋪面石', '公仔'],
+  '平板課程-花影藏香擴香花台': ['擴香座', '試管花器', '乾燥花束'],
+
+  // --- 水晶系列 ---
+  '手作輕寶石水晶手鍊': ['天然石珠', '彈性線', '隔珠', '引線'],
+  '編織星球水晶手鍊': ['水晶珠', '蠟線', '編織板', '剪刀'],
+  '招財水晶樹': ['紫水晶/黃水晶碎石', '銅線', '瑪瑙底座'],
+  '大盆招財水晶樹': ['大量水晶碎石', '粗銅線', '大型底座'],
+  '水晶礦石月曆': ['木框/畫布', '水晶原礦*12', '數字貼紙', '膠槍'],
+  '時光之石水晶時鐘': ['時鐘機芯', '水晶原礦', '鐘面底板', '指針'],
+
+  // --- 蠟燭系列 ---
+  '花圈香氛蠟片': ['蠟材', '甜甜圈模具', '花材', '緞帶'],
+  '乾燥花玻璃杯燭台': ['雙層玻璃杯', '花材', '果凍蠟', '茶蠟'],
+  '微景觀湖泊蠟燭': ['玻璃容器', '果凍蠟', '藍色染料', '造景石'],
+  '告白蠟燭漂流木燭台': ['漂流木', '玻璃杯', '蠟材', '告白紙條'],
+  '黑曜石松果香氛蠟燭': ['黑曜石', '松果', '大豆蠟', '精油'],
+  '微醺調酒香氛蠟燭（含調酒）': ['高腳杯', '果凍蠟', '染料', '裝飾果乾'],
+  '多層透視油畫蠟燭': ['方杯', '不同熔點蠟材', '顏料', '畫筆'],
+  '南瓜鐵藝乾燥花蠟燭': ['南瓜鐵藝架', '蠟燭杯', '花材', '大豆蠟'],
+  '瑪格麗特調酒香氛蠟燭（含調酒）': ['雞尾酒杯', '果凍蠟', '鹽口裝飾', '檸檬片'],
+  '麋鹿香氛蠟燭': ['麋鹿造型杯/裝飾', '大豆蠟', '精油'],
+  '馬芬甜點香氛蠟燭': ['馬芬杯', '蠟材', '仿真奶油蠟', '裝飾果'],
+  '乾燥花擴香蠟片': ['蠟材', '長方模具', '花材', '緞帶'],
+  '果凍海洋蠟燭杯': ['玻璃杯', '貝殼', '星砂', '果凍蠟'],
+
+  // --- 畫畫系列 ---
+  '聖誕樹油畫棒': ['畫板', '重油畫棒', '刮刀'],
+  '耶誕窗景酒精畫': ['專用紙', '酒精墨水', '窗框卡紙', '吹球'],
+  '月亮燈肌理畫': ['圓形畫布', '石英砂/肌理膏', '月球燈組', '顏料'],
+  '絢彩琉璃酒精畫': ['合成紙', '酒精墨水', '酒精', '吹風機'],
+  '經典北歐酒精畫木托盤': ['木托盤', '酒精墨水', '滴膠(保護層)'],
+  '浪花畫油畫棒': ['畫布', '油畫棒', '白色顏料(浪花)', '刮刀'],
+  '金箔肌理畫': ['畫布', '肌理膏', '金箔', '丙烯顏料'],
+  '六角石盤流體畫杯墊': ['六角石盤', '流體顏料', '金粉'],
+  '創作雙流體畫方形布畫與杯墊': ['方畫布', '杯墊', '流體顏料'],
+  '雙流體熊圓形布畫': ['圓畫布', '流體熊白胚*2', '流體顏料'],
+  '康乃馨油畫棒': ['畫布', '油畫棒', '包裝紙'],
+  '聖誕樹肌理畫': ['畫布', '肌理膏', '刮刀', '綠色顏料'],
+  '聖誕絢彩琉璃酒精畫': ['合成紙', '酒精墨水', '聖誕配色'],
+  '新春吉祥酒精畫': ['合成紙', '紅色/金色酒精墨水', '金粉'],
+
+  // --- 多肉植栽系列 ---
+  '路燈多肉相框': ['相框盆器', '多肉植物', '路燈擺飾', '土'],
+  '路燈叢林微景觀多肉梯盆': ['梯形盆', '多肉植物', '路燈', '苔蘚'],
+  '雪地多肉玻璃球': ['玻璃球', '白色鋪面砂', '多肉', '聖誕裝飾'],
+  '苔蘚生態玻璃球': ['玻璃球', '苔蘚', '造景石', '噴瓶'],
+  '能量礦石叢林生態瓶': ['玻璃瓶', '苔蘚', '礦石', '介質'],
+  '上板鹿角蕨': ['鹿角蕨', '木板', '水苔', '魚線', '螺絲'],
+  '上板苔球': ['植物', '水苔', '木板', '線材'],
+  '木質苔球小院': ['木底座', '植物苔球', '小籬笆'],
+  '微景觀多肉暈染石盆': ['石膏盆', '暈染顏料', '多肉', '土'],
+  '月牙多肉三角玻璃屋': ['幾何玻璃屋', '多肉', '裝飾石'],
+  '日式注連繩掛飾': ['注連繩', '乾燥花', '扇子/水引繩', '熱熔膠'],
+  '叢林多肉花圈': ['藤圈', '多肉植物', '水苔', '鐵絲'],
+  '冷杉擴香雪景觀多肉盆': ['水泥盆', '多肉', '雪松', '雪粉'],
+  '療癒水苔多肉藤圈': ['藤圈', '水苔', '多肉剪枝', '固定線'],
+  '上板苔球多肉': ['多肉植物', '水苔', '木板'],
+  '多肉盆栽觸控音樂盒': ['音樂盒底座', '盆器', '多肉植物'],
+
+  // --- 調香系列 ---
+  '法式香水精油調香': ['香水瓶', '酒精', '精油組', '試香紙'],
+  '法式情侶雙人調香組': ['香水瓶*2', '酒精', '精油組'],
+  '芳療精油滾珠瓶': ['滾珠瓶', '荷荷巴油', '精油'],
+  '玻尿酸天然精油調香沐浴精': ['沐浴基底', '玻尿酸原液', '精油', '瓶器'],
+  '室內擴香調香課': ['擴香瓶', '擴香基底液', '精油', '擴香棒'],
+
+  // --- 花藝系列 ---
+  '雪影藏花永生繡球花圈': ['藤圈', '永生繡球', '熱熔膠', '緞帶'],
+  '冬夜響鈴玫瑰永生花圈': ['藤圈', '永生玫瑰', '棉花', '松果'],
+  '水泥樹幹花藝': ['水泥樹幹盆', '乾燥花材', '海綿'],
+  '迎春花藝木框掛飾': ['木框', '迎春花材', '喜氣掛飾'],
+  '日式注連繩迎春花': ['注連繩', '迎春花材', '扇子'],
+  '北歐胖圈擴香花盆': ['胖胖水泥盆', '擴香花', '乾燥花'],
+  '永恆玫瑰玻璃盅永生花燈': ['玻璃盅', '燈座', '永生玫瑰', '苔蘚'],
+  '花藝玻璃珠寶盒': ['六角玻璃盒', '永生花', '海綿'],
+  '韓式香水瓶花盒': ['香水瓶狀壓克力盒', '花材', '緞帶'],
+  '韓式質感花束包裝': ['花材', '韓式包裝紙', '緞帶', '鐵絲'],
+  '多稜角水泥永生花盆': ['幾何水泥盆', '永生花材', '花泥'],
+  '浮游花瓶永生繡球夜燈': ['浮游花瓶', '燈座', '繡球花'],
+  '經典永生花畫框': ['立體畫框', '永生玫瑰', '花泥'],
+  '迎春乾燥花水泥六角盆': ['六角盆', '喜氣花材', '春節插牌'],
+  '松果花藝名片座': ['大松果', '花材裝飾', '名片夾'],
+  '金箔浮游花瓶': ['玻璃瓶', '金箔', '浮游花專用油', '花材'],
+  '摩天輪玫瑰永生花圈': ['特殊摩天輪架', '永生玫瑰', '花材'],
+  '玫瑰永生花方瓷盆': ['方瓷盆', '永生玫瑰', '配花'],
+
+  // --- 皮革系列 ---
+  '皮革證件套': ['皮革材料包', '針線', '強力膠', '磨邊器'],
+  '皮革零錢包': ['皮革材料包', '五金扣', '針線'],
+
+  // --- 環氧樹脂系列 ---
+  '海洋風情托盤與雙杯墊': ['木托盤', '杯墊', '環氧樹脂', '色精(藍/白)', '熱風槍'],
+  '海洋收藏盒': ['木盒', '樹脂', '貝殼', '砂'],
+  '日本樹脂康乃馨水晶花夜燈': ['銅線', '造花液', '燈座'],
+  '日本樹脂龜背葉水晶花': ['銅線', '造花液', '花器'],
+  '磁浮月球燈': ['磁浮底座', '3D列印月球', '顏料'],
+  '夏日海風衛生紙盒與萬用盤': ['衛生紙盒', '盤子', '樹脂', '海洋裝飾'],
+
+  // --- 藍染系列 ---
+  '藍染木架收納袋與編織手機鍊': ['胚布袋', '木架', '藍染液', '棉繩'],
+  '手染遮陽帽與老公公吊飾': ['棉麻帽', '藍染液', '橡皮筋(綁紮)'],
+  '創意染零錢包與提繩': ['布零錢包', '藍染液', '棉繩'],
+  '藍染編織掛布': ['掛布', '藍染液', '織布機/工具'],
+  '藍染兩用手提衛生紙套與編織繩': ['面紙套胚體', '藍染液', '繩材'],
+  '藍染識別證件套與午睡枕': ['布證件套', '小枕頭', '藍染液'],
+
+  // --- 其它 ---
+  '擴香石手作': ['石膏粉', '模具', '顏料', '香精'],
+  '浮游花瓶': ['玻璃瓶', '花材', '浮游花油']
+};
+
 
 // ========== 車馬費表 (完整版) ==========
 
@@ -708,13 +863,13 @@ const AdminLock = ({ onUnlock }) => {
             解鎖進入
           </button>
         </form>
-        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v3.9</p>
+        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v4.0</p>
       </div>
     </div>
   );
 };
 
-// ========== 報價單預覽（★ 修正：高度極致壓縮、印章右移且不佔位） ==========
+// ========== 報價單預覽 ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -730,7 +885,7 @@ const QuotePreview = ({
       id={idName}
       className="bg-white w-[210mm] max-w-full shadow-none px-8 pb-4 pt-[5px] text-sm mx-auto relative print:p-0 print:m-0 print:w-full"
     >
-      {/* 標題 (間距 mb-6 -> mb-2) */}
+      {/* 標題 */}
       <div className="flex justify-between items-end border-b-2 border-gray-800 pb-2 mb-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -743,7 +898,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 品牌單位 + 客戶資料 (間距 mb-6 -> mb-2, padding p-4 -> p-2) */}
+      {/* 品牌單位 + 客戶資料 */}
       <div className="mb-2">
         <div className="grid grid-cols-2 gap-3">
           {/* 左邊 */}
@@ -798,7 +953,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 明細表 (間距 mb-6 -> mb-2) */}
+      {/* 明細表 */}
       <table className="w-full mb-2 border-collapse text-xs">
         <thead>
           <tr className="bg-gray-800 text-white">
@@ -819,7 +974,6 @@ const QuotePreview = ({
             return (
               <React.Fragment key={idx}>
                 <tr className="break-inside-avoid">
-                  {/* padding p-3 -> p-2 */}
                   <td className="p-2">
                     <div className="font-bold text-gray-800 text-sm">
                       {item.courseName}
@@ -936,7 +1090,7 @@ const QuotePreview = ({
         </tbody>
       </table>
 
-      {/* 總金額 (padding p-4 -> p-2) */}
+      {/* 總金額 */}
       <div className="flex justify-end mt-2 break-inside-avoid">
         <div className="w-1/2 bg-gray-50 p-2 rounded border border-gray-200">
           <div className="flex justify-between items-center text-xl font-bold text-blue-900">
@@ -949,7 +1103,7 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 注意事項 (間距 mt-6 -> mt-2) */}
+      {/* 注意事項 */}
       <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
@@ -993,20 +1147,19 @@ const QuotePreview = ({
         </div>
       </div>
 
-      {/* 簽章區 (★ h-32 約128px，印章 w-36，位置 left-36) */}
+      {/* 簽章區 */}
       <div
         className="mt-4 border-t border-gray-300 flex justify-between text-sm items-end relative break-inside-avoid"
         style={{ pageBreakInside: 'avoid' }}
       >
-        {/* 左邊：公司代表 + 印章 (容器高度 h-32 確保不換頁，印章覆蓋文字) */}
+        {/* 左邊：公司代表 + 印章 */}
         <div className="relative mt-2 h-32 w-1/2">
           {isSigned && (
             <img
               src={stampUrl || STAMP_URL}
               alt="Company Stamp"
               crossOrigin="anonymous"
-              // ★ 調整：w-36 (更小), left-36 (避開文字往右), top-0
-              className="absolute top-0 left-36 w-[160px] opacity-90 rotate-[-5deg]"
+              className="absolute top-0 left-36 w-[152px] opacity-90 rotate-[-5deg]"
               style={{ mixBlendMode: 'multiply', zIndex: 0 }}
               onError={() =>
                 console.warn(
@@ -1320,7 +1473,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         city: '台北市',
         area: '',
         eventDate: '',
-        timeRange: '', // ★ 新欄位：時間區間（手動輸入）
+        timeRange: '',
         hasInvoice: false,
         enableDiscount90: false,
         customDiscount: 0,
@@ -1892,93 +2045,85 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                                   fee.id,
                                   'amount',
                                   e.target.value,
-                              )
-                            }
-                            disabled={!fee.isEnabled}
-                          />
+                                )
+                              }
+                              disabled={!fee.isEnabled}
+                            />
+                          </div>
+                          <button
+                            onClick={() => removeExtraFee(idx, fee.id)}
+                            className="text-red-400 hover:text-red-600 p-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeExtraFee(idx, fee.id)}
-                          className="text-red-400 hover:text-red-600 p-2"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
               </div>
             </div>
+          );
+        })}
 
-            {/* 規則錯誤提示 */}
-            {calcItem.calc.error && (
-              <div className="mt-4 p-3 bg-red-100 text-red-800 border border-red-200 rounded flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                <span className="font-bold">{calcItem.calc.error}</span>
-              </div>
-            )}
+        <button
+          onClick={addItem}
+          className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
+        >
+          <Plus className="w-6 h-6 mr-2" />
+          增加更多課程
+        </button>
+      </div>
+
+      {/* 下方即時預覽 + 儲存 */}
+      <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
+        <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Eye className="mr-2" />
+            即時報價單預覽
+          </h3>
+          <div className="flex gap-4 items-center flex-wrap">
+            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
+              <input
+                type="checkbox"
+                checked={isSigned}
+                onChange={(e) => setIsSigned(e.target.checked)}
+                className="w-5 h-5 text-blue-600"
+              />
+              <span className="text-sm font-bold text-blue-800">
+                蓋上印章
+              </span>
+            </label>
+
+            <button
+              onClick={handleSave}
+              className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              儲存至資料庫
+            </button>
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
           </div>
-        );
-      })}
+        </div>
 
-      <button
-        onClick={addItem}
-        className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
-      >
-        <Plus className="w-6 h-6 mr-2" />
-        增加更多課程
-      </button>
-    </div>
-
-    {/* 下方即時預覽 + 儲存 */}
-    <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
-      <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
-        <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-          <Eye className="mr-2" />
-          即時報價單預覽
-        </h3>
-        <div className="flex gap-4 items-center flex-wrap">
-          <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-            <input
-              type="checkbox"
-              checked={isSigned}
-              onChange={(e) => setIsSigned(e.target.checked)}
-              className="w-5 h-5 text-blue-600"
-            />
-            <span className="text-sm font-bold text-blue-800">
-              蓋上印章
-            </span>
-          </label>
-
-          <button
-            onClick={handleSave}
-            className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            儲存至資料庫
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
+        <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
+          <QuotePreview
+            idName="creator-preview-area"
+            clientInfo={clientInfo}
+            items={calculatedItems}
+            totalAmount={totalAmount}
+            dateStr={new Date().toISOString().slice(0, 10)}
+            isSigned={isSigned}
+            stampUrl={STAMP_URL}
+          />
         </div>
       </div>
-
-      <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-        <QuotePreview
-          idName="creator-preview-area"
-          clientInfo={clientInfo}
-          items={calculatedItems}
-          totalAmount={totalAmount}
-          dateStr={new Date().toISOString().slice(0, 10)}
-          isSigned={isSigned}
-          stampUrl={STAMP_URL}
-        />
-      </div>
     </div>
-  </div>
-);
+  );
 };
 
 // ========== 統計頁面 (含北中南對比圖) ==========
@@ -2249,7 +2394,298 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定 + ★修正多筆課程顯示) ==========
+// ========== 備課表 View (修正版：人員名單存 Firebase) ==========
+const PreparationView = ({ quotes, onUpdateQuote }) => {
+  // 只顯示已確認或已付訂的案件
+  const validQuotes = quotes.filter(
+    (q) => q.status === 'confirmed' || q.status === 'paid',
+  );
+
+  // 預設日期為今天
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [filterDate, setFilterDate] = useState(todayStr);
+
+  // ★★★ 修改：人員名單改為監聽 Firebase，預設給一些基本名單 ★★★
+  const [staffList, setStaffList] = useState(['小明', '小華', '老師']);
+  const [newStaffName, setNewStaffName] = useState('');
+
+  // ★★★ 新增：監聽 Firebase 上的員工名單 (collection: settings, doc: staff)
+  useEffect(() => {
+    if (!db) return;
+    const staffRef = doc(db, 'settings', 'staff');
+    
+    const unsub = onSnapshot(staffRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.list && Array.isArray(data.list)) {
+          setStaffList(data.list);
+        }
+      } else {
+        // 如果資料庫還沒有這筆設定，先寫入預設值
+        setDoc(staffRef, { list: ['小明', '小華', '老師'] }, { merge: true });
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  // ★★★ 修改：儲存到 Firebase
+  const updateStaffToFirebase = async (newList) => {
+    setStaffList(newList); // 先更新畫面讓他順暢
+    if (db) {
+      try {
+        await setDoc(doc(db, 'settings', 'staff'), { list: newList }, { merge: true });
+      } catch (err) {
+        console.error("更新人員名單失敗", err);
+        alert("無法儲存人員名單至資料庫");
+      }
+    }
+  };
+
+  const addStaff = () => {
+    if (newStaffName.trim()) {
+      const name = newStaffName.trim();
+      if (!staffList.includes(name)) {
+        updateStaffToFirebase([...staffList, name]);
+      }
+      setNewStaffName('');
+    }
+  };
+
+  const removeStaff = (name) => {
+    if (window.confirm(`確定移除人員：${name}?`)) {
+      updateStaffToFirebase(staffList.filter((s) => s !== name));
+    }
+  };
+
+  // 展開所有課程項目
+  const prepItems = useMemo(() => {
+    const list = [];
+    validQuotes.forEach((q) => {
+      if (!q.items) return;
+      q.items.forEach((item, idx) => {
+        // 日期篩選: item.eventDate <= filterDate
+        if (item.eventDate && item.eventDate <= filterDate) {
+          list.push({
+            quoteId: q.id,
+            itemIdx: idx,
+            clientName: q.clientInfo.companyName,
+            courseName: item.courseName,
+            date: item.eventDate,
+            time: item.timeRange || item.startTime || '',
+            people: item.peopleCount,
+            materials: COURSE_MATERIALS[item.courseName] || [], // 取得材料表
+            // 讀取該 quote 已存的 prepData
+            prepData: q.prepData?.[idx] || {},
+          });
+        }
+      });
+    });
+    // 依日期排序
+    return list.sort((a, b) => (a.date > b.date ? 1 : -1));
+  }, [validQuotes, filterDate]);
+
+  // 更新單一材料狀態
+  const handleMaterialUpdate = (
+    quoteId,
+    itemIdx,
+    matName,
+    field,
+    value,
+  ) => {
+    // 找到原始 quote
+    const quote = quotes.find((q) => q.id === quoteId);
+    if (!quote) return;
+
+    // 複製 prepData 結構
+    const newPrepData = { ...(quote.prepData || {}) };
+    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
+    if (!newPrepData[itemIdx][matName]) {
+      newPrepData[itemIdx][matName] = { done: false, staff: '' };
+    }
+
+    // 更新值
+    newPrepData[itemIdx][matName] = {
+      ...newPrepData[itemIdx][matName],
+      [field]: value,
+    };
+
+    // 呼叫上層更新
+    onUpdateQuote(quoteId, { prepData: newPrepData });
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            <ClipboardList className="mr-2 text-blue-600" />
+            備課檢查表
+          </h2>
+          <p className="text-gray-500 text-sm mt-1">
+            僅顯示「已回簽」或「已付訂」且日期在截止日之前的課程
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-bold text-gray-700">截止日期：</label>
+          <input
+            type="date"
+            className={INPUT_CLASS}
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* 人員管理區塊 */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
+        <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center">
+          <Users className="w-4 h-4 mr-1" />
+          備課人員管理 (資料庫同步)
+        </h3>
+        <div className="flex flex-wrap gap-2 items-center">
+          {staffList.map((staff) => (
+            <span
+              key={staff}
+              className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center group"
+            >
+              {staff}
+              <button
+                onClick={() => removeStaff(staff)}
+                className="ml-2 text-gray-400 hover:text-red-500 hidden group-hover:block"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          <div className="flex items-center ml-2">
+            <input
+              type="text"
+              placeholder="新人員"
+              className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500"
+              value={newStaffName}
+              onChange={(e) => setNewStaffName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addStaff()}
+            />
+            <button
+              onClick={addStaff}
+              className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 備課清單 */}
+      <div className="space-y-6">
+        {prepItems.length === 0 ? (
+          <div className="text-center py-10 text-gray-400">
+            目前無符合條件的備課項目
+          </div>
+        ) : (
+          prepItems.map((item) => {
+            const uniqueKey = `${item.quoteId}_${item.itemIdx}`;
+            
+            // 計算進度
+            const totalMat = item.materials.length;
+            let doneMat = 0;
+            item.materials.forEach(mat => {
+               if (item.prepData[mat]?.done) doneMat++;
+            });
+            const progress = totalMat > 0 ? Math.round((doneMat / totalMat) * 100) : 0;
+            const isAllDone = totalMat > 0 && doneMat === totalMat;
+
+            return (
+              <div
+                key={uniqueKey}
+                className={`bg-white rounded-lg shadow border-l-4 p-6 transition-colors ${
+                  isAllDone
+                    ? 'border-l-green-500 border-green-200 bg-green-50'
+                    : 'border-l-blue-500 border-gray-200'
+                }`}
+              >
+                {/* 標題列 */}
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">
+                      {item.courseName}
+                    </h3>
+                    <div className="text-sm text-gray-600 mt-1 flex items-center gap-4">
+                      <span className="flex items-center">
+                        <User className="w-4 h-4 mr-1" />
+                        {item.clientName}
+                      </span>
+                      <span className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {item.date} {item.time}
+                      </span>
+                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">
+                        {item.people} 人
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-300">
+                        {progress}%
+                      </div>
+                  </div>
+                </div>
+
+                {/* 進度條 */}
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`}
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+
+                {/* 材料檢核區 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {item.materials.length === 0 && (
+                        <p className="text-gray-400 text-sm italic col-span-3">本課程尚無材料清單設定，請聯繫管理員。</p>
+                    )}
+                    {item.materials.map(mat => {
+                        const matState = item.prepData[mat] || { done: false, staff: '' };
+                        return (
+                            <div key={mat} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
+                                <label className="flex items-center cursor-pointer select-none">
+                                    <input 
+                                        type="checkbox"
+                                        className="w-4 h-4 mr-2 text-blue-600 rounded focus:ring-blue-500"
+                                        checked={matState.done}
+                                        onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)}
+                                    />
+                                    <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>
+                                        {mat}
+                                    </span>
+                                </label>
+                                <select
+                                    className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500"
+                                    value={matState.staff}
+                                    onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}
+                                >
+                                    <option value="">未指派</option>
+                                    {staffList.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )
+                    })}
+                </div>
+
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定) ==========
 
 const CalendarView = ({
   quotes,
@@ -2953,7 +3389,7 @@ const QuoteList = ({
         q.clientInfo.taxId || '',
         q.clientInfo.contactPerson || '',
         q.clientInfo.phone || '',
-        `"${clientInfo.address || ''}"`, // 假設有這個欄位
+        `"${q.clientInfo.address || ''}"`, 
         '報價單',
         q.status,
         region,
@@ -3470,6 +3906,25 @@ const App = () => {
     }
   };
 
+  // 新增：直接更新 Quote 的函式 (給 PrepView 用)
+  const handleUpdateQuoteDirect = async (id, data) => {
+    try {
+      if (db) {
+        await updateDoc(doc(db, 'quotes', id), {
+          ...data,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        setQuotes((prev) =>
+          prev.map((q) => (q.id === id ? { ...q, ...data } : q)),
+        );
+      }
+    } catch (err) {
+      console.error('更新失敗', err);
+      alert('更新失敗');
+    }
+  };
+
   // ★ 邏輯判斷：如果是公開模式，直接顯示行事曆
   if (publicCalendarMode) {
     return (
@@ -3504,7 +3959,7 @@ const App = () => {
                 下班隨手作｜企業報價系統
               </div>
               <div className="text-xs text-gray-500">
-                內部管理系統 v4.0 (Date Fix)
+                內部管理系統 v4.0 (Full Merge)
               </div>
             </div>
           </div>
@@ -3549,6 +4004,25 @@ const App = () => {
             >
               行事曆
             </button>
+
+            {/* 新增備課表按鈕 */}
+            <button
+              onClick={() => {
+                setEditingQuote(null);
+                setCurrentView('prep');
+              }}
+              className={`px-3 py-1 rounded-full ${
+                currentView === 'prep'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <div className="flex items-center">
+                <ClipboardList className="w-3 h-3 mr-1" />
+                備課表
+              </div>
+            </button>
+
             <button
               onClick={() => {
                 setEditingQuote(null);
@@ -3615,6 +4089,13 @@ const App = () => {
           />
         )}
 
+        {!loading && currentView === 'prep' && (
+          <PreparationView
+            quotes={quotes}
+            onUpdateQuote={handleUpdateQuoteDirect}
+          />
+        )}
+
         {!loading && currentView === 'stats' && (
           <StatsView quotes={quotes} />
         )}
@@ -3655,7 +4136,7 @@ const App = () => {
         
         /* 一般動畫 */
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
       `}</style>
     </div>
   );
