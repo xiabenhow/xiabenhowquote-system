@@ -2007,9 +2007,11 @@ const StatsView = ({ quotes }) => {
 
 
 // ★★★ 第六部份 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
+// ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
+  // 當資料庫有新資料進來時，更新顯示
   useEffect(() => {
     setLocalValue(value || '');
   }, [value]);
@@ -2020,8 +2022,8 @@ const NoteInput = ({ value, onSave }) => {
       rows="2"
       placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
       value={localValue}
-      onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={() => onSave(localValue)}
+      onChange={(e) => setLocalValue(e.target.value)} // 打字時只更新本地畫面，不存檔
+      onBlur={() => onSave(localValue)} // ★ 關鍵：滑鼠離開(點擊旁邊)時才存入 Firebase
     />
   );
 };
@@ -2031,6 +2033,7 @@ const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
   
   const handleAdd = (e) => {
+    // 防止表單預設提交行為
     if (e) e.preventDefault(); 
     if (!name.trim()) return;
     onAdd(name.trim());
@@ -2059,40 +2062,58 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
-// ========== 備課表 View (修正版：日期+2個月, 刪除功能, 區域過濾, 複製連結, 互相跳轉) ==========
+// ========== 備課表 View (修正版：區域人員獨立編輯, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
+  // 只顯示已確認或已付訂的案件 (★ 排除草稿)
   const validQuotes = quotes.filter(
     (q) => q.status === 'confirmed' || q.status === 'paid',
   );
 
+  // 預設日期為今天 + 2個月
   const [filterDate, setFilterDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 2);
     return d.toISOString().slice(0, 10);
   });
 
-  const [staffList, setStaffList] = useState(['小明', '小華', '老師']);
+  // ★★★ 新增：當前檢視區域 (預設為公開區域或北部) ★★★
+  const [currentRegion, setCurrentRegion] = useState(publicRegion || 'North');
+
+  // ★★★ 修改：人員名單現在是物件結構，依區域儲存 ★★★
+  const [staffData, setStaffData] = useState({ North: [], Central: [], South: [] });
   const [newStaffName, setNewStaffName] = useState('');
 
+  // 監聽 Firebase 上的員工名單 (改為讀取/寫入整個物件)
   useEffect(() => {
     if (!db) return;
     const staffRef = doc(db, 'settings', 'staff');
     const unsub = onSnapshot(staffRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.list && Array.isArray(data.list)) setStaffList(data.list);
+        // 相容舊資料：如果讀到的是 array，預設給 North，其他為空
+        if (Array.isArray(data.list)) {
+            setStaffData({ North: data.list, Central: [], South: [] });
+        } else {
+            setStaffData({
+                North: data.North || [],
+                Central: data.Central || [],
+                South: data.South || []
+            });
+        }
       } else {
-        setDoc(staffRef, { list: ['小明', '小華', '老師'] }, { merge: true });
+        setDoc(staffRef, { North: ['小明', '小華'], Central: [], South: [] }, { merge: true });
       }
     });
     return () => unsub();
   }, []);
 
+  // 更新目前區域的人員名單
   const updateStaffToFirebase = async (newList) => {
-    setStaffList(newList);
+    const updatedData = { ...staffData, [currentRegion]: newList };
+    setStaffData(updatedData); // 樂觀更新
     if (db) {
       try {
-        await setDoc(doc(db, 'settings', 'staff'), { list: newList }, { merge: true });
+        await setDoc(doc(db, 'settings', 'staff'), { [currentRegion]: newList }, { merge: true });
       } catch (err) {
         console.error("更新人員名單失敗", err);
       }
@@ -2102,14 +2123,16 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   const addStaff = () => {
     if (newStaffName.trim()) {
       const name = newStaffName.trim();
-      if (!staffList.includes(name)) updateStaffToFirebase([...staffList, name]);
+      const currentList = staffData[currentRegion] || [];
+      if (!currentList.includes(name)) updateStaffToFirebase([...currentList, name]);
       setNewStaffName('');
     }
   };
 
   const removeStaff = (name) => {
-    if (window.confirm(`確定移除人員：${name}?`)) {
-      updateStaffToFirebase(staffList.filter((s) => s !== name));
+    if (window.confirm(`確定移除 ${currentRegion === 'North' ? '北部' : currentRegion === 'Central' ? '中部' : '南部'} 人員：${name}?`)) {
+      const currentList = staffData[currentRegion] || [];
+      updateStaffToFirebase(currentList.filter((s) => s !== name));
     }
   };
 
@@ -2123,10 +2146,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
       }
   };
 
-  // ★★★ 新增：跳轉回行事曆的功能 ★★★
   const handleGoToCalendar = () => {
       const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('view', 'calendar'); // 切換 view 參數
+      currentUrl.searchParams.set('view', 'calendar'); 
       window.location.href = currentUrl.toString();
   };
 
@@ -2144,7 +2166,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
               if(item.city.includes('高雄') || item.city.includes('台南') || item.city.includes('屏東')) effectiveRegion = 'South';
           }
 
-          if (publicRegion && effectiveRegion !== publicRegion) return;
+          // ★★★ 關鍵：只顯示當前選定區域的課程 ★★★
+          if (effectiveRegion !== currentRegion) return;
 
           const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
           const savedData = q.prepData?.[idx] || {};
@@ -2166,15 +2189,27 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
       });
     });
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
-  }, [validQuotes, filterDate, publicRegion]);
+  }, [validQuotes, filterDate, currentRegion]); // 相依於 currentRegion
 
   const handleMaterialUpdate = (quoteId, itemIdx, matName, field, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
     const newPrepData = { ...(quote.prepData || {}) };
-    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
-    if (!newPrepData[itemIdx][matName]) newPrepData[itemIdx][matName] = { done: false, staff: '' };
-    newPrepData[itemIdx][matName] = { ...newPrepData[itemIdx][matName], [field]: value };
+    
+    // 深層複製以確保更新
+    if (!newPrepData[itemIdx]) {
+        newPrepData[itemIdx] = {};
+    } else {
+        newPrepData[itemIdx] = { ...newPrepData[itemIdx] }; 
+    }
+
+    if (!newPrepData[itemIdx][matName]) {
+      newPrepData[itemIdx][matName] = { done: false, staff: '' };
+    } else {
+      newPrepData[itemIdx][matName] = { ...newPrepData[itemIdx][matName] };
+    }
+
+    newPrepData[itemIdx][matName][field] = value;
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
@@ -2198,10 +2233,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
     const newPrepData = { ...(quote.prepData || {}) };
-    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
+    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {}; else newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
     newPrepData[itemIdx].note = value;
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
+
+  // ★★★ 判斷是否允許編輯人員 (管理員 OR 區域連結) ★★★
+  const canEditStaff = !publicMode || !!publicRegion;
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
@@ -2219,21 +2257,34 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
         <div className="flex flex-col gap-2 items-end">
             {!publicMode ? (
                 <div className="flex gap-2">
+                     {/* ★★★ 分區切換 Tabs (後台模式) ★★★ */}
+                     {['North', 'Central', 'South'].map(r => (
+                         <button
+                            key={r}
+                            onClick={() => setCurrentRegion(r)}
+                            className={`px-3 py-1 rounded text-sm font-bold border ${currentRegion === r ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}
+                         >
+                            {r === 'North' ? '北部' : r === 'Central' ? '中部' : '南部'}
+                         </button>
+                     ))}
+                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
                      <button onClick={() => handleCopyPrepLink('Central')} className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded border border-yellow-200 hover:bg-yellow-200 flex items-center">
-                        <LinkIcon className="w-3 h-3 mr-1"/> 複製中部連結
+                        <LinkIcon className="w-3 h-3 mr-1"/> 中部連結
                      </button>
                      <button onClick={() => handleCopyPrepLink('South')} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 hover:bg-green-200 flex items-center">
-                        <LinkIcon className="w-3 h-3 mr-1"/> 複製南部連結
+                        <LinkIcon className="w-3 h-3 mr-1"/> 南部連結
                      </button>
                 </div>
             ) : (
-                /* ★★★ 公開模式顯示跳轉按鈕 ★★★ */
-                <button 
-                    onClick={handleGoToCalendar}
-                    className="flex items-center gap-1 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-50 shadow text-sm font-bold"
-                >
-                    <Calendar className="w-4 h-4 mr-1"/> 切換至行事曆
-                </button>
+                <div className="flex gap-2 items-center">
+                     {publicRegion && <span className="text-sm font-bold bg-gray-800 text-white px-3 py-1 rounded">{publicRegion === 'Central' ? '中部' : '南部'}專區</span>}
+                     <button 
+                        onClick={handleGoToCalendar}
+                        className="flex items-center gap-1 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded hover:bg-gray-50 shadow text-sm font-bold"
+                    >
+                        <Calendar className="w-4 h-4 mr-1"/> 切換至行事曆
+                    </button>
+                </div>
             )}
           <div className="flex items-center gap-2">
             <label className="text-sm font-bold text-gray-700">截止日期：</label>
@@ -2245,18 +2296,20 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
         <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center">
           <Users className="w-4 h-4 mr-1" />
-          備課人員
+          備課人員 ({currentRegion === 'North' ? '北部' : currentRegion === 'Central' ? '中部' : '南部'})
         </h3>
         <div className="flex flex-wrap gap-2 items-center">
-          {staffList.map((staff) => (
+          {(staffData[currentRegion] || []).map((staff) => (
             <span key={staff} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center group">
               {staff}
-              {!publicMode && (
+              {/* ★★★ 修改：允許編輯人員的條件 (canEditStaff) ★★★ */}
+              {canEditStaff && (
                   <button onClick={() => removeStaff(staff)} className="ml-2 text-gray-400 hover:text-red-500 hidden group-hover:block"><X className="w-3 h-3" /></button>
               )}
             </span>
           ))}
-          {!publicMode && (
+          {/* ★★★ 修改：允許新增人員的條件 (canEditStaff) ★★★ */}
+          {canEditStaff && (
               <div className="flex items-center ml-2">
                 <input type="text" placeholder="新人員" className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStaff()} />
                 <button onClick={addStaff} className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700"><Plus className="w-4 h-4" /></button>
@@ -2267,7 +2320,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
       <div className="space-y-6">
         {prepItems.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">目前無符合條件的備課項目</div>
+          <div className="text-center py-10 text-gray-400">該區域 ({currentRegion === 'North' ? '北部' : currentRegion === 'Central' ? '中部' : '南部'}) 目前無符合條件的備課項目</div>
         ) : (
           prepItems.map((item) => {
             const uniqueKey = `${item.quoteId}_${item.itemIdx}`;
@@ -2303,7 +2356,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                                 </label>
                                 <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
                                     <option value="">未指派</option>
-                                    {staffList.map(s => (<option key={s} value={s}>{s}</option>))}
+                                    {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
                                 </select>
                             </div>
                         )
@@ -2319,7 +2372,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                                 <div className="flex items-center">
                                     <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500 mr-1" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
                                         <option value="">未指派</option>
-                                        {staffList.map(s => (<option key={s} value={s}>{s}</option>))}
+                                        {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
                                     </select>
                                     <button onClick={() => handleRemoveCustomMaterial(item.quoteId, item.itemIdx, mat)} className="text-gray-400 hover:text-red-500 p-1 rounded"><X className="w-3 h-3" /></button>
                                 </div>
