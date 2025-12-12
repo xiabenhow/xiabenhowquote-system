@@ -2321,7 +2321,7 @@ const NoteInput = ({ value, onSave }) => {
   return (
     <textarea
       className="w-full text-sm border-gray-300 rounded bg-yellow-50 focus:ring-blue-500 focus:border-blue-500 p-2 placeholder-gray-400"
-      rows="2"
+      rows={2}
       placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)} // 打字時只更新本地畫面，不存檔
@@ -2466,7 +2466,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
   }, [validQuotes, filterDate]);
 
-  // 更新單一材料狀態 (包含新增材料) - ★★★ 修正了深層複製邏輯，確保畫面刷新 ★★★
+  // 更新單一材料狀態 (包含新增材料)
   const handleMaterialUpdate = (
     quoteId,
     itemIdx,
