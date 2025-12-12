@@ -2309,7 +2309,7 @@ const NoteInput = ({ value, onSave }) => {
     <textarea
       className="w-full text-sm border-gray-300 rounded 
       
-      // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題) ★★★
+      // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
@@ -2321,7 +2321,7 @@ const NoteInput = ({ value, onSave }) => {
   return (
     <textarea
       className="w-full text-sm border-gray-300 rounded bg-yellow-50 focus:ring-blue-500 focus:border-blue-500 p-2 placeholder-gray-400"
-      rows={2}
+      rows="2"
       placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
       value={localValue}
       onChange={(e) => setLocalValue(e.target.value)} // 打字時只更新本地畫面，不存檔
@@ -2335,7 +2335,8 @@ const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
   
   const handleAdd = (e) => {
-    if (e) e.preventDefault(); // 防止誤觸發
+    // 防止表單預設提交行為
+    if (e) e.preventDefault(); 
     if (!name.trim()) return;
     onAdd(name.trim());
     setName('');
@@ -2354,7 +2355,7 @@ const AddMaterialRow = ({ onAdd }) => {
       />
       <button 
         type="button" 
-        onClick={handleAdd}
+        onClick={(e) => handleAdd(e)}
         className="text-xs bg-blue-100 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-200 font-bold transition-colors"
       >
         新增
@@ -2481,7 +2482,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     // 1. 複製最外層 prepData
     const newPrepData = { ...(quote.prepData || {}) };
     
-    // 2. 複製該課程項目層 (Deep Copy Level 2)
+    // 2. 複製該課程項目層
     if (!newPrepData[itemIdx]) {
         newPrepData[itemIdx] = {};
     } else {
@@ -2492,7 +2493,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     if (!newPrepData[itemIdx][matName]) {
       newPrepData[itemIdx][matName] = { done: false, staff: '' };
     } else {
-      // 複製該材料物件 (Deep Copy Level 3)
+      // 複製該材料物件
       newPrepData[itemIdx][matName] = { ...newPrepData[itemIdx][matName] };
     }
 
