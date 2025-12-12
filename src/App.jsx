@@ -2062,7 +2062,7 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
-// ========== 備課表 View (修正版：區域人員獨立編輯, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
+// ========== 備課表 View (修正版：修復人員儲存覆蓋問題, 日期+2個月, 刪除功能, 複製連結) ==========
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   // 只顯示已確認或已付訂的案件 (★ 排除草稿)
   const validQuotes = quotes.filter(
@@ -2090,17 +2090,19 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     const unsub = onSnapshot(staffRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // 相容舊資料：如果讀到的是 array，預設給 North，其他為空
-        if (Array.isArray(data.list)) {
-            setStaffData({ North: data.list, Central: [], South: [] });
-        } else {
-            setStaffData({
-                North: data.North || [],
-                Central: data.Central || [],
-                South: data.South || []
-            });
-        }
+        
+        // ★★★ 修正點：即使有舊的 list，也要讀取新的 Central/South ★★★
+        // 優先讀取 North，若無則讀取舊版 list，再無則為空陣列
+        const northList = data.North || (Array.isArray(data.list) ? data.list : []);
+        
+        setStaffData({
+            North: northList,
+            Central: data.Central || [],
+            South: data.South || []
+        });
+
       } else {
+        // 初始化
         setDoc(staffRef, { North: ['小明', '小華'], Central: [], South: [] }, { merge: true });
       }
     });
@@ -2109,8 +2111,11 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
   // 更新目前區域的人員名單
   const updateStaffToFirebase = async (newList) => {
+    // 1. 先更新本地畫面 (避免閃爍)
     const updatedData = { ...staffData, [currentRegion]: newList };
-    setStaffData(updatedData); // 樂觀更新
+    setStaffData(updatedData); 
+
+    // 2. 寫入 Firebase
     if (db) {
       try {
         await setDoc(doc(db, 'settings', 'staff'), { [currentRegion]: newList }, { merge: true });
@@ -2124,7 +2129,10 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     if (newStaffName.trim()) {
       const name = newStaffName.trim();
       const currentList = staffData[currentRegion] || [];
-      if (!currentList.includes(name)) updateStaffToFirebase([...currentList, name]);
+      // 避免重複添加
+      if (!currentList.includes(name)) {
+          updateStaffToFirebase([...currentList, name]);
+      }
       setNewStaffName('');
     }
   };
@@ -2394,8 +2402,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   );
 };
 
-
-// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉) ==========
+// ========== 第七部分行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉) ==========
 
 const CalendarView = ({
   quotes,
