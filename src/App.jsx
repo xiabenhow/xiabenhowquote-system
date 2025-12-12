@@ -2297,19 +2297,7 @@ const StatsView = ({ quotes }) => {
 };
 
 
-const NoteInput = ({ value, onSave }) => {
-  const [localValue, setLocalValue] = useState(value || '');
-
-  // 當資料庫有新資料進來時，更新顯示
-  useEffect(() => {
-    setLocalValue(value || '');
-  }, [value]);
-
-  return (
-    <textarea
-      className="w-full text-sm border-gray-300 rounded 
-      
-      // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
+// ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
