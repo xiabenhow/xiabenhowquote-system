@@ -1310,6 +1310,8 @@ const PreviewModal = ({ quote, onClose }) => {
   );
 };
 
+//第四部份 ========== QuoteCreator ==========
+
 // ========== QuoteCreator ==========
 
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
@@ -1323,6 +1325,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     },
   );
   const [status] = useState(initialData?.status || 'draft');
+  // ★★★ 新增：內部備註狀態 (預設為空) ★★★
+  const [internalNote, setInternalNote] = useState(initialData?.internalNote || '');
   const [isSigned, setIsSigned] = useState(false);
 
   // 初始化 items
@@ -1332,7 +1336,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         const item = { ...raw };
         if (!item.extraFees) item.extraFees = [];
 
-        // 舊版的 extraFee 搬到 extraFees 陣列
         if (item.extraFee > 0 && item.extraFees.length === 0) {
           item.extraFees.push({
             id: generateId(),
@@ -1344,7 +1347,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           item.extraFeeDesc = '';
         }
 
-        // 把舊的 startTime/endTime 轉成 timeRange 顯示
         if (!item.timeRange) {
           if (item.startTime && item.endTime) {
             item.timeRange = `${item.startTime}-${item.endTime}`;
@@ -1354,12 +1356,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             item.timeRange = '';
           }
         }
-
         return item;
       });
     }
 
-    // 新增報價的預設一筆
     return [
       {
         id: generateId(),
@@ -1387,7 +1387,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     ];
   });
 
-  // 先逐筆計算 → 再做「車馬費去重」
   const calculatedItems = useMemo(() => {
     const withCalc = items.map((item) => ({
       ...item,
@@ -1405,7 +1404,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
 
-    // 課程選單連動單價
     if (field === 'courseName') {
       const series = COURSE_DATA[newItems[index].courseSeries];
       const course = series.find((c) => c.name === value);
@@ -1426,7 +1424,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     if (field === 'city') {
       newItems[index].area = '';
     }
-
     setItems(newItems);
   };
 
@@ -1489,6 +1486,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       items: calculatedItems,
       totalAmount,
       status,
+      internalNote, // ★ 儲存內部備註
     });
   };
 
@@ -1509,10 +1507,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入名稱"
                 value={clientInfo.companyName}
                 onChange={(e) =>
-                  setClientInfo((prev) => ({
-                    ...prev,
-                    companyName: e.target.value,
-                  }))
+                  setClientInfo((prev) => ({ ...prev, companyName: e.target.value }))
                 }
               />
             </div>
@@ -1523,10 +1518,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="選填"
                 value={clientInfo.taxId}
                 onChange={(e) =>
-                  setClientInfo((prev) => ({
-                    ...prev,
-                    taxId: e.target.value,
-                  }))
+                  setClientInfo((prev) => ({ ...prev, taxId: e.target.value }))
                 }
               />
             </div>
@@ -1537,10 +1529,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入聯絡人"
                 value={clientInfo.contactPerson}
                 onChange={(e) =>
-                  setClientInfo((prev) => ({
-                    ...prev,
-                    contactPerson: e.target.value,
-                  }))
+                  setClientInfo((prev) => ({ ...prev, contactPerson: e.target.value }))
                 }
               />
             </div>
@@ -1551,273 +1540,126 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 placeholder="請輸入電話"
                 value={clientInfo.phone}
                 onChange={(e) =>
-                  setClientInfo((prev) => ({
-                    ...prev,
-                    phone: e.target.value,
-                  }))
+                  setClientInfo((prev) => ({ ...prev, phone: e.target.value }))
                 }
               />
             </div>
+          </div>
+          
+          {/* ★★★ 新增：內部備註輸入框 ★★★ */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+             <label className="block text-sm font-bold text-red-600 mb-1 flex items-center">
+                <Lock className="w-3 h-3 mr-1"/> 內部備註 (不會顯示在報價單上，僅顯示於行事曆)
+             </label>
+             <textarea
+                className={INPUT_CLASS}
+                rows="2"
+                placeholder="例如：客戶偏好、注意事項、內部交代事項..."
+                value={internalNote}
+                onChange={(e) => setInternalNote(e.target.value)}
+             />
           </div>
         </section>
 
         {/* 課程項目 */}
         {items.map((item, idx) => {
           const calcItem = calculatedItems[idx];
-
           return (
-            <div
-              key={item.id}
-              className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative"
-            >
+            <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                  <Plus className="w-5 h-5 mr-2" />
-                  課程項目 ({idx + 1})
+                  <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
                 </h3>
                 {items.length > 1 && (
-                  <button
-                    onClick={() => removeItem(idx)}
-                    className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
-                  >
+                  <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded">
                     <Trash2 className="w-5 h-5" />
                   </button>
                 )}
               </div>
 
-              {/* 課程選擇 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className={LABEL_CLASS}>課程系列</label>
-                  <select
-                    className={INPUT_CLASS}
-                    value={item.courseSeries}
-                    onChange={(e) =>
-                      updateItem(idx, 'courseSeries', e.target.value)
-                    }
-                  >
+                  <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
                     {Object.keys(COURSE_DATA).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className={LABEL_CLASS}>
-                    課程名稱 （單價: ${item.price}）
-                  </label>
-                  <select
-                    className={INPUT_CLASS}
-                    value={item.courseName}
-                    onChange={(e) =>
-                      updateItem(idx, 'courseName', e.target.value)
-                    }
-                  >
+                  <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
+                  <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
                     {COURSE_DATA[item.courseSeries]?.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name} (${c.price})
-                      </option>
+                      <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* 日期 + 時間（手動） + 人數 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className={LABEL_CLASS}>人數</label>
-                  <input
-                    type="number"
-                    className={INPUT_CLASS}
-                    value={item.peopleCount}
-                    onChange={(e) =>
-                      updateItem(idx, 'peopleCount', e.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>日期</label>
-                  <input
-                    type="date"
-                    className={INPUT_CLASS}
-                    value={item.eventDate}
-                    onChange={(e) =>
-                      updateItem(idx, 'eventDate', e.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={LABEL_CLASS}>時間（手動輸入）</label>
-                  <input
-                    type="text"
-                    className={INPUT_CLASS}
-                    placeholder="例如：12:00-14:00"
-                    value={item.timeRange || ''}
-                    onChange={(e) =>
-                      updateItem(idx, 'timeRange', e.target.value)
-                    }
-                  />
-                </div>
+                <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
+                <div><label className={LABEL_CLASS}>日期</label><input type="date" className={INPUT_CLASS} value={item.eventDate} onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} /></div>
+                <div><label className={LABEL_CLASS}>時間（手動輸入）</label><input type="text" className={INPUT_CLASS} placeholder="例如：12:00-14:00" value={item.timeRange || ''} onChange={(e) => updateItem(idx, 'timeRange', e.target.value)} /></div>
               </div>
 
-              {/* 發票、九折 */}
               <div className="flex flex-col gap-2 mb-4">
                 <div className="flex gap-4">
                   <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
-                    <input
-                      type="checkbox"
-                      className="mr-2 w-4 h-4"
-                      checked={item.hasInvoice}
-                      onChange={(e) =>
-                        updateItem(idx, 'hasInvoice', e.target.checked)
-                      }
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      是否開立發票？（加 5%）
-                    </span>
+                    <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={(e) => updateItem(idx, 'hasInvoice', e.target.checked)} />
+                    <span className="text-sm font-medium text-gray-700">是否開立發票？（加 5%）</span>
                   </label>
                   <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
-                    <input
-                      type="checkbox"
-                      className="mr-2 w-4 h-4"
-                      checked={item.enableDiscount90 || false}
-                      onChange={(e) =>
-                        updateItem(idx, 'enableDiscount90', e.target.checked)
-                      }
-                    />
-                    <span className="text-sm font-medium text-red-700">
-                      套用九折優惠
-                    </span>
+                    <input type="checkbox" className="mr-2 w-4 h-4" checked={item.enableDiscount90 || false} onChange={(e) => updateItem(idx, 'enableDiscount90', e.target.checked)} />
+                    <span className="text-sm font-medium text-red-700">套用九折優惠</span>
                   </label>
                 </div>
               </div>
 
-              {/* 地點 / 車馬費設定 */}
               <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
                 <div className="flex gap-6 mb-4">
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                    <input
-                      type="radio"
-                      name={`mode-${item.id}`}
-                      className="mr-2 w-4 h-4"
-                      checked={item.locationMode === 'outing'}
-                      onChange={() => updateItem(idx, 'locationMode', 'outing')}
-                    />
-                    外派教學
-                  </label>
-
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700">
-                    <input
-                      type="radio"
-                      name={`mode-${item.id}`}
-                      className="mr-2 w-4 h-4"
-                      checked={item.locationMode === 'store'}
-                      onChange={() => updateItem(idx, 'locationMode', 'store')}
-                    />
-                    店內包班
-                  </label>
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
                 </div>
 
                 {item.locationMode === 'outing' ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className={LABEL_CLASS}>車馬費計算區域</label>
-                      <select
-                        className={INPUT_CLASS}
-                        value={item.outingRegion}
-                        onChange={(e) =>
-                          updateItem(idx, 'outingRegion', e.target.value)
-                        }
-                      >
+                      <select className={INPUT_CLASS} value={item.outingRegion} onChange={(e) => updateItem(idx, 'outingRegion', e.target.value)}>
                         <option value="North">北部出課</option>
                         <option value="Central">中部老師出課</option>
                         <option value="South">南部老師出課</option>
                       </select>
                     </div>
                     <div>
-                      <label className={LABEL_CLASS}>
-                        縣市{' '}
-                        {calcItem.calc.transportFee > 0 && !calcItem.area && (
-                          <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                            預估: $
-                            {calcItem.calc.transportFee.toLocaleString()}
-                          </span>
-                        )}
-                      </label>
-                      <select
-                        className={INPUT_CLASS}
-                        value={item.city}
-                        onChange={(e) =>
-                          updateItem(idx, 'city', e.target.value)
-                        }
-                      >
+                      <label className={LABEL_CLASS}>縣市 {calcItem.calc.transportFee > 0 && !calcItem.area && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">預估: ${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
+                      <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
                         {getAvailableCities(item.outingRegion).map((c) => (
-                          <option key={c} value={c}>
-                            {c
-                              .replace('(北部出發)', '')
-                              .replace('(中部出發)', '')
-                              .replace('(南部出發)', '')}
-                          </option>
+                          <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>
                         ))}
                       </select>
                     </div>
-
-                    {TRANSPORT_FEES[item.city]?.zones &&
-                      Object.keys(TRANSPORT_FEES[item.city].zones).length >
-                        0 && (
+                    {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
                         <div>
-                          <label className={LABEL_CLASS}>
-                            區域{' '}
-                            {calcItem.calc.transportFee > 0 && (
-                              <span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">
-                                +$
-                                {calcItem.calc.transportFee.toLocaleString()}
-                              </span>
-                            )}
-                          </label>
-                          <select
-                            className={INPUT_CLASS}
-                            value={item.area}
-                            onChange={(e) =>
-                              updateItem(idx, 'area', e.target.value)
-                            }
-                          >
+                          <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
+                          <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
                             <option value="">選擇區域...</option>
-                            {Object.entries(
-                              TRANSPORT_FEES[item.city].zones,
-                            ).map(([zone, fee]) => (
-                              <option key={zone} value={zone}>
-                                {zone} (+${fee})
-                              </option>
+                            {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
+                              <option key={zone} value={zone}>{zone} (+${fee})</option>
                             ))}
                           </select>
                         </div>
                       )}
-
                     <div className="md:col-span-3">
                       <label className={LABEL_CLASS}>詳細地址</label>
-                      <input
-                        className={INPUT_CLASS}
-                        placeholder="請輸入詳細地址"
-                        value={item.address || ''}
-                        onChange={(e) =>
-                          updateItem(idx, 'address', e.target.value)
-                        }
-                      />
+                      <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
                     </div>
                   </div>
                 ) : (
                   <div className="flex gap-4">
                     <div>
                       <label className={LABEL_CLASS}>店內區域</label>
-                      <select
-                        className={INPUT_CLASS}
-                        value={item.regionType || 'North'}
-                        onChange={(e) =>
-                          updateItem(idx, 'regionType', e.target.value)
-                        }
-                      >
+                      <select className={INPUT_CLASS} value={item.regionType || 'North'} onChange={(e) => updateItem(idx, 'regionType', e.target.value)}>
                         <option value="North">北部店內</option>
                         <option value="Central">中部店內</option>
                         <option value="South">南部店內</option>
@@ -1827,135 +1669,38 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 )}
               </div>
 
-              {/* 備註 */}
               <div className="mb-4">
                 <label className={LABEL_CLASS}>該堂課備註說明（選填）</label>
-                <input
-                  type="text"
-                  className={INPUT_CLASS}
-                  placeholder="例如：需提前半小時進場、特殊需求..."
-                  value={item.itemNote || ''}
-                  onChange={(e) => updateItem(idx, 'itemNote', e.target.value)}
-                />
+                <input type="text" className={INPUT_CLASS} placeholder="例如：需提前半小時進場、特殊需求..." value={item.itemNote || ''} onChange={(e) => updateItem(idx, 'itemNote', e.target.value)} />
               </div>
 
-              {/* 折扣 & 額外收費 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 手動折扣 */}
                 <div className="bg-red-50 p-4 rounded border border-red-100">
-                  <label className={LABEL_CLASS + ' text-red-800'}>
-                    手動折扣（減項）
-                  </label>
+                  <label className={LABEL_CLASS + ' text-red-800'}>手動折扣（減項）</label>
                   <div className="flex flex-col gap-2">
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500 font-bold">
-                        -
-                      </span>
-                      <input
-                        type="number"
-                        className={INPUT_CLASS + ' pl-6'}
-                        placeholder="金額"
-                        value={item.customDiscount}
-                        onChange={(e) =>
-                          updateItem(idx, 'customDiscount', e.target.value)
-                        }
-                      />
+                      <span className="absolute left-3 top-2 text-gray-500 font-bold">-</span>
+                      <input type="number" className={INPUT_CLASS + ' pl-6'} placeholder="金額" value={item.customDiscount} onChange={(e) => updateItem(idx, 'customDiscount', e.target.value)} />
                     </div>
-                    <input
-                      type="text"
-                      className={INPUT_CLASS}
-                      placeholder="折扣說明"
-                      value={item.customDiscountDesc || ''}
-                      onChange={(e) =>
-                        updateItem(idx, 'customDiscountDesc', e.target.value)
-                      }
-                    />
+                    <input type="text" className={INPUT_CLASS} placeholder="折扣說明" value={item.customDiscountDesc || ''} onChange={(e) => updateItem(idx, 'customDiscountDesc', e.target.value)} />
                   </div>
                 </div>
 
-                {/* 額外加價 */}
                 <div className="bg-blue-50 p-4 rounded border border-blue-100">
                   <div className="flex justify-between items-center mb-2">
-                    <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>
-                      額外加價（加項）
-                    </label>
-                    <button
-                      onClick={() => addExtraFee(idx)}
-                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      新增
-                    </button>
+                    <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>額外加價（加項）</label>
+                    <button onClick={() => addExtraFee(idx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"><Plus className="w-3 h-3 mr-1" /> 新增</button>
                   </div>
                   <div className="space-y-2">
-                    {item.extraFees &&
-                      item.extraFees.map((fee) => (
-                        <div
-                          key={fee.id}
-                          className="flex gap-2 items-center"
-                        >
-                          <input
-                            type="checkbox"
-                            className="w-5 h-5 cursor-pointer accent-blue-600"
-                            checked={fee.isEnabled}
-                            onChange={(e) =>
-                              updateExtraFee(
-                                idx,
-                                fee.id,
-                                'isEnabled',
-                                e.target.checked,
-                              )
-                            }
-                          />
-                          <input
-                            type="text"
-                            className={
-                              INPUT_CLASS +
-                              ' flex-1 ' +
-                              (!fee.isEnabled ? 'opacity-50' : '')
-                            }
-                            placeholder="加價說明"
-                            value={fee.description}
-                            onChange={(e) =>
-                              updateExtraFee(
-                                idx,
-                                fee.id,
-                                'description',
-                                e.target.value,
-                              )
-                            }
-                            disabled={!fee.isEnabled}
-                          />
+                    {item.extraFees && item.extraFees.map((fee) => (
+                        <div key={fee.id} className="flex gap-2 items-center">
+                          <input type="checkbox" className="w-5 h-5 cursor-pointer accent-blue-600" checked={fee.isEnabled} onChange={(e) => updateExtraFee(idx, fee.id, 'isEnabled', e.target.checked)} />
+                          <input type="text" className={INPUT_CLASS + ' flex-1 ' + (!fee.isEnabled ? 'opacity-50' : '')} placeholder="加價說明" value={fee.description} onChange={(e) => updateExtraFee(idx, fee.id, 'description', e.target.value)} disabled={!fee.isEnabled} />
                           <div className="relative w-32">
-                            <span className="absolute left-2 top-2 text-gray-500 font-bold">
-                              +
-                            </span>
-                            <input
-                              type="number"
-                              className={
-                                INPUT_CLASS +
-                                ' pl-5 ' +
-                                (!fee.isEnabled ? 'opacity-50' : '')
-                              }
-                              placeholder="金額"
-                              value={fee.amount}
-                              onChange={(e) =>
-                                updateExtraFee(
-                                  idx,
-                                  fee.id,
-                                  'amount',
-                                  e.target.value,
-                                )
-                              }
-                              disabled={!fee.isEnabled}
-                            />
+                            <span className="absolute left-2 top-2 text-gray-500 font-bold">+</span>
+                            <input type="number" className={INPUT_CLASS + ' pl-5 ' + (!fee.isEnabled ? 'opacity-50' : '')} placeholder="金額" value={fee.amount} onChange={(e) => updateExtraFee(idx, fee.id, 'amount', e.target.value)} disabled={!fee.isEnabled} />
                           </div>
-                          <button
-                            onClick={() => removeExtraFee(idx, fee.id)}
-                            className="text-red-400 hover:text-red-600 p-2"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => removeExtraFee(idx, fee.id)} className="text-red-400 hover:text-red-600 p-2"><X className="w-4 h-4" /></button>
                         </div>
                       ))}
                   </div>
@@ -1965,69 +1710,33 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           );
         })}
 
-        <button
-          onClick={addItem}
-          className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg"
-        >
-          <Plus className="w-6 h-6 mr-2" />
-          增加更多課程
+        <button onClick={addItem} className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg">
+          <Plus className="w-6 h-6 mr-2" /> 增加更多課程
         </button>
       </div>
 
-      {/* 下方即時預覽 + 儲存 */}
       <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
         <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center">
-            <Eye className="mr-2" />
-            即時報價單預覽
-          </h3>
+          <h3 className="text-2xl font-bold text-gray-800 flex items-center"><Eye className="mr-2" /> 即時報價單預覽</h3>
           <div className="flex gap-4 items-center flex-wrap">
             <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-              <input
-                type="checkbox"
-                checked={isSigned}
-                onChange={(e) => setIsSigned(e.target.checked)}
-                className="w-5 h-5 text-blue-600"
-              />
-              <span className="text-sm font-bold text-blue-800">
-                蓋上印章
-              </span>
+              <input type="checkbox" checked={isSigned} onChange={(e) => setIsSigned(e.target.checked)} className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
             </label>
-
-            <button
-              onClick={handleSave}
-              className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              儲存至資料庫
-            </button>
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
-            >
-              取消
-            </button>
+            <button onClick={handleSave} className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"><Save className="w-4 h-4 mr-2" /> 儲存至資料庫</button>
+            <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
           </div>
         </div>
 
         <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-          <QuotePreview
-            idName="creator-preview-area"
-            clientInfo={clientInfo}
-            items={calculatedItems}
-            totalAmount={totalAmount}
-            dateStr={new Date().toISOString().slice(0, 10)}
-            isSigned={isSigned}
-            stampUrl={STAMP_URL}
-          />
+          <QuotePreview idName="creator-preview-area" clientInfo={clientInfo} items={calculatedItems} totalAmount={totalAmount} dateStr={new Date().toISOString().slice(0, 10)} isSigned={isSigned} stampUrl={STAMP_URL} />
         </div>
       </div>
     </div>
   );
 };
 
-
-// ========== 統計頁面 (含北中南對比圖) ==========
+// 第五部份========== 統計頁面 (含北中南對比圖) ==========
 
 const StatsView = ({ quotes }) => {
   // 過濾掉內部排程
@@ -2297,7 +2006,7 @@ const StatsView = ({ quotes }) => {
 };
 
 
-// ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
+// ★★★ 第六部份 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
@@ -2669,6 +2378,15 @@ const CalendarView = ({
             date: item.eventDate || '',
             time: item.timeRange || item.startTime || '',
             title: q.clientInfo?.companyName || '未知客戶',
+            // ★★★ 新增：完整詳細資料欄位 ★★★
+            contact: q.clientInfo?.contactPerson || '',
+            phone: q.clientInfo?.phone || '',
+            address: item.address || q.clientInfo?.address || '',
+            courseName: item.courseName,
+            peopleCount: item.peopleCount,
+            note: item.itemNote || '',
+            internalNote: q.internalNote || '', // 內部備註
+            
             subTitle: `${item.courseName || '未定課程'} (${item.peopleCount || 0}人)`,
             region: item.outingRegion || item.regionType || 'North',
             location: `${item.city || ''} ${item.address || ''}`,
@@ -2711,7 +2429,7 @@ const CalendarView = ({
   const handleDayClick = (day) => {
     const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     setCurrentDate(d);
-    setViewMode('day');
+    setViewMode('day'); // ★ 點擊日期切換到日視圖
   };
 
   const getEventsForDay = (date) => {
@@ -2749,6 +2467,7 @@ const CalendarView = ({
     let region = 'North';
     if (regularForm.location.includes('台中')) region = 'Central';
     if (regularForm.location.includes('高雄')) region = 'South';
+
     const data = { ...regularForm, region };
     if (isEditingRegular && editingRegularId) {
       onUpdateRegularClass(editingRegularId, data);
@@ -2777,6 +2496,7 @@ const CalendarView = ({
       setIsEditingRegular(true);
       setShowAddModal(true);
     } else if (!publicMode) {
+      // 在後台模式點擊事件，顯示簡易資訊 (前台模式在下方顯示詳細列表)
       alert(`企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`);
     }
   };
@@ -2825,6 +2545,7 @@ const CalendarView = ({
     );
   };
 
+  // ★★★ 修改：日檢視顯示詳細資訊 (包含內部備註) ★★★
   const renderDayView = () => {
     const events = getEventsForDay(currentDate).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     return (
@@ -2833,17 +2554,33 @@ const CalendarView = ({
         {events.length === 0 ? <p className="text-gray-400 text-center py-10">本日無行程</p> : (
           <div className="space-y-4">
             {events.map((evt) => (
-              <div key={evt.id} onClick={(e) => handleEventClick(e, evt)} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white relative group cursor-pointer ${getEventStyle(evt).replace('bg-', 'border-l-').split(' ')[0]}`}>
-                <div className="mr-6 text-center min-w-[80px]">
+              <div key={evt.id} onClick={(e) => handleEventClick(e, evt)} className={`flex flex-col md:flex-row items-start p-4 rounded-lg border-l-4 shadow-sm bg-white relative group cursor-pointer ${getEventStyle(evt).replace('bg-', 'border-l-').split(' ')[0]}`}>
+                <div className="mr-6 text-center min-w-[80px] mb-2 md:mb-0">
                   <div className="text-xl font-bold text-gray-800">{evt.time || '全天'}</div>
                   <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${evt.type === 'regular' ? 'bg-purple-200 text-purple-800' : 'bg-gray-200 text-gray-700'}`}>
                     {evt.type === 'regular' ? '常態課' : evt.type === 'internal' ? '內部' : '企業'}
                   </div>
                 </div>
-                <div>
+                <div className="flex-1 space-y-1">
                   <h4 className="text-lg font-bold text-gray-900 flex items-center">{evt.title}</h4>
-                  <div className="text-gray-600 mt-1 flex items-center"><FileText className="w-4 h-4 mr-1" />{evt.subTitle}</div>
-                  <div className="text-gray-500 mt-1 text-sm flex items-center"><MapPin className="w-4 h-4 mr-1" />{evt.location}</div>
+                  <div className="text-gray-600 flex items-center"><FileText className="w-4 h-4 mr-2" />{evt.courseName} ({evt.peopleCount}人)</div>
+                  
+                  {/* 詳細資訊區塊 */}
+                  {evt.type === 'quote' && (
+                      <div className="text-sm text-gray-500 mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                          <div><span className="font-bold">聯絡人：</span>{evt.contact}</div>
+                          <div><span className="font-bold">電話：</span>{evt.phone}</div>
+                          <div className="md:col-span-2"><span className="font-bold">地址：</span>{evt.address}</div>
+                          {evt.internalNote && (
+                             <div className="md:col-span-2 text-red-600 bg-red-50 p-1 rounded mt-1">
+                                <span className="font-bold"><Lock className="w-3 h-3 inline mr-1"/>內部備註：</span>{evt.internalNote}
+                             </div>
+                          )}
+                      </div>
+                  )}
+                  {evt.type === 'regular' && (
+                     <div className="text-sm text-gray-500 mt-1"><MapPin className="w-4 h-4 inline mr-1"/>{evt.location}</div>
+                  )}
                 </div>
               </div>
             ))}
@@ -2943,6 +2680,8 @@ const CalendarView = ({
 
 // ========== 報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
 
+// ========== 報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
+
 const QuoteList = ({
   quotes,
   onCreateNew,
@@ -2957,7 +2696,7 @@ const QuoteList = ({
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState('all'); // 月份過濾
   const [filterStatus, setFilterStatus] = useState('all'); // 狀態過濾
-  // ★ 已移除區域篩選 filterRegion，遵照您的要求
+  const [filterRegion, setFilterRegion] = useState('all'); // ★ 新增區域過濾
   const fileInputRef = useRef(null);
 
   // 計算可用月份
@@ -2995,7 +2734,7 @@ const QuoteList = ({
     return 'North'; // 預設北部
   };
 
-  // ★ 過濾邏輯 (增強搜尋：含備註欄位)
+  // ★ 過濾邏輯 (增強搜尋：含備註欄位 + 區域)
   const filtered = quotes.filter((q) => {
     // 關鍵字 (搜尋公司名、課程名、訂金備註、追加備註)
     const kw = search.trim();
@@ -3019,7 +2758,11 @@ const QuoteList = ({
     const matchStatus =
       filterStatus === 'all' || (q.status || 'draft') === filterStatus;
 
-    return matchText && matchMonth && matchStatus;
+    // 區域
+    const region = getQuoteRegion(q);
+    const matchRegion = filterRegion === 'all' || region === filterRegion;
+
+    return matchText && matchMonth && matchStatus && matchRegion;
   });
 
   // ★ CSV 匯出邏輯 (完整保留)
@@ -3173,7 +2916,20 @@ const QuoteList = ({
 
           {/* 過濾器區域 */}
           <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-            <Filter className="w-4 h-4 text-gray-500 ml-2" />
+            {/* ★★★ 新增：區域篩選 Tabs ★★★ */}
+            <div className="flex bg-white rounded p-0.5 border border-gray-200 mr-2">
+                {['all', 'North', 'Central', 'South'].map((r) => (
+                    <button
+                        key={r}
+                        onClick={() => setFilterRegion(r)}
+                        className={`px-3 py-1 text-xs rounded font-bold ${filterRegion === r ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                        {r === 'all' ? '全部' : r === 'North' ? '北部' : r === 'Central' ? '中部' : '南部'}
+                    </button>
+                ))}
+            </div>
+
+            <Filter className="w-4 h-4 text-gray-500" />
             <select
               className="bg-transparent text-sm border-none focus:ring-0 text-gray-700 font-bold cursor-pointer"
               value={filterMonth}
