@@ -2317,7 +2317,38 @@ const NoteInput = ({ value, onSave }) => {
   );
 };
 
-// ========== 備課表 View (修正版：含人員名單 Firebase 同步 + 交接備註) ==========
+// ★★★ 新增：新增材料的輸入元件 ★★★
+const AddMaterialRow = ({ onAdd }) => {
+  const [name, setName] = useState('');
+  
+  const handleAdd = () => {
+    if (!name.trim()) return;
+    onAdd(name.trim());
+    setName('');
+  };
+
+  return (
+    <div className="flex items-center gap-2 mt-3 p-2 bg-gray-50 rounded border border-dashed border-gray-300">
+      <Plus className="w-4 h-4 text-gray-400" />
+      <input 
+        type="text"
+        className="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-400"
+        placeholder="新增額外準備項目 (例如: 延長線)..."
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+      />
+      <button 
+        onClick={handleAdd}
+        className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 font-bold"
+      >
+        新增
+      </button>
+    </div>
+  );
+};
+
+// ========== 備課表 View (修正版：含人員名單 Firebase 同步 + 交接備註 + 自訂新增材料) ==========
 const PreparationView = ({ quotes, onUpdateQuote }) => {
   // 只顯示已確認或已付訂的案件 (★ 排除草稿)
   const validQuotes = quotes.filter(
@@ -2389,6 +2420,17 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
       q.items.forEach((item, idx) => {
         // 日期篩選: item.eventDate <= filterDate
         if (item.eventDate && item.eventDate <= filterDate) {
+          
+          // ★★★ 關鍵修改：合併「固定材料表」與「手動新增的材料」 ★★★
+          const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
+          const savedData = q.prepData?.[idx] || {};
+          // 找出所有已經存檔的 key，排除 'note' (備註)，並排除已經在標準清單裡的 (避免重複)
+          const customMaterials = Object.keys(savedData).filter(
+             key => key !== 'note' && !standardMaterials.includes(key)
+          );
+          // 合併顯示清單
+          const allMaterials = [...standardMaterials, ...customMaterials];
+
           list.push({
             quoteId: q.id,
             itemIdx: idx,
@@ -2397,9 +2439,9 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
             date: item.eventDate,
             time: item.timeRange || item.startTime || '',
             people: item.peopleCount,
-            materials: COURSE_MATERIALS[item.courseName] || [], // 取得材料表
+            materials: allMaterials, // 使用合併後的清單
             // 讀取該 quote 已存的 prepData
-            prepData: q.prepData?.[idx] || {},
+            prepData: savedData,
           });
         }
       });
@@ -2408,7 +2450,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
   }, [validQuotes, filterDate]);
 
-  // 更新單一材料狀態
+  // 更新單一材料狀態 (包含新增材料)
   const handleMaterialUpdate = (
     quoteId,
     itemIdx,
@@ -2435,6 +2477,12 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
 
     // 呼叫上層更新
     onUpdateQuote(quoteId, { prepData: newPrepData });
+  };
+
+  // 處理新增客製化材料
+  const handleAddCustomMaterial = (quoteId, itemIdx, matName) => {
+      // 直接呼叫更新函數，設定 done 為 false，這會自動在資料庫建立該欄位
+      handleMaterialUpdate(quoteId, itemIdx, matName, 'done', false);
   };
 
   // ★★★ 新增：更新備註欄位功能 ★★★
@@ -2615,6 +2663,9 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
                         )
                     })}
                 </div>
+                
+                {/* ★★★ 新增：這裡加入了新增材料的輸入框 ★★★ */}
+                <AddMaterialRow onAdd={(name) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name)} />
 
                 {/* ★★★ 新增：交接備註欄位 (使用 NoteInput 解決輸入法問題) ★★★ */}
                 <div className="mt-4 pt-3 border-t border-gray-100">
