@@ -2296,6 +2296,27 @@ const StatsView = ({ quotes }) => {
   );
 };
 
+// ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題) ★★★
+const NoteInput = ({ value, onSave }) => {
+  const [localValue, setLocalValue] = useState(value || '');
+
+  // 當資料庫有新資料進來時，更新顯示
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  return (
+    <textarea
+      className="w-full text-sm border-gray-300 rounded bg-yellow-50 focus:ring-blue-500 focus:border-blue-500 p-2 placeholder-gray-400"
+      rows="2"
+      placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)} // 打字時只更新本地畫面，不存檔
+      onBlur={() => onSave(localValue)} // ★ 關鍵：滑鼠離開(點擊旁邊)時才存入 Firebase
+    />
+  );
+};
+
 // ========== 備課表 View (修正版：含人員名單 Firebase 同步 + 交接備註) ==========
 const PreparationView = ({ quotes, onUpdateQuote }) => {
   // 只顯示已確認或已付訂的案件 (★ 排除草稿)
@@ -2595,17 +2616,14 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
                     })}
                 </div>
 
-                {/* ★★★ 新增：交接備註欄位 ★★★ */}
+                {/* ★★★ 新增：交接備註欄位 (使用 NoteInput 解決輸入法問題) ★★★ */}
                 <div className="mt-4 pt-3 border-t border-gray-100">
                     <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center">
                         <MessageSquare className="w-3 h-3 mr-1"/> 交接備註事項：
                     </label>
-                    <textarea
-                        className="w-full text-sm border-gray-300 rounded bg-yellow-50 focus:ring-blue-500 focus:border-blue-500 p-2 placeholder-gray-400"
-                        rows="2"
-                        placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
+                    <NoteInput 
                         value={item.prepData.note || ''}
-                        onChange={(e) => handleNoteUpdate(item.quoteId, item.itemIdx, e.target.value)}
+                        onSave={(newValue) => handleNoteUpdate(item.quoteId, item.itemIdx, newValue)}
                     />
                 </div>
 
