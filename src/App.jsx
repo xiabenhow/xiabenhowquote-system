@@ -208,7 +208,7 @@ const COURSE_DATA = {
     { name: '多層透視油畫蠟燭', price: 1380 },
     { name: '南瓜鐵藝乾燥花蠟燭', price: 880 },
     { name: '鐵罐乾燥花香氛蠟燭', price: 650 },
-    { name: '瑪格麗特調酒香氛蠟燭（含調酒）', price: 1380 },
+    { name: '瑪格麗特調酒香氛蠟燭', price: 1380 },
     { name: '麋鹿香氛蠟燭', price: 880 },
     { name: '瑪芬甜點香氛蠟燭', price: 590 },
     { name: '乾燥花擴香蠟片', price: 650 },
