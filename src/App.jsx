@@ -2296,7 +2296,20 @@ const StatsView = ({ quotes }) => {
   );
 };
 
-// ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題) ★★★
+
+const NoteInput = ({ value, onSave }) => {
+  const [localValue, setLocalValue] = useState(value || '');
+
+  // 當資料庫有新資料進來時，更新顯示
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  return (
+    <textarea
+      className="w-full text-sm border-gray-300 rounded 
+      
+      // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題) ★★★
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
@@ -2317,11 +2330,12 @@ const NoteInput = ({ value, onSave }) => {
   );
 };
 
-// ★★★ 新增：新增材料的輸入元件 ★★★
+// ★★★ 新增：新增材料的輸入元件 (修正按鈕類型) ★★★
 const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
   
-  const handleAdd = () => {
+  const handleAdd = (e) => {
+    if (e) e.preventDefault(); // 防止誤觸發
     if (!name.trim()) return;
     onAdd(name.trim());
     setName('');
@@ -2336,11 +2350,12 @@ const AddMaterialRow = ({ onAdd }) => {
         placeholder="新增額外準備項目 (例如: 延長線)..."
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+        onKeyDown={(e) => e.key === 'Enter' && handleAdd(e)}
       />
       <button 
+        type="button" 
         onClick={handleAdd}
-        className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200 font-bold"
+        className="text-xs bg-blue-100 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-200 font-bold transition-colors"
       >
         新增
       </button>
@@ -2424,6 +2439,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
           // ★★★ 關鍵修改：合併「固定材料表」與「手動新增的材料」 ★★★
           const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
           const savedData = q.prepData?.[idx] || {};
+          
           // 找出所有已經存檔的 key，排除 'note' (備註)，並排除已經在標準清單裡的 (避免重複)
           const customMaterials = Object.keys(savedData).filter(
              key => key !== 'note' && !standardMaterials.includes(key)
@@ -2450,7 +2466,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
   }, [validQuotes, filterDate]);
 
-  // 更新單一材料狀態 (包含新增材料)
+  // 更新單一材料狀態 (包含新增材料) - ★★★ 修正了深層複製邏輯，確保畫面刷新 ★★★
   const handleMaterialUpdate = (
     quoteId,
     itemIdx,
@@ -2462,18 +2478,26 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
 
-    // 複製 prepData 結構
+    // 1. 複製最外層 prepData
     const newPrepData = { ...(quote.prepData || {}) };
-    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
-    if (!newPrepData[itemIdx][matName]) {
-      newPrepData[itemIdx][matName] = { done: false, staff: '' };
+    
+    // 2. 複製該課程項目層 (Deep Copy Level 2)
+    if (!newPrepData[itemIdx]) {
+        newPrepData[itemIdx] = {};
+    } else {
+        newPrepData[itemIdx] = { ...newPrepData[itemIdx] }; 
     }
 
-    // 更新值
-    newPrepData[itemIdx][matName] = {
-      ...newPrepData[itemIdx][matName],
-      [field]: value,
-    };
+    // 3. 確保該材料的物件存在
+    if (!newPrepData[itemIdx][matName]) {
+      newPrepData[itemIdx][matName] = { done: false, staff: '' };
+    } else {
+      // 複製該材料物件 (Deep Copy Level 3)
+      newPrepData[itemIdx][matName] = { ...newPrepData[itemIdx][matName] };
+    }
+
+    // 4. 更新值
+    newPrepData[itemIdx][matName][field] = value;
 
     // 呼叫上層更新
     onUpdateQuote(quoteId, { prepData: newPrepData });
@@ -2481,24 +2505,23 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
 
   // 處理新增客製化材料
   const handleAddCustomMaterial = (quoteId, itemIdx, matName) => {
-      // 直接呼叫更新函數，設定 done 為 false，這會自動在資料庫建立該欄位
+      // 直接呼叫更新函數，這會自動觸發資料庫更新與畫面重繪
       handleMaterialUpdate(quoteId, itemIdx, matName, 'done', false);
   };
 
   // ★★★ 新增：更新備註欄位功能 ★★★
   const handleNoteUpdate = (quoteId, itemIdx, value) => {
-    // 找到原始 quote
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
 
-    // 複製 prepData 結構
     const newPrepData = { ...(quote.prepData || {}) };
-    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
+    if (!newPrepData[itemIdx]) {
+        newPrepData[itemIdx] = {};
+    } else {
+        newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
+    }
 
-    // 更新備註 (存放在該 item 的 note 屬性下)
     newPrepData[itemIdx].note = value;
-
-    // 呼叫上層更新
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
