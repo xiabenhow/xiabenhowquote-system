@@ -2011,7 +2011,6 @@ const StatsView = ({ quotes }) => {
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
-  // 當資料庫有新資料進來時，更新顯示
   useEffect(() => {
     setLocalValue(value || '');
   }, [value]);
@@ -2022,8 +2021,8 @@ const NoteInput = ({ value, onSave }) => {
       rows="2"
       placeholder="在此填寫交接事項、特殊需求或是已完成的細節..."
       value={localValue}
-      onChange={(e) => setLocalValue(e.target.value)} // 打字時只更新本地畫面，不存檔
-      onBlur={() => onSave(localValue)} // ★ 關鍵：滑鼠離開(點擊旁邊)時才存入 Firebase
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={() => onSave(localValue)}
     />
   );
 };
@@ -2033,7 +2032,6 @@ const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
   
   const handleAdd = (e) => {
-    // 防止表單預設提交行為
     if (e) e.preventDefault(); 
     if (!name.trim()) return;
     onAdd(name.trim());
@@ -2062,60 +2060,44 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
-// ========== 備課表 View (修正版：修復人員儲存覆蓋問題, 日期+2個月, 刪除功能, 複製連結) ==========
+// ========== 備課表 View (修正版：修復人員新增Bug, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
-  // 只顯示已確認或已付訂的案件 (★ 排除草稿)
   const validQuotes = quotes.filter(
     (q) => q.status === 'confirmed' || q.status === 'paid',
   );
 
-  // 預設日期為今天 + 2個月
   const [filterDate, setFilterDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 2);
     return d.toISOString().slice(0, 10);
   });
 
-  // ★★★ 新增：當前檢視區域 (預設為公開區域或北部) ★★★
   const [currentRegion, setCurrentRegion] = useState(publicRegion || 'North');
-
-  // ★★★ 修改：人員名單現在是物件結構，依區域儲存 ★★★
   const [staffData, setStaffData] = useState({ North: [], Central: [], South: [] });
   const [newStaffName, setNewStaffName] = useState('');
 
-  // 監聽 Firebase 上的員工名單 (改為讀取/寫入整個物件)
   useEffect(() => {
     if (!db) return;
     const staffRef = doc(db, 'settings', 'staff');
     const unsub = onSnapshot(staffRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
-        // ★★★ 修正點：即使有舊的 list，也要讀取新的 Central/South ★★★
-        // 優先讀取 North，若無則讀取舊版 list，再無則為空陣列
         const northList = data.North || (Array.isArray(data.list) ? data.list : []);
-        
         setStaffData({
             North: northList,
             Central: data.Central || [],
             South: data.South || []
         });
-
       } else {
-        // 初始化
         setDoc(staffRef, { North: ['小明', '小華'], Central: [], South: [] }, { merge: true });
       }
     });
     return () => unsub();
   }, []);
 
-  // 更新目前區域的人員名單
   const updateStaffToFirebase = async (newList) => {
-    // 1. 先更新本地畫面 (避免閃爍)
     const updatedData = { ...staffData, [currentRegion]: newList };
     setStaffData(updatedData); 
-
-    // 2. 寫入 Firebase
     if (db) {
       try {
         await setDoc(doc(db, 'settings', 'staff'), { [currentRegion]: newList }, { merge: true });
@@ -2125,11 +2107,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     }
   };
 
-  const addStaff = () => {
+  const addStaff = (e) => {
+    // ★★★ 修正：防止事件冒泡與預設行為 ★★★
+    if (e) e.preventDefault();
+    
     if (newStaffName.trim()) {
       const name = newStaffName.trim();
       const currentList = staffData[currentRegion] || [];
-      // 避免重複添加
       if (!currentList.includes(name)) {
           updateStaffToFirebase([...currentList, name]);
       }
@@ -2174,7 +2158,6 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
               if(item.city.includes('高雄') || item.city.includes('台南') || item.city.includes('屏東')) effectiveRegion = 'South';
           }
 
-          // ★★★ 關鍵：只顯示當前選定區域的課程 ★★★
           if (effectiveRegion !== currentRegion) return;
 
           const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
@@ -2197,14 +2180,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
       });
     });
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
-  }, [validQuotes, filterDate, currentRegion]); // 相依於 currentRegion
+  }, [validQuotes, filterDate, currentRegion]); 
 
   const handleMaterialUpdate = (quoteId, itemIdx, matName, field, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
     const newPrepData = { ...(quote.prepData || {}) };
     
-    // 深層複製以確保更新
     if (!newPrepData[itemIdx]) {
         newPrepData[itemIdx] = {};
     } else {
@@ -2246,7 +2228,6 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
-  // ★★★ 判斷是否允許編輯人員 (管理員 OR 區域連結) ★★★
   const canEditStaff = !publicMode || !!publicRegion;
 
   return (
@@ -2265,7 +2246,6 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
         <div className="flex flex-col gap-2 items-end">
             {!publicMode ? (
                 <div className="flex gap-2">
-                     {/* ★★★ 分區切換 Tabs (後台模式) ★★★ */}
                      {['North', 'Central', 'South'].map(r => (
                          <button
                             key={r}
@@ -2310,17 +2290,29 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           {(staffData[currentRegion] || []).map((staff) => (
             <span key={staff} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center group">
               {staff}
-              {/* ★★★ 修改：允許編輯人員的條件 (canEditStaff) ★★★ */}
               {canEditStaff && (
                   <button onClick={() => removeStaff(staff)} className="ml-2 text-gray-400 hover:text-red-500 hidden group-hover:block"><X className="w-3 h-3" /></button>
               )}
             </span>
           ))}
-          {/* ★★★ 修改：允許新增人員的條件 (canEditStaff) ★★★ */}
+          {/* ★★★ 修改：按鈕樣式與事件綁定，確保能點擊 ★★★ */}
           {canEditStaff && (
               <div className="flex items-center ml-2">
-                <input type="text" placeholder="新人員" className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStaff()} />
-                <button onClick={addStaff} className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700"><Plus className="w-4 h-4" /></button>
+                <input 
+                    type="text" 
+                    placeholder="新人員" 
+                    className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500" 
+                    value={newStaffName} 
+                    onChange={(e) => setNewStaffName(e.target.value)} 
+                    onKeyDown={(e) => e.key === 'Enter' && addStaff(e)} 
+                />
+                <button 
+                    type="button" 
+                    onClick={(e) => addStaff(e)} 
+                    className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700"
+                >
+                    <Plus className="w-4 h-4" />
+                </button>
               </div>
           )}
         </div>
@@ -2404,6 +2396,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
 // ========== 第七部分行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉) ==========
 
+// ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉 + 週視圖 + 手機點擊修復) ==========
+
 const CalendarView = ({
   quotes,
   regularClasses,
@@ -2415,7 +2409,7 @@ const CalendarView = ({
 }) => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
-  const [viewMode, setViewMode] = useState('month');
+  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
   const [filterRegion, setFilterRegion] = useState(publicRegion || 'all'); 
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -2438,14 +2432,14 @@ const CalendarView = ({
             date: item.eventDate || '',
             time: item.timeRange || item.startTime || '',
             title: q.clientInfo?.companyName || '未知客戶',
-            // ★★★ 新增：完整詳細資料欄位 ★★★
+            // ★ 詳細資料 ★
             contact: q.clientInfo?.contactPerson || '',
             phone: q.clientInfo?.phone || '',
             address: item.address || q.clientInfo?.address || '',
             courseName: item.courseName,
             peopleCount: item.peopleCount,
             note: item.itemNote || '',
-            internalNote: q.internalNote || '', // 內部備註
+            internalNote: q.internalNote || '', 
             
             subTitle: `${item.courseName || '未定課程'} (${item.peopleCount || 0}人)`,
             region: item.outingRegion || item.regionType || 'North',
@@ -2470,6 +2464,7 @@ const CalendarView = ({
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
 
+  // ★★★ 修改：下一頁邏輯 (支援週切換) ★★★
   const nextPeriod = () => {
     const d = new Date(currentDate);
     if (viewMode === 'month') d.setMonth(d.getMonth() + 1);
@@ -2478,6 +2473,7 @@ const CalendarView = ({
     setCurrentDate(d);
   };
 
+  // ★★★ 修改：上一頁邏輯 (支援週切換) ★★★
   const prevPeriod = () => {
     const d = new Date(currentDate);
     if (viewMode === 'month') d.setMonth(d.getMonth() - 1);
@@ -2489,7 +2485,7 @@ const CalendarView = ({
   const handleDayClick = (day) => {
     const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     setCurrentDate(d);
-    setViewMode('day'); // ★ 點擊日期切換到日視圖
+    setViewMode('day'); 
   };
 
   const getEventsForDay = (date) => {
@@ -2527,7 +2523,6 @@ const CalendarView = ({
     let region = 'North';
     if (regularForm.location.includes('台中')) region = 'Central';
     if (regularForm.location.includes('高雄')) region = 'South';
-
     const data = { ...regularForm, region };
     if (isEditingRegular && editingRegularId) {
       onUpdateRegularClass(editingRegularId, data);
@@ -2545,8 +2540,9 @@ const CalendarView = ({
   };
 
   const handleEventClick = (e, event) => {
-    e.stopPropagation();
     if (event.type === 'regular' && !publicMode) {
+      // 編輯模式：停止冒泡，打開編輯視窗
+      e.stopPropagation();
       const r = event.raw;
       setRegularForm({
         courseName: r.courseName || '', date: r.date || '', time: r.time || '',
@@ -2556,8 +2552,16 @@ const CalendarView = ({
       setIsEditingRegular(true);
       setShowAddModal(true);
     } else if (!publicMode) {
-      // 在後台模式點擊事件，顯示簡易資訊 (前台模式在下方顯示詳細列表)
+      // 管理員模式檢視企業課：停止冒泡，顯示 Alert
+      e.stopPropagation();
       alert(`企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`);
+    } else {
+      // ★★★ 關鍵修正：手機版/公開模式 ★★★
+      // 不做任何 stopPropagation，讓它自然觸發父層的 "Day Click"，
+      // 或者直接在這裡觸發導航 (更保險)
+      const d = new Date(event.date);
+      setCurrentDate(d);
+      setViewMode('day');
     }
   };
 
@@ -2571,7 +2575,6 @@ const CalendarView = ({
       }
   };
 
-  // ★★★ 新增：跳轉回備課表的功能 ★★★
   const handleGoToPrep = () => {
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.set('view', 'prep'); 
@@ -2605,7 +2608,50 @@ const CalendarView = ({
     );
   };
 
-  // ★★★ 修改：日檢視顯示詳細資訊 (包含內部備註) ★★★
+  // ★★★ 新增：週視圖 ★★★
+  const renderWeekView = () => {
+    // 找出本週第一天 (週日)
+    const startOfWeek = new Date(currentDate);
+    const day = startOfWeek.getDay(); // 0 (Sun) to 6 (Sat)
+    startOfWeek.setDate(startOfWeek.getDate() - day);
+
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(startOfWeek);
+        d.setDate(d.getDate() + i);
+        return d;
+    });
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            {weekDays.map((date, i) => {
+                const events = getEventsForDay(date);
+                const isToday = new Date().toDateString() === date.toDateString();
+                
+                return (
+                    <div key={i} className={`bg-white rounded shadow border ${isToday ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'} flex flex-col`}>
+                        {/* Header */}
+                        <div className={`p-2 text-center font-bold border-b ${isToday ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-700'}`}>
+                            {['週日','週一','週二','週三','週四','週五','週六'][date.getDay()]} <br/>
+                            <span className="text-sm font-normal">{date.getMonth()+1}/{date.getDate()}</span>
+                        </div>
+                        {/* Body */}
+                        <div className="p-2 flex-1 min-h-[150px] space-y-2" onClick={() => handleDayClick(date.getDate())}>
+                            {events.map((evt) => (
+                                <div key={evt.id} onClick={(e) => handleEventClick(e, evt)} className={`text-xs p-2 rounded border cursor-pointer shadow-sm ${getEventStyle(evt)}`}>
+                                    <div className="font-bold">{(evt.time || '').slice(0, 5)}</div>
+                                    <div>{evt.title}</div>
+                                    <div className="opacity-75">{evt.subTitle}</div>
+                                </div>
+                            ))}
+                            {events.length === 0 && <div className="text-gray-300 text-xs text-center py-4">無行程</div>}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+  };
+
   const renderDayView = () => {
     const events = getEventsForDay(currentDate).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     return (
@@ -2660,6 +2706,7 @@ const CalendarView = ({
           </h2>
           <div className="flex bg-gray-100 rounded p-1">
             <button onClick={() => setViewMode('month')} className={`px-3 py-1 text-sm rounded ${viewMode === 'month' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>月</button>
+            <button onClick={() => setViewMode('week')} className={`px-3 py-1 text-sm rounded ${viewMode === 'week' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>週</button>
             <button onClick={() => setViewMode('day')} className={`px-3 py-1 text-sm rounded ${viewMode === 'day' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>日</button>
           </div>
         </div>
@@ -2710,6 +2757,7 @@ const CalendarView = ({
         </div>
       </div>
       {viewMode === 'month' && renderMonthView()}
+      {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
       {showAddModal && !publicMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -2738,9 +2786,8 @@ const CalendarView = ({
   );
 };
 
-// ========== 報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
+// ========== 第八部份報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
 
-// ========== 報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
 
 const QuoteList = ({
   quotes,
