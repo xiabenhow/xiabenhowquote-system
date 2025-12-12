@@ -2323,7 +2323,6 @@ const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
   
   const handleAdd = (e) => {
-    // 防止表單預設提交行為
     if (e) e.preventDefault(); 
     if (!name.trim()) return;
     onAdd(name.trim());
@@ -2352,22 +2351,25 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
-// ========== 備課表 View (修正版：含人員名單 Firebase 同步 + 交接備註 + 自訂新增材料) ==========
-const PreparationView = ({ quotes, onUpdateQuote }) => {
+// ========== 備課表 View (修正版：日期+2個月, 刪除功能, 區域過濾, 複製連結) ==========
+const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   // 只顯示已確認或已付訂的案件 (★ 排除草稿)
   const validQuotes = quotes.filter(
     (q) => q.status === 'confirmed' || q.status === 'paid',
   );
 
-  // 預設日期為今天
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const [filterDate, setFilterDate] = useState(todayStr);
+  // ★★★ 修改：預設日期為今天 + 2個月 ★★★
+  const [filterDate, setFilterDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 2);
+    return d.toISOString().slice(0, 10);
+  });
 
-  // ★★★ 修改：人員名單改為監聽 Firebase，預設給一些基本名單 ★★★
+  // 人員名單
   const [staffList, setStaffList] = useState(['小明', '小華', '老師']);
   const [newStaffName, setNewStaffName] = useState('');
 
-  // ★★★ 新增：監聽 Firebase 上的員工名單 (collection: settings, doc: staff)
+  // 監聽 Firebase 上的員工名單
   useEffect(() => {
     if (!db) return;
     const staffRef = doc(db, 'settings', 'staff');
@@ -2379,23 +2381,19 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
           setStaffList(data.list);
         }
       } else {
-        // 如果資料庫還沒有這筆設定，先寫入預設值
         setDoc(staffRef, { list: ['小明', '小華', '老師'] }, { merge: true });
       }
     });
-
     return () => unsub();
   }, []);
 
-  // ★★★ 修改：儲存到 Firebase
   const updateStaffToFirebase = async (newList) => {
-    setStaffList(newList); // 先更新畫面讓他順暢
+    setStaffList(newList);
     if (db) {
       try {
         await setDoc(doc(db, 'settings', 'staff'), { list: newList }, { merge: true });
       } catch (err) {
         console.error("更新人員名單失敗", err);
-        alert("無法儲存人員名單至資料庫");
       }
     }
   };
@@ -2416,6 +2414,19 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     }
   };
 
+  // ★★★ 新增：複製備課連結功能 ★★★
+  const handleCopyPrepLink = (region) => {
+      const baseUrl = window.location.href.split('?')[0];
+      const url = `${baseUrl}?view=prep&mode=public&region=${region}`;
+      if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(url).then(() => {
+              alert(`已複製「${region === 'Central' ? '中部' : '南部'}備課表」連結！`);
+          }).catch(() => prompt("請複製連結：", url));
+      } else {
+          prompt("請複製連結：", url);
+      }
+  };
+
   // 展開所有課程項目
   const prepItems = useMemo(() => {
     const list = [];
@@ -2425,16 +2436,26 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
         // 日期篩選: item.eventDate <= filterDate
         if (item.eventDate && item.eventDate <= filterDate) {
           
-          // ★★★ 關鍵修改：合併「固定材料表」與「手動新增的材料」 ★★★
+          // ★★★ 區域過濾邏輯：如果有指定 publicRegion，只顯示該區 ★★★
+          const itemRegion = item.outingRegion || item.regionType || 'North';
+          // 簡單判斷：如果城市包含台中/高雄/台南，也歸類到對應區域
+          let effectiveRegion = itemRegion;
+          if(item.city){
+              if(item.city.includes('台中') || item.city.includes('彰化') || item.city.includes('南投')) effectiveRegion = 'Central';
+              if(item.city.includes('高雄') || item.city.includes('台南') || item.city.includes('屏東')) effectiveRegion = 'South';
+          }
+
+          if (publicRegion && effectiveRegion !== publicRegion) {
+             return; // 不符合區域，跳過
+          }
+
           const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
           const savedData = q.prepData?.[idx] || {};
           
-          // 找出所有已經存檔的 key，排除 'note' (備註)，並排除已經在標準清單裡的 (避免重複)
+          // 找出所有已經存檔的 key (客製化材料)
           const customMaterials = Object.keys(savedData).filter(
              key => key !== 'note' && !standardMaterials.includes(key)
           );
-          // 合併顯示清單
-          const allMaterials = [...standardMaterials, ...customMaterials];
 
           list.push({
             quoteId: q.id,
@@ -2444,72 +2465,57 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
             date: item.eventDate,
             time: item.timeRange || item.startTime || '',
             people: item.peopleCount,
-            materials: allMaterials, // 使用合併後的清單
-            // 讀取該 quote 已存的 prepData
+            standardMaterials, // 固定材料
+            customMaterials,   // 客製化材料
             prepData: savedData,
           });
         }
       });
     });
-    // 依日期排序
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
-  }, [validQuotes, filterDate]);
+  }, [validQuotes, filterDate, publicRegion]);
 
-  // 更新單一材料狀態 (包含新增材料)
-  const handleMaterialUpdate = (
-    quoteId,
-    itemIdx,
-    matName,
-    field,
-    value,
-  ) => {
-    // 找到原始 quote
+  // 更新單一材料狀態
+  const handleMaterialUpdate = (quoteId, itemIdx, matName, field, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
-
-    // 1. 複製最外層 prepData
     const newPrepData = { ...(quote.prepData || {}) };
+    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
+    if (!newPrepData[itemIdx][matName]) newPrepData[itemIdx][matName] = { done: false, staff: '' };
     
-    // 2. 複製該課程項目層
-    if (!newPrepData[itemIdx]) {
-        newPrepData[itemIdx] = {};
-    } else {
-        newPrepData[itemIdx] = { ...newPrepData[itemIdx] }; 
-    }
-
-    // 3. 確保該材料的物件存在
-    if (!newPrepData[itemIdx][matName]) {
-      newPrepData[itemIdx][matName] = { done: false, staff: '' };
-    } else {
-      // 複製該材料物件
-      newPrepData[itemIdx][matName] = { ...newPrepData[itemIdx][matName] };
-    }
-
-    // 4. 更新值
-    newPrepData[itemIdx][matName][field] = value;
-
-    // 呼叫上層更新
+    newPrepData[itemIdx][matName] = {
+      ...newPrepData[itemIdx][matName],
+      [field]: value,
+    };
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
-  // 處理新增客製化材料
   const handleAddCustomMaterial = (quoteId, itemIdx, matName) => {
-      // 直接呼叫更新函數，這會自動觸發資料庫更新與畫面重繪
       handleMaterialUpdate(quoteId, itemIdx, matName, 'done', false);
   };
 
-  // ★★★ 新增：更新備註欄位功能 ★★★
+  // ★★★ 新增：刪除客製化材料功能 ★★★
+  const handleRemoveCustomMaterial = (quoteId, itemIdx, matName) => {
+      if(!window.confirm(`確定刪除加項「${matName}」嗎？`)) return;
+      
+      const quote = quotes.find((q) => q.id === quoteId);
+      if (!quote) return;
+
+      const newPrepData = { ...(quote.prepData || {}) };
+      if (newPrepData[itemIdx]) {
+          // 複製該層物件
+          newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
+          // 刪除該 Key
+          delete newPrepData[itemIdx][matName];
+      }
+      onUpdateQuote(quoteId, { prepData: newPrepData });
+  };
+
   const handleNoteUpdate = (quoteId, itemIdx, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
-
     const newPrepData = { ...(quote.prepData || {}) };
-    if (!newPrepData[itemIdx]) {
-        newPrepData[itemIdx] = {};
-    } else {
-        newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
-    }
-
+    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {};
     newPrepData[itemIdx].note = value;
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
@@ -2520,61 +2526,68 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center">
             <ClipboardList className="mr-2 text-blue-600" />
-            備課檢查表
+            備課檢查表 {publicRegion && <span className="ml-2 text-sm bg-gray-800 text-white px-2 py-1 rounded">({publicRegion === 'Central' ? '中部' : '南部'}專用)</span>}
           </h2>
           <p className="text-gray-500 text-sm mt-1">
-            僅顯示「已回簽」或「已付訂」且日期在截止日之前的課程
+            顯示截止日之前的課程 (預設顯示未來2個月)
           </p>
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-gray-700">截止日期：</label>
-          <input
-            type="date"
-            className={INPUT_CLASS}
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-          />
+            {!publicMode && (
+                <div className="flex gap-2">
+                     <button onClick={() => handleCopyPrepLink('Central')} className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded border border-yellow-200 hover:bg-yellow-200 flex items-center">
+                        <LinkIcon className="w-3 h-3 mr-1"/> 複製中部連結
+                     </button>
+                     <button onClick={() => handleCopyPrepLink('South')} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 hover:bg-green-200 flex items-center">
+                        <LinkIcon className="w-3 h-3 mr-1"/> 複製南部連結
+                     </button>
+                </div>
+            )}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-bold text-gray-700">截止日期：</label>
+            <input
+                type="date"
+                className={INPUT_CLASS}
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* 人員管理區塊 */}
+      {/* 人員管理區塊 (公開模式下隱藏管理功能，只顯示名單) */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
         <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center">
           <Users className="w-4 h-4 mr-1" />
-          備課人員管理 (資料庫同步)
+          備課人員
         </h3>
         <div className="flex flex-wrap gap-2 items-center">
           {staffList.map((staff) => (
-            <span
-              key={staff}
-              className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center group"
-            >
+            <span key={staff} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center group">
               {staff}
-              <button
-                onClick={() => removeStaff(staff)}
-                className="ml-2 text-gray-400 hover:text-red-500 hidden group-hover:block"
-              >
-                <X className="w-3 h-3" />
-              </button>
+              {!publicMode && (
+                  <button onClick={() => removeStaff(staff)} className="ml-2 text-gray-400 hover:text-red-500 hidden group-hover:block">
+                    <X className="w-3 h-3" />
+                  </button>
+              )}
             </span>
           ))}
-          <div className="flex items-center ml-2">
-            <input
-              type="text"
-              placeholder="新人員"
-              className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500"
-              value={newStaffName}
-              onChange={(e) => setNewStaffName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addStaff()}
-            />
-            <button
-              onClick={addStaff}
-              className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
+          {!publicMode && (
+              <div className="flex items-center ml-2">
+                <input
+                  type="text"
+                  placeholder="新人員"
+                  className="border rounded px-2 py-1 text-sm w-24 mr-1 focus:outline-none focus:border-blue-500"
+                  value={newStaffName}
+                  onChange={(e) => setNewStaffName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addStaff()}
+                />
+                <button onClick={addStaff} className="bg-blue-600 text-white rounded p-1 hover:bg-blue-700">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+          )}
         </div>
       </div>
 
@@ -2589,107 +2602,89 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
             const uniqueKey = `${item.quoteId}_${item.itemIdx}`;
             
             // 計算進度
-            const totalMat = item.materials.length;
+            const totalMat = item.standardMaterials.length + item.customMaterials.length;
             let doneMat = 0;
-            item.materials.forEach(mat => {
-               if (item.prepData[mat]?.done) doneMat++;
-            });
+            // 計算固定材料
+            item.standardMaterials.forEach(mat => { if (item.prepData[mat]?.done) doneMat++; });
+            // 計算客製材料
+            item.customMaterials.forEach(mat => { if (item.prepData[mat]?.done) doneMat++; });
+
             const progress = totalMat > 0 ? Math.round((doneMat / totalMat) * 100) : 0;
             const isAllDone = totalMat > 0 && doneMat === totalMat;
 
             return (
-              <div
-                key={uniqueKey}
-                className={`bg-white rounded-lg shadow border-l-4 p-6 transition-colors ${
-                  isAllDone
-                    ? 'border-l-green-500 border-green-200 bg-green-50'
-                    : 'border-l-blue-500 border-gray-200'
-                }`}
-              >
+              <div key={uniqueKey} className={`bg-white rounded-lg shadow border-l-4 p-6 transition-colors ${isAllDone ? 'border-l-green-500 border-green-200 bg-green-50' : 'border-l-blue-500 border-gray-200'}`}>
                 {/* 標題列 */}
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-800">
-                      {item.courseName}
-                    </h3>
+                    <h3 className="text-lg font-bold text-gray-800">{item.courseName}</h3>
                     <div className="text-sm text-gray-600 mt-1 flex items-center gap-4">
-                      <span className="flex items-center">
-                        <User className="w-4 h-4 mr-1" />
-                        {item.clientName}
-                      </span>
-                      <span className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {item.date} {item.time}
-                      </span>
-                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">
-                        {item.people} 人
-                      </span>
+                      <span className="flex items-center"><User className="w-4 h-4 mr-1" />{item.clientName}</span>
+                      <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" />{item.date} {item.time}</span>
+                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{item.people} 人</span>
                     </div>
                   </div>
                   <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-300">
-                        {progress}%
-                      </div>
+                      <div className="text-2xl font-bold text-gray-300">{progress}%</div>
                   </div>
                 </div>
 
                 {/* 進度條 */}
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`}
-                    style={{ width: `${progress}%` }}
-                  />
+                  <div className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} />
                 </div>
 
                 {/* 材料檢核區 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {item.materials.length === 0 && (
-                        <p className="text-gray-400 text-sm italic col-span-3">本課程尚無材料清單設定，請聯繫管理員。</p>
-                    )}
-                    {item.materials.map(mat => {
+                    {/* 固定材料 */}
+                    {item.standardMaterials.map(mat => {
                         const matState = item.prepData[mat] || { done: false, staff: '' };
                         return (
                             <div key={mat} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
                                 <label className="flex items-center cursor-pointer select-none">
-                                    <input 
-                                        type="checkbox"
-                                        className="w-4 h-4 mr-2 text-blue-600 rounded focus:ring-blue-500"
-                                        checked={matState.done}
-                                        onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)}
-                                    />
-                                    <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>
-                                        {mat}
-                                    </span>
+                                    <input type="checkbox" className="w-4 h-4 mr-2 text-blue-600 rounded focus:ring-blue-500" checked={matState.done} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)} />
+                                    <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{mat}</span>
                                 </label>
-                                <select
-                                    className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500"
-                                    value={matState.staff}
-                                    onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}
-                                >
+                                <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
                                     <option value="">未指派</option>
-                                    {staffList.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
+                                    {staffList.map(s => (<option key={s} value={s}>{s}</option>))}
                                 </select>
+                            </div>
+                        )
+                    })}
+
+                    {/* ★★★ 客製化新增的材料 (含刪除按鈕) ★★★ */}
+                    {item.customMaterials.map(mat => {
+                        const matState = item.prepData[mat] || { done: false, staff: '' };
+                        return (
+                            <div key={mat} className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-200 relative group">
+                                <label className="flex items-center cursor-pointer select-none">
+                                    <input type="checkbox" className="w-4 h-4 mr-2 text-blue-600 rounded focus:ring-blue-500" checked={matState.done} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)} />
+                                    <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-blue-800 font-medium'}`}>{mat}</span>
+                                </label>
+                                <div className="flex items-center">
+                                    <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500 mr-1" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
+                                        <option value="">未指派</option>
+                                        {staffList.map(s => (<option key={s} value={s}>{s}</option>))}
+                                    </select>
+                                    {/* 刪除按鈕 */}
+                                    <button onClick={() => handleRemoveCustomMaterial(item.quoteId, item.itemIdx, mat)} className="text-gray-400 hover:text-red-500 p-1 rounded">
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
                             </div>
                         )
                     })}
                 </div>
                 
-                {/* ★★★ 新增：這裡加入了新增材料的輸入框 ★★★ */}
                 <AddMaterialRow onAdd={(name) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name)} />
 
-                {/* ★★★ 新增：交接備註欄位 (使用 NoteInput 解決輸入法問題) ★★★ */}
                 <div className="mt-4 pt-3 border-t border-gray-100">
                     <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center">
                         <MessageSquare className="w-3 h-3 mr-1"/> 交接備註事項：
                     </label>
-                    <NoteInput 
-                        value={item.prepData.note || ''}
-                        onSave={(newValue) => handleNoteUpdate(item.quoteId, item.itemIdx, newValue)}
-                    />
+                    <NoteInput value={item.prepData.note || ''} onSave={(newValue) => handleNoteUpdate(item.quoteId, item.itemIdx, newValue)} />
                 </div>
-
               </div>
             );
           })
@@ -2698,6 +2693,7 @@ const PreparationView = ({ quotes, onUpdateQuote }) => {
     </div>
   );
 };
+
 
 // ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定) ==========
 
@@ -2728,28 +2724,21 @@ const CalendarView = ({
     location: '台北店', // 實際據點
   });
 
-  // --- 資料合併邏輯 (★ 修正：展開每個 quote 的 items) ---
+  // --- 資料合併邏輯 ---
   const allEvents = useMemo(() => {
-    // 1. 處理企業報價單 (★ 使用 flatMap 展開所有課程項目)
+    // 1. 處理企業報價單
     const quoteEvents = quotes
       .filter((q) => q.status !== 'draft') // ★ 確保過濾掉草稿
       .flatMap((q) => {
-        // 如果 items 為空，返回空陣列
         if (!q.items || q.items.length === 0) return [];
-        
-        // 將每個 item 轉換為一個獨立事件
         return q.items.map((item, index) => {
-          // 確保每個事件有唯一 ID (quoteID + itemIndex)
           return {
             id: `${q.id}_${index}`, 
             type: 'quote',
-            date: item.eventDate || '', // 確保日期字串
+            date: item.eventDate || '',
             time: item.timeRange || item.startTime || '',
             title: q.clientInfo?.companyName || '未知客戶',
-            subTitle: `${item.courseName || '未定課程'} (${
-              item.peopleCount || 0
-            }人)`,
-            // 優先使用該課程的區域設定
+            subTitle: `${item.courseName || '未定課程'} (${item.peopleCount || 0}人)`,
             region: item.outingRegion || item.regionType || 'North',
             location: `${item.city || ''} ${item.address || ''}`,
             raw: q,
@@ -2770,26 +2759,18 @@ const CalendarView = ({
       raw: r,
     }));
 
-    // 3. 合併所有事件並過濾區域
     const combined = [...quoteEvents, ...regularEvents];
 
-    // ★ 關鍵：如果是透過連結進入 (publicRegion 存在)，強制過濾，無視 filterRegion 狀態
     if (publicRegion) {
         return combined.filter((e) => e.region === publicRegion);
     }
-
     if (filterRegion === 'all') return combined;
     return combined.filter((e) => e.region === filterRegion);
   }, [quotes, regularClasses, filterRegion, publicRegion]);
 
   // --- 日期操作 ---
-  const getDaysInMonth = (year, month) =>
-    new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = new Date(
-    currentDate.getFullYear(),
-    currentDate.getMonth(),
-    1,
-  ).getDay();
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
 
   const nextPeriod = () => {
     const d = new Date(currentDate);
@@ -2808,24 +2789,17 @@ const CalendarView = ({
   };
 
   const handleDayClick = (day) => {
-    const d = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      day,
-    );
+    const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     setCurrentDate(d);
     setViewMode('day');
   };
 
-  // --- 取得特定日期的事件 ---
   const getEventsForDay = (date) => {
     if (!date) return [];
     return allEvents.filter((e) => {
       if (!e.date) return false;
       const d = new Date(e.date);
-      // 防止 Invalid Date 導致的邏輯錯誤
       if (isNaN(d.getTime())) return false;
-      
       return (
         d.getDate() === date.getDate() &&
         d.getMonth() === date.getMonth() &&
@@ -2834,84 +2808,51 @@ const CalendarView = ({
     });
   };
 
-  // --- 顏色樣式 ---
   const getEventStyle = (event) => {
-    if (event.type === 'regular') {
-      return 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200';
-    }
-    // 企業報價：依照區域
+    if (event.type === 'regular') return 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200';
     const map = {
-      North:
-        'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
-      Central:
-        'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
-      South:
-        'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
+      North: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+      Central: 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200',
+      South: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
     };
     return map[event.region] || map['North'];
   };
 
-  // --- 處理新增/修改常態課 ---
   const handleOpenAddModal = () => {
-    setRegularForm({
-      courseName: '',
-      date: '',
-      time: '',
-      region: 'North',
-      location: '台北店',
-    });
+    setRegularForm({ courseName: '', date: '', time: '', region: 'North', location: '台北店' });
     setIsEditingRegular(false);
     setEditingRegularId(null);
     setShowAddModal(true);
   };
 
   const handleSubmitClass = () => {
-    if (
-      !regularForm.courseName ||
-      !regularForm.date ||
-      !regularForm.time
-    ) {
+    if (!regularForm.courseName || !regularForm.date || !regularForm.time) {
       alert('課程名稱、日期、時間為必填！');
       return;
     }
-
-    // 根據地點自動判斷區域
     let region = 'North';
     if (regularForm.location.includes('台中')) region = 'Central';
     if (regularForm.location.includes('高雄')) region = 'South';
 
-    const data = {
-      courseName: regularForm.courseName,
-      date: regularForm.date,
-      time: regularForm.time,
-      location: regularForm.location,
-      region: region,
-    };
-
+    const data = { ...regularForm, region };
     if (isEditingRegular && editingRegularId) {
       onUpdateRegularClass(editingRegularId, data);
     } else {
       onAddRegularClass(data);
     }
-
     setShowAddModal(false);
   };
 
   const handleDeleteCurrentRegular = () => {
-    if (
-      editingRegularId &&
-      window.confirm('確定要刪除此常態課程嗎？')
-    ) {
+    if (editingRegularId && window.confirm('確定要刪除此常態課程嗎？')) {
       onDeleteRegularClass(editingRegularId);
       setShowAddModal(false);
     }
   };
 
-  // --- 點擊事件 ---
   const handleEventClick = (e, event) => {
     e.stopPropagation();
     if (event.type === 'regular' && !publicMode) {
-      // 編輯常態課
       const r = event.raw;
       setRegularForm({
         courseName: r.courseName || '',
@@ -2924,85 +2865,41 @@ const CalendarView = ({
       setIsEditingRegular(true);
       setShowAddModal(true);
     } else if (!publicMode) {
-      alert(
-        `企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`,
-      );
+      alert(`企業案件：${event.title}\n時間：${event.time}\n地點：${event.location}`);
     }
   };
 
-  // ★ 新增：連結生成功能 (複製連結到剪貼簿)
-  const handleCopyRegionLink = (region) => {
+  const handleCopyLink = (region, type = 'calendar') => {
       const baseUrl = window.location.href.split('?')[0];
-      const url = `${baseUrl}?view=calendar&mode=public&region=${region}`;
-      
+      const url = `${baseUrl}?view=${type}&mode=public&region=${region}`;
       if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(url).then(() => {
-              alert(`已複製「${region === 'Central' ? '中部' : '南部'}行事曆」連結！\n\n將連結傳給老師，對方打開後只能看到該區域的行程。`);
-          }).catch(() => {
-              alert('複製失敗，請手動複製網址：\n' + url);
-          });
+              alert(`已複製「${region === 'Central' ? '中部' : '南部'}${type === 'prep' ? '備課表' : '行事曆'}」連結！`);
+          }).catch(() => prompt("請複製：", url));
       } else {
-          // 備用方案
-          prompt("請複製以下連結：", url);
+          prompt("請複製：", url);
       }
   };
 
-  // --- Render Views ---
   const renderMonthView = () => {
-    const days = Array.from(
-      {
-        length: getDaysInMonth(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-        ),
-      },
-      (_, i) => i + 1,
-    );
+    const days = Array.from({ length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) }, (_, i) => i + 1);
     const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
 
     return (
       <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200">
         {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
-          <div
-            key={d}
-            className="bg-gray-50 p-2 text-center font-bold text-gray-500"
-          >
-            {d}
-          </div>
+          <div key={d} className="bg-gray-50 p-2 text-center font-bold text-gray-500">{d}</div>
         ))}
-        {blanks.map((b, i) => (
-          <div key={`blank-${i}`} className="bg-white min-h-[100px]" />
-        ))}
+        {blanks.map((b, i) => <div key={`blank-${i}`} className="bg-white min-h-[100px]" />)}
         {days.map((day) => {
-          const date = new Date(
-            currentDate.getFullYear(),
-            currentDate.getMonth(),
-            day,
-          );
+          const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
           const events = getEventsForDay(date);
           return (
-            <div
-              key={day}
-              onClick={() => handleDayClick(day)}
-              className="bg-white min-h-[100px] p-1 border hover:bg-blue-50 transition relative cursor-pointer group flex flex-col gap-1"
-            >
-              <span className="text-sm text-gray-400 font-semibold ml-1">
-                {day}
-              </span>
+            <div key={day} onClick={() => handleDayClick(day)} className="bg-white min-h-[100px] p-1 border hover:bg-blue-50 transition relative cursor-pointer group flex flex-col gap-1">
+              <span className="text-sm text-gray-400 font-semibold ml-1">{day}</span>
               {events.map((evt) => (
-                <div
-                  key={evt.id}
-                  onClick={(e) => handleEventClick(e, evt)}
-                  className={`text-xs p-1 rounded border truncate cursor-pointer ${getEventStyle(
-                    evt,
-                  )}`}
-                  title={`${evt.title} - ${evt.subTitle}`}
-                >
-                  {(evt.time || '').slice(0, 5)}{' '}
-                  {evt.type === 'regular' && (
-                    <span className="font-bold">★</span>
-                  )}{' '}
-                  {evt.title}
+                <div key={evt.id} onClick={(e) => handleEventClick(e, evt)} className={`text-xs p-1 rounded border truncate cursor-pointer ${getEventStyle(evt)}`} title={`${evt.title} - ${evt.subTitle}`}>
+                  {(evt.time || '').slice(0, 5)} {evt.type === 'regular' && <span className="font-bold">★</span>} {evt.title}
                 </div>
               ))}
             </div>
@@ -3013,56 +2910,26 @@ const CalendarView = ({
   };
 
   const renderDayView = () => {
-    const events = getEventsForDay(currentDate).sort((a, b) =>
-      (a.time || '').localeCompare(b.time || ''),
-    );
+    const events = getEventsForDay(currentDate).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     return (
       <div className="border rounded-lg bg-white min-h-[500px] p-6">
-        <h3 className="text-xl font-bold mb-6 border-b pb-4">
-          行程列表 ({currentDate.toLocaleDateString()})
-        </h3>
+        <h3 className="text-xl font-bold mb-6 border-b pb-4">行程列表 ({currentDate.toLocaleDateString()})</h3>
         {events.length === 0 ? (
           <p className="text-gray-400 text-center py-10">本日無行程</p>
         ) : (
           <div className="space-y-4">
             {events.map((evt) => (
-              <div
-                key={evt.id}
-                onClick={(e) => handleEventClick(e, evt)}
-                className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white relative group cursor-pointer ${
-                  getEventStyle(evt).replace('bg-', 'border-l-').split(' ')[0]
-                }`}
-              >
+              <div key={evt.id} onClick={(e) => handleEventClick(e, evt)} className={`flex items-start p-4 rounded-lg border-l-4 shadow-sm bg-white relative group cursor-pointer ${getEventStyle(evt).replace('bg-', 'border-l-').split(' ')[0]}`}>
                 <div className="mr-6 text-center min-w-[80px]">
-                  <div className="text-xl font-bold text-gray-800">
-                    {evt.time || '全天'}
-                  </div>
-                  <div
-                    className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${
-                      evt.type === 'regular'
-                        ? 'bg-purple-200 text-purple-800'
-                        : 'bg-gray-200 text-gray-700'
-                    }`}
-                  >
-                    {evt.type === 'regular'
-                      ? '常態課'
-                      : evt.type === 'internal'
-                      ? '內部'
-                      : '企業'}
+                  <div className="text-xl font-bold text-gray-800">{evt.time || '全天'}</div>
+                  <div className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${evt.type === 'regular' ? 'bg-purple-200 text-purple-800' : 'bg-gray-200 text-gray-700'}`}>
+                    {evt.type === 'regular' ? '常態課' : evt.type === 'internal' ? '內部' : '企業'}
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900 flex items-center">
-                    {evt.title}
-                  </h4>
-                  <div className="text-gray-600 mt-1 flex items-center">
-                    <FileText className="w-4 h-4 mr-1" />
-                    {evt.subTitle}
-                  </div>
-                  <div className="text-gray-500 mt-1 text-sm flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    {evt.location}
-                  </div>
+                  <h4 className="text-lg font-bold text-gray-900 flex items-center">{evt.title}</h4>
+                  <div className="text-gray-600 mt-1 flex items-center"><FileText className="w-4 h-4 mr-1" />{evt.subTitle}</div>
+                  <div className="text-gray-500 mt-1 text-sm flex items-center"><MapPin className="w-4 h-4 mr-1" />{evt.location}</div>
                 </div>
               </div>
             ))}
@@ -3074,112 +2941,60 @@ const CalendarView = ({
 
   return (
     <div className="max-w-6xl mx-auto bg-white p-6 rounded shadow relative">
-      {/* 頁面標題列 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold flex items-center">
             <Calendar className="mr-2" />
-            {currentDate.toLocaleDateString('zh-TW', {
-              year: 'numeric',
-              month: 'long',
-            })}
+            {currentDate.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' })}
           </h2>
           <div className="flex bg-gray-100 rounded p-1">
-            <button
-              onClick={() => setViewMode('month')}
-              className={`px-3 py-1 text-sm rounded ${
-                viewMode === 'month'
-                  ? 'bg-white shadow text-blue-600 font-bold'
-                  : 'text-gray-600'
-              }`}
-            >
-              月
-            </button>
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-3 py-1 text-sm rounded ${
-                viewMode === 'day'
-                  ? 'bg-white shadow text-blue-600 font-bold'
-                  : 'text-gray-600'
-              }`}
-            >
-              日
-            </button>
+            <button onClick={() => setViewMode('month')} className={`px-3 py-1 text-sm rounded ${viewMode === 'month' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>月</button>
+            <button onClick={() => setViewMode('day')} className={`px-3 py-1 text-sm rounded ${viewMode === 'day' ? 'bg-white shadow text-blue-600 font-bold' : 'text-gray-600'}`}>日</button>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 新增常態課按鈕 (僅內部模式顯示) */}
           {!publicMode && (
             <>
-              <button
-                onClick={handleOpenAddModal}
-                className="flex items-center gap-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 shadow text-sm font-bold mr-2"
-              >
-                <Plus className="w-4 h-4" />
-                新增常態課
+              <button onClick={handleOpenAddModal} className="flex items-center gap-1 bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 shadow text-sm font-bold mr-2">
+                <Plus className="w-4 h-4" /> 新增常態課
               </button>
-
-              {/* ★ 新增：連結生成按鈕 (只有管理者看得到) */}
-              <button onClick={() => handleCopyRegionLink('Central')} className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200" title="複製連結給中部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製中部行事曆
+              {/* 行事曆連結 */}
+              <button onClick={() => handleCopyLink('Central', 'calendar')} className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200 text-sm font-bold border border-yellow-200" title="複製行事曆">
+                  <LinkIcon className="w-4 h-4"/> 中部行事曆
               </button>
-              <button onClick={() => handleCopyRegionLink('South')} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200 text-sm font-bold border border-green-200" title="複製連結給南部老師">
-                  <LinkIcon className="w-4 h-4"/> 複製南部行事曆
+              <button onClick={() => handleCopyLink('South', 'calendar')} className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200 text-sm font-bold border border-green-200" title="複製行事曆">
+                  <LinkIcon className="w-4 h-4"/> 南部行事曆
+              </button>
+              {/* ★★★ 新增：備課表連結 ★★★ */}
+               <button onClick={() => handleCopyLink('Central', 'prep')} className="flex items-center gap-1 bg-yellow-50 text-yellow-600 px-3 py-2 rounded hover:bg-yellow-100 text-sm border border-yellow-200 ml-2" title="複製備課表">
+                  <ClipboardList className="w-4 h-4"/> 中部備課
+              </button>
+              <button onClick={() => handleCopyLink('South', 'prep')} className="flex items-center gap-1 bg-green-50 text-green-600 px-3 py-2 rounded hover:bg-green-100 text-sm border border-green-200" title="複製備課表">
+                  <ClipboardList className="w-4 h-4"/> 南部備課
               </button>
             </>
           )}
 
-          {/* ★ 區域篩選邏輯：如果 publicRegion 存在，強制鎖定不顯示篩選器 */}
           {!publicRegion && !publicMode && (
              <div className="flex bg-gray-100 rounded p-1">
                {['all', 'North', 'Central', 'South'].map((r) => (
-                 <button
-                   key={r}
-                   onClick={() => setFilterRegion(r)}
-                   className={`px-3 py-1 text-sm rounded ${
-                     filterRegion === r
-                       ? 'bg-gray-800 text-white'
-                       : 'text-gray-600'
-                   }`}
-                 >
-                   {r === 'all'
-                     ? '全部'
-                     : r === 'North'
-                     ? '北部'
-                     : r === 'Central'
-                     ? '中部'
-                     : '南部'}
+                 <button key={r} onClick={() => setFilterRegion(r)} className={`px-3 py-1 text-sm rounded ${filterRegion === r ? 'bg-gray-800 text-white' : 'text-gray-600'}`}>
+                   {r === 'all' ? '全部' : r === 'North' ? '北部' : r === 'Central' ? '中部' : '南部'}
                  </button>
                ))}
              </div>
           )}
           {publicRegion && (
               <span className="px-3 py-1 bg-gray-800 text-white rounded text-sm font-bold flex items-center">
-                  <Lock className="w-3 h-3 mr-1" />
-                  只顯示：{publicRegion === 'Central' ? '中部' : '南部'}行程
+                  <Lock className="w-3 h-3 mr-1" /> 只顯示：{publicRegion === 'Central' ? '中部' : '南部'}行程
               </span>
           )}
 
           <div className="flex gap-1">
-            <button
-              onClick={prevPeriod}
-              className="p-2 hover:bg-gray-100 rounded border"
-            >
-              <ChevronLeft />
-            </button>
-            <button
-              onClick={() => setCurrentDate(today)}
-              className="px-3 py-2 text-sm hover:bg-gray-100 rounded border"
-            >
-              今天
-            </button>
-            <button
-              onClick={nextPeriod}
-              className="p-2 hover:bg-gray-100 rounded border"
-            >
-              <ChevronRight />
-            </button>
+            <button onClick={prevPeriod} className="p-2 hover:bg-gray-100 rounded border"><ChevronLeft /></button>
+            <button onClick={() => setCurrentDate(today)} className="px-3 py-2 text-sm hover:bg-gray-100 rounded border">今天</button>
+            <button onClick={nextPeriod} className="p-2 hover:bg-gray-100 rounded border"><ChevronRight /></button>
           </div>
         </div>
       </div>
@@ -3187,113 +3002,44 @@ const CalendarView = ({
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'day' && renderDayView()}
 
-      {/* --- 新增/編輯常態課 Modal (簡化版) --- */}
       {showAddModal && !publicMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="text-xl font-bold text-gray-800 flex items-center">
                 <Calendar className="w-5 h-5 mr-2" />
-                {isEditingRegular ? '編輯常態課' : '新增常態課'}{' '}
-                (老師排課)
+                {isEditingRegular ? '編輯常態課' : '新增常態課'} (老師排課)
               </h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X />
-              </button>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X /></button>
             </div>
-
             <div className="space-y-4">
               <div>
                 <label className={LABEL_CLASS}>課程名稱</label>
-                <input
-                  className={INPUT_CLASS}
-                  value={regularForm.courseName}
-                  onChange={(e) =>
-                    setRegularForm({
-                      ...regularForm,
-                      courseName: e.target.value,
-                    })
-                  }
-                  placeholder="例如：水晶手鍊常態班"
-                />
+                <input className={INPUT_CLASS} value={regularForm.courseName} onChange={(e) => setRegularForm({ ...regularForm, courseName: e.target.value })} placeholder="例如：水晶手鍊常態班" />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={LABEL_CLASS}>日期 (必填)</label>
-                  <input
-                    type="date"
-                    className={INPUT_CLASS}
-                    value={regularForm.date}
-                    onChange={(e) =>
-                      setRegularForm({
-                        ...regularForm,
-                        date: e.target.value,
-                      })
-                    }
-                  />
+                  <input type="date" className={INPUT_CLASS} value={regularForm.date} onChange={(e) => setRegularForm({ ...regularForm, date: e.target.value })} />
                 </div>
                 <div>
                   <label className={LABEL_CLASS}>時間 (選填)</label>
-                  <input
-                    type="text"
-                    className={INPUT_CLASS}
-                    value={regularForm.time}
-                    onChange={(e) =>
-                      setRegularForm({
-                        ...regularForm,
-                        time: e.target.value,
-                      })
-                    }
-                    placeholder="14:00-16:00"
-                  />
+                  <input type="text" className={INPUT_CLASS} value={regularForm.time} onChange={(e) => setRegularForm({ ...regularForm, time: e.target.value })} placeholder="14:00-16:00" />
                 </div>
               </div>
-
               <div>
                 <label className={LABEL_CLASS}>地區 (店內)</label>
-                <select
-                  className={INPUT_CLASS}
-                  value={regularForm.location}
-                  onChange={(e) =>
-                    setRegularForm({
-                      ...regularForm,
-                      location: e.target.value,
-                    })
-                  }
-                >
+                <select className={INPUT_CLASS} value={regularForm.location} onChange={(e) => setRegularForm({ ...regularForm, location: e.target.value })}>
                   <option value="台北店">台北店內 (北部)</option>
                   <option value="台中店">台中店內 (中部)</option>
                   <option value="高雄店">高雄店內 (南部)</option>
                 </select>
               </div>
             </div>
-
             <div className="flex gap-2 mt-6">
-              {isEditingRegular && (
-                <button
-                  onClick={handleDeleteCurrentRegular}
-                  className="flex-1 bg-white text-red-600 border border-red-200 font-bold py-2 rounded hover:bg-red-50"
-                >
-                  刪除
-                </button>
-              )}
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 bg-white border border-gray-300 rounded text-gray-700 font-bold hover:bg-gray-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSubmitClass}
-                className="flex-[2] bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 flex justify-center items-center"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isEditingRegular ? '儲存變更' : '儲存常態課'}
-              </button>
+              {isEditingRegular && <button onClick={handleDeleteCurrentRegular} className="flex-1 bg-white text-red-600 border border-red-200 font-bold py-2 rounded hover:bg-red-50">刪除</button>}
+              <button onClick={() => setShowAddModal(false)} className="flex-1 bg-white border border-gray-300 rounded text-gray-700 font-bold hover:bg-gray-50">取消</button>
+              <button onClick={handleSubmitClass} className="flex-[2] bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 flex justify-center items-center"><Save className="w-4 h-4 mr-2" /> {isEditingRegular ? '儲存變更' : '儲存常態課'}</button>
             </div>
           </div>
         </div>
@@ -3727,7 +3473,7 @@ const QuoteList = ({
   );
 };
 
-// ========== App 主程式 (★ 修正：安全鎖定邏輯) ==========
+// ========== App 主程式 (★ 修正：路由與安全鎖定邏輯) ==========
 
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -3739,7 +3485,7 @@ const App = () => {
   const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState(
-    urlView === 'calendar' ? 'calendar' : 'list',
+    urlView === 'calendar' ? 'calendar' : urlView === 'prep' ? 'prep' : 'list',
   );
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
@@ -3748,7 +3494,8 @@ const App = () => {
   // ★ 新增：解鎖狀態 (預設 false)
   const [isUnlocked, setIsUnlocked] = useState(false);
 
-  const publicCalendarMode = urlMode === 'public' && urlView === 'calendar';
+  // ★★★ 修改：判斷公開模式 ★★★
+  const isPublicMode = urlMode === 'public';
 
   useEffect(() => {
     if (!db) {
@@ -3937,16 +3684,25 @@ const App = () => {
     }
   };
 
-  // ★ 邏輯判斷：如果是公開模式，直接顯示行事曆
-  if (publicCalendarMode) {
+  // ★ 邏輯判斷：如果是公開模式，直接顯示對應視圖
+  if (isPublicMode) {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
-        <CalendarView
-          quotes={quotes}
-          regularClasses={regularClasses}
-          publicMode
-          publicRegion={urlRegion} // ★ 傳入網址的區域參數
-        />
+        {urlView === 'prep' ? (
+             <PreparationView 
+                quotes={quotes} 
+                onUpdateQuote={handleUpdateQuoteDirect}
+                publicMode 
+                publicRegion={urlRegion}
+             />
+        ) : (
+            <CalendarView
+              quotes={quotes}
+              regularClasses={regularClasses}
+              publicMode
+              publicRegion={urlRegion} // ★ 傳入網址的區域參數
+            />
+        )}
       </div>
     );
   }
