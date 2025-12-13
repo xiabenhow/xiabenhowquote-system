@@ -194,6 +194,7 @@ const COURSE_DATA = {
     { name: '手作輕寶石水晶手鍊', price: 980 },
     { name: '編織星球水晶手鍊', price: 1080 },
     { name: '招財水晶樹', price: 750 },
+    { name: '水晶吊飾', price: 650 },
     { name: '大盆招財水晶樹', price: 1380 },
     { name: '水晶礦石月曆', price: 1180 },
     { name: '時光之石水晶時鐘', price: 1080 },
