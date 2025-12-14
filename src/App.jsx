@@ -1351,6 +1351,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         if (item.applyTransportFee === undefined) item.applyTransportFee = true;
         // 確保有自訂模式旗標
         if (item.isCustom === undefined) item.isCustom = false;
+        // 確保有 85 折旗標
+        if (item.enableDiscount85 === undefined) item.enableDiscount85 = false;
 
         if (item.extraFee > 0 && item.extraFees.length === 0) {
           item.extraFees.push({
@@ -1392,6 +1394,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         timeRange: '',
         hasInvoice: false,
         enableDiscount90: false,
+        enableDiscount85: false,
         customDiscount: 0,
         customDiscountDesc: '',
         extraFees: [],
@@ -1399,8 +1402,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         extraFeeDesc: '',
         address: '',
         itemNote: '',
-        applyTransportFee: true, // ★ 預設要算車馬費
-        isCustom: false, // ★ 預設非自訂
+        applyTransportFee: true,
+        isCustom: false,
       },
     ];
   });
@@ -1454,21 +1457,23 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const toggleCustomMode = (index) => {
       const newItems = [...items];
       const current = newItems[index];
-      // 切換模式時，如果是切到自訂，名稱清空或保留，價格歸零或保留
-      // 這裡選擇切換成自訂時保留當前值，切回選單時重置為預設
+      // 切換模式時
       if (!current.isCustom) {
           // 變成自訂
           current.isCustom = true;
-          // current.courseSeries = ''; // 保持原樣或清空看需求，這裡保持原樣
+          // 清除 9 折，避免混淆 (自訂模式用 85 折)
+          current.enableDiscount90 = false;
       } else {
           // 變回選單
           current.isCustom = false;
-          current.courseSeries = '水晶系列'; // 重置
+          current.courseSeries = '水晶系列'; 
           const series = COURSE_DATA['水晶系列'];
           if(series) {
               current.courseName = series[0].name;
               current.price = series[0].price;
           }
+          // 清除 85 折
+          current.enableDiscount85 = false;
       }
       setItems(newItems);
   };
@@ -1481,6 +1486,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         id: generateId(),
         itemNote: '',
         enableDiscount90: false,
+        enableDiscount85: false,
         extraFees: [],
         extraFee: 0,
         timeRange: '',
@@ -1639,7 +1645,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
               {/* 課程選擇 or 手動輸入 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {/* 如果是手動模式：
-                   1. 隱藏系列選單 (或是 disable)
+                   1. 隱藏系列選單
                    2. 課程名稱變成 input
                    3. 單價變成 number input
                 */}
@@ -1689,7 +1695,20 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
-                <div><label className={LABEL_CLASS}>日期</label><input type="date" className={INPUT_CLASS} value={item.eventDate} onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} /></div>
+                
+                {/* ★★★ 修改：日期欄位一律顯示，但在自訂模式下標記為選填 ★★★ */}
+                <div>
+                    <label className={LABEL_CLASS}>
+                        日期 {item.isCustom ? '(選填)' : ''}
+                    </label>
+                    <input 
+                        type="date" 
+                        className={INPUT_CLASS} 
+                        value={item.eventDate} 
+                        onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} 
+                    />
+                </div>
+                
                 <div><label className={LABEL_CLASS}>時間（手動輸入）</label><input type="text" className={INPUT_CLASS} placeholder="例如：12:00-14:00" value={item.timeRange || ''} onChange={(e) => updateItem(idx, 'timeRange', e.target.value)} /></div>
               </div>
 
@@ -1699,9 +1718,18 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={(e) => updateItem(idx, 'hasInvoice', e.target.checked)} />
                     <span className="text-sm font-medium text-gray-700">是否開立發票？（加 5%）</span>
                   </label>
+                  
+                  {/* ★★★ 修改：根據模式顯示 9折 或 85折 ★★★ */}
                   <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
-                    <input type="checkbox" className="mr-2 w-4 h-4" checked={item.enableDiscount90 || false} onChange={(e) => updateItem(idx, 'enableDiscount90', e.target.checked)} />
-                    <span className="text-sm font-medium text-red-700">套用九折優惠</span>
+                    <input 
+                        type="checkbox" 
+                        className="mr-2 w-4 h-4" 
+                        checked={item.isCustom ? (item.enableDiscount85 || false) : (item.enableDiscount90 || false)} 
+                        onChange={(e) => updateItem(idx, item.isCustom ? 'enableDiscount85' : 'enableDiscount90', e.target.checked)} 
+                    />
+                    <span className="text-sm font-medium text-red-700">
+                        {item.isCustom ? '套用 85 折優惠 (自訂模式)' : '套用 9 折優惠'}
+                    </span>
                   </label>
                 </div>
               </div>
