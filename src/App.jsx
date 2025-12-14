@@ -311,13 +311,14 @@ const COURSE_DATA = {
   ],
 };
 
+//第二段 ========== 課程材料對照表 (依照指示更新) ==========
 // ========== 課程材料對照表 (依照指示更新) ==========
 const COURSE_MATERIALS = {
   // --- 花藝系列 ---
   '工業風擴香乾燥花盆': ['大理石圓盆', '繡球花材包', '大牛皮盒'],
   '水泥六角擴香花盤': ['泥盤+乾棉', '小提袋'],
   '浮游花瓶永生繡球夜燈': ['200ml洛克瓶', '繡球花材包', '大牛皮盒', '塑膠盒'],
-  '松果聖誕樹名片座': ['松果底座', '小鑷子', '大提袋', '富貴豆'],
+  '松果花藝名片座': ['松果底座', '小鑷子', '大提袋', '富貴豆'],
   '工業風永生花': ['大理石八角盆', '繡球花材包', '大牛皮盒'],
   '冬夜響鈴玫瑰永生花圈': ['鈴鐺', '永生玫瑰', '小鑷子', '大提袋'],
   '永恆玫瑰玻璃盅永生花燈': ['花盅底座+電池', '繡球花材包', '開窗提袋'],
@@ -329,7 +330,7 @@ const COURSE_MATERIALS = {
   '微景觀多肉暈染石盆': ['石膏包', '紙碗', '小提袋', '赤玉土'],
   '路燈叢林微景觀多肉梯盆': ['階梯盆', '赤玉土'],
   '月牙多肉三角玻璃屋': ['月牙玻璃屋', '赤玉土'],
-  '多肉玻璃球': ['玻璃球', '赤玉土'],
+  '微景觀多肉玻璃球': ['玻璃球', '赤玉土'], 
   '能量礦石叢林生態瓶': ['生態玻璃盅', '礦石與裝飾小房子', '水草', '大提袋'],
   '叢林多肉花圈': ['藤圈', '長鐵絲與短鐵支', '大提袋'],
   '苔蘚生態玻璃球': ['裝飾小房子', '多肉專用土', '水草', '玻璃球'],
@@ -341,30 +342,32 @@ const COURSE_MATERIALS = {
   '經典北歐酒精畫木托盤': ['酒精顏料', '畫紙', '黑提袋', '酒精罐'],
   '六角石盤流體畫杯墊': ['流體顏料包', '海綿腳墊貼', '小提袋'],
   '金箔肌理畫': ['大排刷', '扇形刷', '畫刀', '小鑷子'],
-  '雙流體熊圓型畫布': ['紙碗', '小冰棒棍', '養生膠帶', '膠台'],
+  '雙流體熊圓形布畫': ['紙碗', '小冰棒棍', '養生膠帶', '膠台'],
 
   // --- 蠟燭系列 ---
   '南瓜鐵藝乾燥花蠟燭': ['南瓜容器', '塑膠盒', '蛋糕盒底座', '大紙杯'],
   '黑曜石松果香氛蠟燭': ['黑曜石鐵盒', '熱風槍', '拉菲草', '墊片'],
-  '微醺調酒香氛蠟燭': ['玻璃杯', '冰塊蠟', '美工刀', '2ml精油'],
+  '微醺調酒香氛蠟燭（含調酒）': ['玻璃杯', '冰塊蠟', '美工刀', '2ml精油'],
   '乾燥花擴香蠟片': ['蠟片模具', '鐵釦', '蠟片花材包', '抽屜盒'],
   '告白蠟燭漂流木燭台': ['漂流木燭台組', '長尾夾', '漂流木花材包', '蛋糕盒'],
   '鐵罐乾燥花香氛蠟燭': ['鐵罐', '5ml精油', '細燭芯', '大豆軟蠟'],
   '乾燥花圈精油手工皂': ['透明皂基', '塑膠盒', '花圈模具', '皂鋼杯'],
-  '聖誕燭台': ['高腳杯', '小玻璃杯', '花材包', '橙片'],
+  '乾燥花圈香氛手工皂': ['透明皂基', '塑膠盒', '花圈模具', '皂鋼杯'], 
+  '聖誕燭台': ['高腳杯', '小玻璃杯', '花材包', '橙片'], 
+  '乾燥花玻璃杯燭台': ['高腳杯', '小玻璃杯', '花材包', '橙片'], 
   '花圈香氛蠟片': ['圓蠟片模具', '鐵釦', '花材包', '1/2橙片'],
-  '瑪芬甜點香氛蠟燭': ['馬芬蛋糕杯', '5ml精油', '細燭芯', '塑膠盒'],
+  '馬芬甜點香氛蠟燭': ['馬芬蛋糕杯', '5ml精油', '細燭芯', '塑膠盒'],
   '果凍海洋蠟燭杯': ['玻璃杯+蓋子', '貝殼砂', '細燭芯', '小牛皮盒+繩'],
 
   // --- 環氧系列 & 水晶系列 ---
-  '環氧樹脂夜燈': ['英文模具', '燈座', 'ＡＢ膠', '環氧顏料'],
+  '環氧夜燈': ['英文模具', '燈座', 'ＡＢ膠', '環氧顏料'],
   '海洋風情托盤與雙杯墊': ['熱風槍', '托盤', '杯墊', '環氧顏料'],
   '手作輕寶石水晶手鍊': ['水晶講義', '出課水晶', '剪刀', '長尾夾'],
   '招財水晶樹': ['水晶樹枝', 'moss草', '吊牌', '尖嘴鉗'],
-  '水晶吊飾': ['小卡', '出課水晶（要帶吊牌）', '剪刀', '35cm鐵絲'],
+  '純淨水晶礦石吊飾': ['小卡', '出課水晶（要帶吊牌）', '剪刀', '35cm鐵絲'],
 
   // --- 法式調香系列 ---
-  '法式香水晶油調香': ['調香講義', '黑抽屜盒', '抽屜盒蓋子', '原子筆'],
+  '法式香水精油調香': ['調香講義', '黑抽屜盒', '抽屜盒蓋子', '原子筆'],
   '玻尿酸天然精油調香沐浴精': ['講義', '原子筆', '水量壺', '刻度量杯'],
 };
 
@@ -564,6 +567,7 @@ const calculateItem = (item) => {
     extraFees,
     extraFee,
     enableDiscount90,
+    applyTransportFee = true, // ★★★ 新增：預設為 true (要算車馬費)
   } = item;
 
   let error = null;
@@ -625,8 +629,8 @@ const calculateItem = (item) => {
     isDiscountApplied = true;
   }
 
-  // --- 車馬費 ---
-  if (locationMode === 'outing' && city) {
+  // --- 車馬費計算 (★ 新增 applyTransportFee 判斷) ---
+  if (locationMode === 'outing' && city && applyTransportFee) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
       if (cityData.zones && area && cityData.zones[area]) {
@@ -635,6 +639,9 @@ const calculateItem = (item) => {
         transportFee = cityData.default;
       }
     }
+  } else {
+    // 沒選地點，或者使用者手動取消了車馬費
+    transportFee = 0;
   }
 
   const subTotal = unitPrice * count;
@@ -1326,7 +1333,6 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     },
   );
   const [status] = useState(initialData?.status || 'draft');
-  // ★★★ 新增：內部備註狀態 (預設為空) ★★★
   const [internalNote, setInternalNote] = useState(initialData?.internalNote || '');
   const [isSigned, setIsSigned] = useState(false);
 
@@ -1336,6 +1342,11 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       return initialData.items.map((raw) => {
         const item = { ...raw };
         if (!item.extraFees) item.extraFees = [];
+
+        // 確保有預設的 applyTransportFee
+        if (item.applyTransportFee === undefined) item.applyTransportFee = true;
+        // 確保有自訂模式旗標
+        if (item.isCustom === undefined) item.isCustom = false;
 
         if (item.extraFee > 0 && item.extraFees.length === 0) {
           item.extraFees.push({
@@ -1384,6 +1395,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         extraFeeDesc: '',
         address: '',
         itemNote: '',
+        applyTransportFee: true, // ★ 預設要算車馬費
+        isCustom: false, // ★ 預設非自訂
       },
     ];
   });
@@ -1403,29 +1416,57 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
   const updateItem = (index, field, value) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    const item = { ...newItems[index], [field]: value };
+    
+    // 課程選單連動單價 (僅在非自訂模式下生效)
+    if (!item.isCustom) {
+        if (field === 'courseName') {
+            const series = COURSE_DATA[item.courseSeries];
+            const course = series?.find((c) => c.name === value);
+            if (course) item.price = course.price;
+        }
+        if (field === 'courseSeries') {
+            const series = COURSE_DATA[value];
+            if (series && series.length > 0) {
+                item.courseName = series[0].name;
+                item.price = series[0].price;
+            }
+        }
+    }
 
-    if (field === 'courseName') {
-      const series = COURSE_DATA[newItems[index].courseSeries];
-      const course = series.find((c) => c.name === value);
-      if (course) newItems[index].price = course.price;
-    }
-    if (field === 'courseSeries') {
-      const series = COURSE_DATA[value];
-      if (series && series.length > 0) {
-        newItems[index].courseName = series[0].name;
-        newItems[index].price = series[0].price;
-      }
-    }
     if (field === 'outingRegion') {
       const available = getAvailableCities(value);
-      newItems[index].city = available[0] || '';
-      newItems[index].area = '';
+      item.city = available[0] || '';
+      item.area = '';
     }
     if (field === 'city') {
-      newItems[index].area = '';
+      item.area = '';
     }
+    
+    newItems[index] = item;
     setItems(newItems);
+  };
+
+  const toggleCustomMode = (index) => {
+      const newItems = [...items];
+      const current = newItems[index];
+      // 切換模式時，如果是切到自訂，名稱清空或保留，價格歸零或保留
+      // 這裡選擇切換成自訂時保留當前值，切回選單時重置為預設
+      if (!current.isCustom) {
+          // 變成自訂
+          current.isCustom = true;
+          // current.courseSeries = ''; // 保持原樣或清空看需求，這裡保持原樣
+      } else {
+          // 變回選單
+          current.isCustom = false;
+          current.courseSeries = '水晶系列'; // 重置
+          const series = COURSE_DATA['水晶系列'];
+          if(series) {
+              current.courseName = series[0].name;
+              current.price = series[0].price;
+          }
+      }
+      setItems(newItems);
   };
 
   const addItem = () =>
@@ -1439,6 +1480,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         extraFees: [],
         extraFee: 0,
         timeRange: '',
+        isCustom: false,
+        applyTransportFee: true,
       },
     ]);
 
@@ -1487,7 +1530,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       items: calculatedItems,
       totalAmount,
       status,
-      internalNote, // ★ 儲存內部備註
+      internalNote,
     });
   };
 
@@ -1577,24 +1620,67 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                   </button>
                 )}
               </div>
+              
+              {/* ★★★ 新增：手動/選單模式切換按鈕 ★★★ */}
+              <div className="flex justify-end mb-2">
+                 <button 
+                    type="button"
+                    onClick={() => toggleCustomMode(idx)}
+                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition-colors"
+                 >
+                     {item.isCustom ? "↩ 切換回選單選擇" : "✎ 改為手動輸入名稱與價格"}
+                 </button>
+              </div>
 
+              {/* 課程選擇 or 手動輸入 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className={LABEL_CLASS}>課程系列</label>
-                  <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
-                    {Object.keys(COURSE_DATA).map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
-                  <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
-                    {COURSE_DATA[item.courseSeries]?.map((c) => (
-                      <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
-                    ))}
-                  </select>
-                </div>
+                {/* 如果是手動模式：
+                   1. 隱藏系列選單 (或是 disable)
+                   2. 課程名稱變成 input
+                   3. 單價變成 number input
+                */}
+                {!item.isCustom ? (
+                    <>
+                        <div>
+                          <label className={LABEL_CLASS}>課程系列</label>
+                          <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
+                            {Object.keys(COURSE_DATA).map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
+                          <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
+                            {COURSE_DATA[item.courseSeries]?.map((c) => (
+                              <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
+                            ))}
+                          </select>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="md:col-span-2">
+                             <label className={LABEL_CLASS}>課程名稱 (自訂)</label>
+                             <input 
+                                className={INPUT_CLASS} 
+                                value={item.courseName} 
+                                onChange={(e) => updateItem(idx, 'courseName', e.target.value)} 
+                                placeholder="請輸入課程名稱"
+                             />
+                        </div>
+                        <div>
+                             <label className={LABEL_CLASS}>單價</label>
+                             <input 
+                                type="number"
+                                className={INPUT_CLASS} 
+                                value={item.price} 
+                                onChange={(e) => updateItem(idx, 'price', e.target.value)} 
+                                placeholder="請輸入單價"
+                             />
+                        </div>
+                    </>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1655,6 +1741,20 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                       <label className={LABEL_CLASS}>詳細地址</label>
                       <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
                     </div>
+                    
+                    {/* ★★★ 新增：是否套用車馬費 ★★★ */}
+                    <div className="md:col-span-3">
+                         <label className="flex items-center cursor-pointer select-none">
+                            <input 
+                                type="checkbox" 
+                                className="mr-2 w-4 h-4 text-blue-600" 
+                                checked={item.applyTransportFee} 
+                                onChange={(e) => updateItem(idx, 'applyTransportFee', e.target.checked)} 
+                            />
+                            <span className="text-sm font-bold text-gray-700">是否計算車馬費？ (取消勾選則車馬費為 $0)</span>
+                         </label>
+                    </div>
+
                   </div>
                 ) : (
                   <div className="flex gap-4">
