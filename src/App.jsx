@@ -567,7 +567,8 @@ const calculateItem = (item) => {
     extraFees,
     extraFee,
     enableDiscount90,
-    applyTransportFee = true, // ★★★ 新增：預設為 true (要算車馬費)
+    applyTransportFee = true,
+    isCustom = false, // ★★★ 新增：自訂模式標記
   } = item;
 
   let error = null;
@@ -587,40 +588,43 @@ const calculateItem = (item) => {
       .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
-  // --- 最低人數 & 師資費規則 ---
-  if (locationMode === 'outing') {
-    if (outingRegion === 'North') {
-      const isRemote =
-        ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) ||
-        city.includes('(北部出發)');
-      if (isRemote) {
-        if (count < 25) {
-          error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+  // ★★★ 關鍵修改：如果是自訂模式 (isCustom)，完全跳過最低人數與師資費規則檢查 ★★★
+  if (!isCustom) {
+      if (locationMode === 'outing') {
+        if (outingRegion === 'North') {
+          const isRemote =
+            ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) ||
+            city.includes('(北部出發)');
+          if (isRemote) {
+            if (count < 25) {
+              error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+            }
+          } else {
+            if (['台北市', '新北市'].includes(city)) {
+              // 正常模式下，自動計算師資費
+              if (count >= 10 && count <= 14) teacherFee = 2000;
+            }
+          }
+        } else if (outingRegion === 'Central') {
+          if (city === '台中市') {
+            if (count < 10) error = '中部市區外派最低出課人數為 10 人';
+          } else {
+            if (count < 15) error = '中部其他地區外派最低出課人數為 15 人';
+          }
+        } else if (outingRegion === 'South') {
+          if (city === '高雄市') {
+            if (count < 10) error = '南部市區外派最低出課人數為 10 人';
+          } else {
+            if (count < 15) error = '南部其他地區外派最低出課人數為 15 人';
+          }
         }
       } else {
-        if (['台北市', '新北市'].includes(city)) {
-          if (count >= 10 && count <= 14) teacherFee = 2000;
+        if (outingRegion === 'Central') {
+          if (count < 10) error = '中部店內包班最低人數 10 人';
+        } else if (outingRegion === 'South') {
+          if (count < 6) error = '南部店內包班最低人數 6 人';
         }
       }
-    } else if (outingRegion === 'Central') {
-      if (city === '台中市') {
-        if (count < 10) error = '中部市區外派最低出課人數為 10 人';
-      } else {
-        if (count < 15) error = '中部其他地區外派最低出課人數為 15 人';
-      }
-    } else if (outingRegion === 'South') {
-      if (city === '高雄市') {
-        if (count < 10) error = '南部市區外派最低出課人數為 10 人';
-      } else {
-        if (count < 15) error = '南部其他地區外派最低出課人數為 15 人';
-      }
-    }
-  } else {
-    if (outingRegion === 'Central') {
-      if (count < 10) error = '中部店內包班最低人數 10 人';
-    } else if (outingRegion === 'South') {
-      if (count < 6) error = '南部店內包班最低人數 6 人';
-    }
   }
 
   // --- 九折優惠 ---
@@ -629,7 +633,7 @@ const calculateItem = (item) => {
     isDiscountApplied = true;
   }
 
-  // --- 車馬費計算 (★ 新增 applyTransportFee 判斷) ---
+  // --- 車馬費計算 ---
   if (locationMode === 'outing' && city && applyTransportFee) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
@@ -640,7 +644,7 @@ const calculateItem = (item) => {
       }
     }
   } else {
-    // 沒選地點，或者使用者手動取消了車馬費
+    // 沒選地點，或者使用者手動取消了車馬費 (即使在自訂模式，若勾選套用車馬費依然會算)
     transportFee = 0;
   }
 
