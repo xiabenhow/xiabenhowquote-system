@@ -1129,7 +1129,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       // 6. 總金額
       worksheet.addRow([]);
-      const totalRow = worksheet.addRow(['', '', '總金額', totalAmount]);
+      const totalRow = worksheet.addRow(['', '', '總金額', quote.totalAmount]);
       worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
       totalRow.getCell(3).font = { size: 14, bold: true };
       totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF0000FF' } };
