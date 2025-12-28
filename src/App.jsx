@@ -88,7 +88,7 @@ try {
   console.error('Firebase 初始化失敗', err);
 }
 
-// ========== 共用小工具 ==========
+// ========== 共用小工具 ========== 
 
 // 動態載入 html2pdf
 const loadScript = (src) =>
@@ -150,7 +150,7 @@ const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
 const SECTION_CLASS =
   'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
-// ========== 課程資料 (完整版) ==========
+// ========== 課程資料 (完整版) ========== 
 
 const COURSE_DATA = {
   平板課程: [
@@ -321,53 +321,17 @@ const TRANSPORT_FEES = {
   台北市: {
     default: 0,
     zones: {
-      中正區: 500,
-      大同區: 500,
-      中山區: 500,
-      大安區: 500,
-      萬華區: 500,
-      信義區: 500,
-      文山區: 800,
-      松山區: 800,
-      士林區: 800,
-      北投區: 800,
-      南港區: 1000,
-      內湖區: 1000,
-      陽明山: 1000,
+      中正區: 500, 大同區: 500, 中山區: 500, 大安區: 500, 萬華區: 500, 信義區: 500,
+      文山區: 800, 松山區: 800, 士林區: 800, 北投區: 800, 南港區: 1000, 內湖區: 1000, 陽明山: 1000,
     },
   },
   新北市: {
     default: 0,
     zones: {
-      新莊區: 500,
-      板橋區: 500,
-      三重區: 500,
-      中和區: 500,
-      永和區: 500,
-      林口區: 1000,
-      五股區: 1000,
-      泰山區: 1000,
-      蘆洲區: 1000,
-      新店區: 1000,
-      深坑區: 1000,
-      石碇區: 1000,
-      汐止區: 1000,
-      土城區: 1000,
-      樹林區: 1000,
-      淡水區: 1500,
-      雙溪區: 1500,
-      三芝區: 1500,
-      三峽區: 1500,
-      鶯歌區: 1500,
-      烏來區: 1500,
-      八里區: 1800,
-      萬里區: 1800,
-      金山區: 1800,
-      石門區: 1800,
-      瑞芳區: 1800,
-      平溪區: 1800,
-      坪林區: 1800,
-      貢寮區: 1800,
+      新莊區: 500, 板橋區: 500, 三重區: 500, 中和區: 500, 永和區: 500,
+      林口區: 1000, 五股區: 1000, 泰山區: 1000, 蘆洲區: 1000, 新店區: 1000, 深坑區: 1000, 石碇區: 1000, 汐止區: 1000, 土城區: 1000, 樹林區: 1000,
+      淡水區: 1500, 雙溪區: 1500, 三芝區: 1500, 三峽區: 1500, 鶯歌區: 1500, 烏來區: 1500,
+      八里區: 1800, 萬里區: 1800, 金山區: 1800, 石門區: 1800, 瑞芳區: 1800, 平溪區: 1800, 坪林區: 1800, 貢寮區: 1800,
     },
   },
   基隆市: { default: 2000, zones: {} },
@@ -382,76 +346,25 @@ const TRANSPORT_FEES = {
   '嘉義縣市(北部出發)': { default: 5500, zones: {} },
   '台南市(北部出發)': { default: 6500, zones: {} },
   '高雄市(北部出發)': { default: 6500, zones: {} },
-
   台中市: {
     default: 0,
     zones: {
-      中區: 500,
-      東區: 500,
-      南區: 500,
-      西區: 500,
-      北區: 500,
-      西屯區: 500,
-      南屯區: 500,
-      北屯區: 500,
-      太平區: 800,
-      大里區: 800,
-      霧峰區: 800,
-      烏日區: 800,
-      豐原區: 1200,
-      后里區: 1200,
-      石岡區: 1200,
-      東勢區: 1200,
-      和平區: 1200,
-      新社區: 1200,
-      潭子區: 1200,
-      大雅區: 1200,
-      神岡區: 1200,
-      大肚區: 1200,
-      外埔區: 1200,
-      沙鹿區: 1500,
-      龍井區: 1500,
-      梧棲區: 1500,
-      清水區: 1500,
-      大甲區: 1500,
-      大安區: 1500,
+      中區: 500, 東區: 500, 南區: 500, 西區: 500, 北區: 500, 西屯區: 500, 南屯區: 500, 北屯區: 500,
+      太平區: 800, 大里區: 800, 霧峰區: 800, 烏日區: 800,
+      豐原區: 1200, 后里區: 1200, 石岡區: 1200, 東勢區: 1200, 和平區: 1200, 新社區: 1200, 潭子區: 1200, 大雅區: 1200, 神岡區: 1200, 大肚區: 1200, 外埔區: 1200,
+      沙鹿區: 1500, 龍井區: 1500, 梧棲區: 1500, 清水區: 1500, 大甲區: 1500, 大安區: 1500,
     },
   },
   彰化縣: { default: 1800, zones: {} },
   南投縣: { default: 1800, zones: {} },
   '苗栗縣(中部出發)': { default: 1800, zones: {} },
-
   高雄市: {
     default: 0,
     zones: {
-      前金區: 500,
-      新興區: 500,
-      鹽埕區: 500,
-      鼓山區: 500,
-      旗津區: 500,
-      左營區: 500,
-      楠梓區: 500,
-      三民區: 500,
-      苓雅區: 500,
-      前鎮區: 500,
-      小港區: 500,
-      鳳山區: 800,
-      大寮區: 800,
-      仁武區: 800,
-      大樹區: 800,
-      大社區: 800,
-      橋頭區: 800,
-      梓官區: 800,
-      鳥松區: 1000,
-      彌陀區: 1000,
-      永安區: 1000,
-      岡山區: 1000,
-      燕巢區: 1000,
-      阿蓮區: 1000,
-      路竹區: 1000,
-      林園區: 1500,
-      田寮區: 1500,
-      湖內區: 1500,
+      前金區: 500, 新興區: 500, 鹽埕區: 500, 鼓山區: 500, 旗津區: 500, 左營區: 500, 楠梓區: 500, 三民區: 500, 苓雅區: 500, 前鎮區: 500, 小港區: 500,
+      鳳山區: 800, 大寮區: 800, 仁武區: 800, 大樹區: 800, 大社區: 800, 橋頭區: 800, 梓官區: 800,
+      鳥松區: 1000, 彌陀區: 1000, 永安區: 1000, 岡山區: 1000, 燕巢區: 1000, 阿蓮區: 1000, 路竹區: 1000,
+      林園區: 1500, 田寮區: 1500, 湖內區: 1500,
       '山區(茂林/桃源等)': 2500,
     },
   },
@@ -470,20 +383,9 @@ const TRANSPORT_FEES = {
 const getAvailableCities = (region) => {
   if (region === 'North') {
     return [
-      '台北市',
-      '新北市',
-      '基隆市',
-      '桃園市',
-      '新竹縣市',
-      '宜蘭縣',
-      '苗栗縣',
-      '台中市(北部出發)',
-      '彰化縣(北部出發)',
-      '南投縣(北部出發)',
-      '雲林縣(北部出發)',
-      '嘉義縣市(北部出發)',
-      '台南市(北部出發)',
-      '高雄市(北部出發)',
+      '台北市', '新北市', '基隆市', '桃園市', '新竹縣市', '宜蘭縣', '苗栗縣',
+      '台中市(北部出發)', '彰化縣(北部出發)', '南投縣(北部出發)', '雲林縣(北部出發)',
+      '嘉義縣市(北部出發)', '台南市(北部出發)', '高雄市(北部出發)',
     ];
   }
   if (region === 'Central') {
@@ -497,7 +399,7 @@ const getAvailableCities = (region) => {
 
 // 第 3 段：價格計算與車馬費去重邏輯
 
-// ========== 價格計算邏輯 ==========
+// ========== 價格計算邏輯 ========== 
 
 const calculateItem = (item) => {
   const {
@@ -542,7 +444,7 @@ const calculateItem = (item) => {
             city.includes('(北部出發)');
           if (isRemote) {
             if (count < 25) {
-              error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+              error = `北部遠程外派(${city.replace(/(.*)/, '')})最低出課人數為 25 人`;
             }
           } else {
             if (['台北市', '新北市'].includes(city)) {
@@ -559,7 +461,8 @@ const calculateItem = (item) => {
         } else if (outingRegion === 'South') {
           if (city === '高雄市') {
             if (count < 10) error = '南部市區外派最低出課人數為 10 人';
-          } else {
+          }
+          else {
             if (count < 15) error = '南部其他地區外派最低出課人數為 15 人';
           }
         }
@@ -644,7 +547,7 @@ const applyTransportDedup = (itemsWithCalc) => {
 
 // 第 4 段：UI 小元件、後台鎖定與報價單預覽 (含新增 Excel 下載按鈕 - 修正條款全文)
 
-// ========== UI 小元件 ==========
+// ========== UI 小元件 ========== 
 
 const StatusSelector = ({ status, onChange }) => {
   // ★ 修改：只保留四種狀態：草稿、已回簽、已付訂、已結案
@@ -678,7 +581,7 @@ const StatusSelector = ({ status, onChange }) => {
   );
 };
 
-// ========== 後台鎖定畫面 (AdminLock) ==========
+// ========== 後台鎖定畫面 (AdminLock) ========== 
 const AdminLock = ({ onUnlock }) => {
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState(false);
@@ -728,7 +631,7 @@ const AdminLock = ({ onUnlock }) => {
   );
 };
 
-// ========== 報價單預覽 (PDF 顯示用) ==========
+// ========== 報價單預覽 (PDF 顯示用) ========== 
 
 const QuotePreview = ({
   clientInfo,
@@ -887,7 +790,7 @@ const QuotePreview = ({
                 {item.calc.transportFee > 0 && (
                   <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
                     <td colSpan={3} className="p-1 pl-2 text-right">
-                      車馬費 ({item.city.replace(/\(.*\)/, '')}
+                      車馬費 ({item.city.replace(/(.*)/, '')}
                       {item.area})
                     </td>
                     <td className="p-1 text-right font-bold">
@@ -1044,7 +947,7 @@ const QuotePreview = ({
   );
 };
 
-// ========== PaymentModal ==========
+// ========== PaymentModal ========== 
 
 const PaymentModal = ({ quote, onClose, onSave }) => {
   const [data, setData] = useState({
@@ -1204,42 +1107,42 @@ const PreviewModal = ({ quote, onClose }) => {
       ];
 
       const titleRow = worksheet.addRow(['下班隨手作活動報價單']);
-      worksheet.mergeCells(`A\${titleRow.number}:D\${titleRow.number}`);
+      worksheet.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
       titleRow.getCell(1).font = { name: '微軟正黑體', size: 20, bold: true };
       titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
       
-      const dateRow1 = worksheet.addRow(['', '', '', `報價日期: \${displayDateStr}`]);
-      worksheet.mergeCells(`A\${dateRow1.number}:C\${dateRow1.number}`);
+      const dateRow1 = worksheet.addRow(['', '', '', `報價日期: ${displayDateStr}`]);
+      worksheet.mergeCells(`A${dateRow1.number}:C${dateRow1.number}`);
       dateRow1.getCell(4).font = { size: 10 };
       dateRow1.getCell(4).alignment = { horizontal: 'right' };
       const dateRow2 = worksheet.addRow(['', '', '', '有效期限：3天']);
-      worksheet.mergeCells(`A\${dateRow2.number}:C\${dateRow2.number}`);
+      worksheet.mergeCells(`A${dateRow2.number}:C${dateRow2.number}`);
       dateRow2.getCell(4).font = { size: 10, bold: true };
       dateRow2.getCell(4).alignment = { horizontal: 'right' };
       worksheet.addRow([]);
 
       const infoStartRow = worksheet.lastRow.number + 1;
-      worksheet.getCell(`A\${infoStartRow}`).value = '品牌單位';
-      worksheet.getCell(`A\${infoStartRow}`).font = { bold: true, size: 12 };
-      worksheet.getCell(`A\${infoStartRow}`).border = { bottom: { style: 'thin' } };
-      worksheet.getCell(`A\${infoStartRow + 1}`).value = '公司行號: 下班文化國際有限公司';
-      worksheet.getCell(`A\${infoStartRow + 2}`).value = '統一編號: 83475827';
-      worksheet.getCell(`A\${infoStartRow + 3}`).value = '聯絡電話: 02-2371-4171';
-      worksheet.getCell(`A\${infoStartRow + 4}`).value = '聯絡人: 下班隨手作';
+      worksheet.getCell(`A${infoStartRow}`).value = '品牌單位';
+      worksheet.getCell(`A${infoStartRow}`).font = { bold: true, size: 12 };
+      worksheet.getCell(`A${infoStartRow}`).border = { bottom: { style: 'thin' } };
+      worksheet.getCell(`A${infoStartRow + 1}`).value = '公司行號: 下班文化國際有限公司';
+      worksheet.getCell(`A${infoStartRow + 2}`).value = '統一編號: 83475827';
+      worksheet.getCell(`A${infoStartRow + 3}`).value = '聯絡電話: 02-2371-4171';
+      worksheet.getCell(`A${infoStartRow + 4}`).value = '聯絡人: 下班隨手作';
 
       const rightCol = 'B';
-      worksheet.getCell(`\${rightCol}\${infoStartRow}`).value = '客戶資料';
-      worksheet.mergeCells(`\${rightCol}\${infoStartRow}:D\${infoStartRow}`);
-      worksheet.getCell(`\${rightCol}\${infoStartRow}`).font = { bold: true, size: 12 };
-      worksheet.getCell(`\${rightCol}\${infoStartRow}`).border = { bottom: { style: 'thin' } };
-      worksheet.getCell(`\${rightCol}\${infoStartRow + 1}`).value = `名稱: \${quote.clientInfo.companyName || '-'}`;
-      worksheet.mergeCells(`\${rightCol}\${infoStartRow + 1}:D\${infoStartRow + 1}`);
-      worksheet.getCell(`\${rightCol}\${infoStartRow + 2}`).value = `統編: \${quote.clientInfo.taxId || '-'}`;
-      worksheet.mergeCells(`\${rightCol}\${infoStartRow + 2}:D\${infoStartRow + 2}`);
-      worksheet.getCell(`\${rightCol}\${infoStartRow + 3}`).value = `聯絡人: \${quote.clientInfo.contactPerson || '-'}`;
-      worksheet.mergeCells(`\${rightCol}\${infoStartRow + 3}:D\${infoStartRow + 3}`);
-      worksheet.getCell(`\${rightCol}\${infoStartRow + 4}`).value = `電話: \${quote.clientInfo.phone || '-'}`;
-      worksheet.mergeCells(`\${rightCol}\${infoStartRow + 4}:D\${infoStartRow + 4}`);
+      worksheet.getCell(`${rightCol}${infoStartRow}`).value = '客戶資料';
+      worksheet.mergeCells(`${rightCol}${infoStartRow}:D${infoStartRow}`);
+      worksheet.getCell(`${rightCol}${infoStartRow}`).font = { bold: true, size: 12 };
+      worksheet.getCell(`${rightCol}${infoStartRow}`).border = { bottom: { style: 'thin' } };
+      worksheet.getCell(`${rightCol}${infoStartRow + 1}`).value = `名稱: ${quote.clientInfo.companyName || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 1}:D${infoStartRow + 1}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 2}`).value = `統編: ${quote.clientInfo.taxId || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 2}:D${infoStartRow + 2}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 3}`).value = `聯絡人: ${quote.clientInfo.contactPerson || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 3}:D${infoStartRow + 3}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 4}`).value = `電話: ${quote.clientInfo.phone || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 4}:D${infoStartRow + 4}`);
       worksheet.addRow([]);
       worksheet.addRow([]);
 
@@ -1260,12 +1163,12 @@ const PreviewModal = ({ quote, onClose }) => {
           itemRow.getCell(4).font = { bold: true };
 
           let details = [];
-          if (item.itemNote) details.push(`[備註] \${item.itemNote}`);
-          if (item.eventDate) details.push(`時間: \${formatDateWithDay(item.eventDate)} \${item.timeRange || ''}`);
-          if (item.address) details.push(`地點: \${item.address}`);
+          if (item.itemNote) details.push(`[備註] ${item.itemNote}`);
+          if (item.eventDate) details.push(`時間: ${formatDateWithDay(item.eventDate)} ${item.timeRange || ''}`);
+          if (item.address) details.push(`地點: ${item.address}`);
           if (details.length > 0) {
               const detailRow = worksheet.addRow([details.join('\n')]);
-              worksheet.mergeCells(`A\${detailRow.number}:D\${detailRow.number}`);
+              worksheet.mergeCells(`A${detailRow.number}:D${detailRow.number}`);
               detailRow.height = details.length * 15;
               detailRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
               detailRow.getCell(1).font = { color: { argb: 'FF666666' }, size: 10 };
@@ -1274,7 +1177,7 @@ const PreviewModal = ({ quote, onClose }) => {
           if (item.calc.isDiscountApplied || item.customDiscount > 0) {
               const val = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
               const row = worksheet.addRow(['', '', '折扣優惠', -val]);
-              worksheet.mergeCells(`A\${row.number}:C\${row.number}`);
+              worksheet.mergeCells(`A${row.number}:C${row.number}`);
               row.getCell(3).alignment = { horizontal: 'right' };
               row.getCell(3).font = { color: { argb: 'FFFF0000' } };
               row.getCell(4).font = { color: { argb: 'FFFF0000' }, bold: true };
@@ -1283,34 +1186,34 @@ const PreviewModal = ({ quote, onClose }) => {
           }
 
           if (item.calc.transportFee > 0) {
-              const row = worksheet.addRow(['', '', `車馬費 (\${item.city}\${item.area})`, item.calc.transportFee]);
-              worksheet.mergeCells(`A\${row.number}:C\${row.number}`);
+              const row = worksheet.addRow(['', '', `車馬費 (${item.city}${item.area})`, item.calc.transportFee]);
+              worksheet.mergeCells(`A${row.number}:C${row.number}`);
               row.getCell(3).alignment = { horizontal: 'right' };
               row.getCell(4).numFmt = '"+"#,##0';
           }
           if (item.calc.teacherFee > 0) {
               const row = worksheet.addRow(['', '', '師資費', item.calc.teacherFee]);
-              worksheet.mergeCells(`A\${row.number}:C\${row.number}`);
+              worksheet.mergeCells(`A${row.number}:C${row.number}`);
               row.getCell(3).alignment = { horizontal: 'right' };
               row.getCell(4).numFmt = '"+"#,##0';
           }
           if (item.extraFees) {
               item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-                  const row = worksheet.addRow(['', '', `加價: \${fee.description}`, parseInt(fee.amount)]);
-                  worksheet.mergeCells(`A\${row.number}:C\${row.number}`);
+                  const row = worksheet.addRow(['', '', `加價: ${fee.description}`, parseInt(fee.amount)]);
+                  worksheet.mergeCells(`A${row.number}:C${row.number}`);
                   row.getCell(3).alignment = { horizontal: 'right' };
                   row.getCell(4).numFmt = '"+"#,##0';
               });
           }
           if (item.hasInvoice) {
               const row = worksheet.addRow(['', '', '營業稅 (5%)', item.calc.tax]);
-              worksheet.mergeCells(`A\${row.number}:C\${row.number}`);
+              worksheet.mergeCells(`A${row.number}:C${row.number}`);
               row.getCell(3).alignment = { horizontal: 'right' };
               row.getCell(4).numFmt = '"+"#,##0';
           }
           
           const itemTotalRow = worksheet.addRow(['', '', '項目總計', item.calc.finalTotal]);
-          worksheet.mergeCells(`A\${itemTotalRow.number}:C\${itemTotalRow.number}`);
+          worksheet.mergeCells(`A${itemTotalRow.number}:C${itemTotalRow.number}`);
           itemTotalRow.eachCell(c => {
             c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
             c.font = { bold: true };
@@ -1324,7 +1227,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       worksheet.addRow([]);
       const totalRow = worksheet.addRow(['', '', '總金額', quote.totalAmount]);
-      worksheet.mergeCells(`A\${totalRow.number}:B\${totalRow.number}`);
+      worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
       
       const totalCellC = totalRow.getCell(3);
       const totalCellD = totalRow.getCell(4);
@@ -1355,7 +1258,7 @@ const PreviewModal = ({ quote, onClose }) => {
       ];
       notes.forEach(note => {
           const r = worksheet.addRow([note]);
-          worksheet.mergeCells(`A\${r.number}:D\${r.number}`);
+          worksheet.mergeCells(`A${r.number}:D${r.number}`);
           r.getCell(1).alignment = { wrapText: true };
           if (note.includes('付款方式')) r.getCell(1).font = { color: { argb: 'FFFF0000' }, bold: true };
       });
@@ -1364,8 +1267,8 @@ const PreviewModal = ({ quote, onClose }) => {
       worksheet.addRow([]);
       
       const signRow = worksheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
-      worksheet.mergeCells(`A\${signRow.number}:B\${signRow.number}`);
-      worksheet.mergeCells(`C\${signRow.number}:D\${signRow.number}`);
+      worksheet.mergeCells(`A${signRow.number}:B${signRow.number}`);
+      worksheet.mergeCells(`C${signRow.number}:D${signRow.number}`);
       signRow.getCell(1).font = { bold: true };
       signRow.getCell(3).font = { bold: true };
       signRow.getCell(3).alignment = { horizontal: 'right' };
@@ -1389,11 +1292,11 @@ const PreviewModal = ({ quote, onClose }) => {
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, `\${quote.clientInfo.companyName || '報價單'}_\${new Date().toISOString().slice(0, 10)}.xlsx`);
+      saveAs(blob, `${quote.clientInfo.companyName || '報價單'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
     } catch (error) {
       console.error("產生 Excel 失敗:", error);
-      alert(`抱歉，產生 Excel 檔案時發生錯誤：\n\${error.message}`);
+      alert(`抱歉，產生 Excel 檔案時發生錯誤：\n${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1403,7 +1306,7 @@ const PreviewModal = ({ quote, onClose }) => {
     const element = document.getElementById('preview-modal-area');
     if (!element) return;
     const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `\${quote.clientInfo.companyName || '客戶'}_\${dateStr}.pdf`;
+    const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
     if (!window.html2pdf) {
       try {
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
@@ -1478,9 +1381,9 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // 第 5 段：QuoteCreator (新增/編輯報價單)
 
-//第四部份 ========== QuoteCreator ==========
+//第四部份 ========== QuoteCreator ========== 
 
-// ========== QuoteCreator ==========
+// ========== QuoteCreator ========== 
 
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
@@ -1523,7 +1426,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
         if (!item.timeRange) {
           if (item.startTime && item.endTime) {
-            item.timeRange = `\${item.startTime}-\${item.endTime}`;
+            item.timeRange = `${item.startTime}-${item.endTime}`;
           } else if (item.startTime) {
             item.timeRange = item.startTime;
           } else {
@@ -1892,8 +1795,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
               <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
                 <div className="flex gap-6 mb-4">
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-\${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-\${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
+                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
                 </div>
 
                 {item.locationMode === 'outing' ? (
@@ -2027,7 +1930,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
 
 // 第 6 段：統計頁面、備註與材料元件
 
-// 第五部份========== 統計頁面 (含北中南對比圖) ==========
+//第五部份========== 統計頁面 (含北中南對比圖) ========== 
 
 const StatsView = ({ quotes }) => {
   // 過濾掉內部排程
@@ -2038,7 +1941,7 @@ const StatsView = ({ quotes }) => {
     validQuotes.forEach((q) => {
       if (q.status !== 'draft') {
         const d = getSafeDate(q.createdAt);
-        const key = `\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
           2,
           '0',
         )}`;
@@ -2115,7 +2018,7 @@ const StatsView = ({ quotes }) => {
       // 統計不包含草稿
       if (q.status === 'draft') return;
       const d = getSafeDate(q.createdAt);
-      const monthKey = `\${d.getFullYear()}-\${String(d.getMonth() + 1).padStart(
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
         2,
         '0',
       )}`;
@@ -2211,15 +2114,15 @@ const StatsView = ({ quotes }) => {
               <div key={key}>
                 <div className="flex justify-between items-end mb-1">
                   <span className="font-bold text-gray-600">{region.name}</span>
-                  <span className={`font-bold \${region.textColor}`}>
+                  <span className={`font-bold ${region.textColor}`}>
                     $${region.revenue.toLocaleString()}
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-1000 \${region.color}`}
+                    className={`h-full rounded-full transition-all duration-1000 ${region.color}`}
                     style={{
-                      width: `\${(region.revenue / stats.totalRevenue) * 100}%`,
+                      width: `${(region.revenue / stats.totalRevenue) * 100}%`,
                     }}
                   ></div>
                 </div>
@@ -2246,15 +2149,15 @@ const StatsView = ({ quotes }) => {
               {Object.entries(stats.regions).map(([key, region]) => (
                 <div
                   key={key}
-                  className={`\${region.color} transition-all duration-1000`}
+                  className={`${region.color} transition-all duration-1000`}
                   style={{
-                    width: `\${
+                    width: `${
                       stats.totalOrders > 0
                         ? (region.count / stats.totalOrders) * 100
                         : 0
                     }%`,
                   }}
-                  title={`\${region.name}: \${region.count}件`}
+                  title={`${region.name}: ${region.count}件`}
                 ></div>
               ))}
             </div>
@@ -2262,7 +2165,7 @@ const StatsView = ({ quotes }) => {
               {Object.entries(stats.regions).map(([key, region]) => (
                 <div key={key} className="flex flex-col items-center">
                   <div
-                    className={`w-3 h-3 rounded-full mb-2 \${region.color}`}
+                    className={`w-3 h-3 rounded-full mb-2 ${region.color}`}
                   ></div>
                   <span className="text-gray-500 text-sm">{region.name}</span>
                   <span className="text-xl font-bold text-gray-800">
@@ -2282,7 +2185,7 @@ const StatsView = ({ quotes }) => {
         {Object.entries(stats.statuses).map(([key, status]) => (
           <div
             key={key}
-            className={`p-4 rounded-lg border \${status.color.replace(
+            className={`p-4 rounded-lg border ${status.color.replace(
               'text-',
               'border-',
             )} bg-opacity-50`}
@@ -2300,7 +2203,7 @@ const StatsView = ({ quotes }) => {
 
 // 第 7 段：備課表、行事曆、列表與 App 主體
 
-//第六部份 ========== 備課表、行事曆、列表與 App 主體 ==========
+//第六部份========== 備課表、行事曆、列表與 App 主體 ========== 
 
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   const validQuotes = quotes.filter((q) => q.status === 'confirmed' || q.status === 'paid');
@@ -2312,8 +2215,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   useEffect(() => { if (!db) return; const unsub = onSnapshot(doc(db, 'settings', 'staff'), (docSnap) => { if (docSnap.exists()) { const data = docSnap.data(); setStaffData({ North: data.North || (Array.isArray(data.list) ? data.list : []), Central: data.Central || [], South: data.South || [] }); } else { setDoc(doc(db, 'settings', 'staff'), { North: ['小明', '小華'], Central: [], South: [] }, { merge: true }); } }); return () => unsub(); }, []);
   const updateStaffToFirebase = async (newList) => { const updatedData = { ...staffData, [currentRegion]: newList }; setStaffData(updatedData); if (db) await setDoc(doc(db, 'settings', 'staff'), { [currentRegion]: newList }, { merge: true }); };
   const addStaff = (e) => { if (e) e.preventDefault(); if (newStaffName.trim() && !staffData[currentRegion].includes(newStaffName.trim())) updateStaffToFirebase([...staffData[currentRegion], newStaffName.trim()]); setNewStaffName(''); };
-  const removeStaff = (name) => { if (window.confirm(`確定移除 \${name}?`)) updateStaffToFirebase(staffData[currentRegion].filter((s) => s !== name)); };
-  const handleCopyPrepLink = (region) => { const url = `\${window.location.href.split('?')[0]}?view=prep&mode=public&region=\${region}`; navigator.clipboard.writeText(url).then(() => alert(`已複製「\${region === 'Central' ? '中部' : '南部'}備課表」連結！`)).catch(() => prompt("請複製連結：", url)); };
+  const removeStaff = (name) => { if (window.confirm(`確定移除 ${name}?`)) updateStaffToFirebase(staffData[currentRegion].filter((s) => s !== name)); };
+  const handleCopyPrepLink = (region) => { const url = `${window.location.href.split('?')[0]}?view=prep&mode=public&region=${region}`; navigator.clipboard.writeText(url).then(() => alert(`已複製「${region === 'Central' ? '中部' : '南部'}備課表」連結！`)).catch(() => prompt("請複製連結：", url)); };
   const handleGoToCalendar = () => { const url = new URL(window.location.href); url.searchParams.set('view', 'calendar'); window.location.href = url.toString(); };
   
   const prepItems = useMemo(() => {
@@ -2341,10 +2244,10 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><div><h2 className="text-2xl font-bold flex items-center"><ClipboardList className="mr-2" /> 備課檢查表 {publicRegion && `(\${publicRegion})`}</h2></div><div className="flex flex-col gap-2 items-end">{!publicMode ? (<div className="flex gap-2">{['North', 'Central', 'South'].map(r => <button key={r} onClick={() => setCurrentRegion(r)} className={`px-3 py-1 rounded border \${currentRegion === r ? 'bg-blue-600 text-white' : 'bg-white'}`}>{r}</button>)}<button onClick={() => handleCopyPrepLink('Central')} className="text-xs bg-yellow-100 px-2 py-1 rounded border">中部連結</button><button onClick={() => handleCopyPrepLink('South')} className="text-xs bg-green-100 px-2 py-1 rounded border">南部連結</button></div>) : (<button onClick={handleGoToCalendar} className="bg-white border px-3 py-2 rounded">切換至行事曆</button>)}<div className="flex items-center gap-2"><label className="text-sm font-bold">截止：</label><input type="date" className={INPUT_CLASS} value={filterDate} onChange={(e) => setFilterDate(e.target.value)} /></div></div></div>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><div><h2 className="text-2xl font-bold flex items-center"><ClipboardList className="mr-2" /> 備課檢查表 {publicRegion && `(${publicRegion})`}</h2></div><div className="flex flex-col gap-2 items-end">{!publicMode ? (<div className="flex gap-2">{['North', 'Central', 'South'].map(r => <button key={r} onClick={() => setCurrentRegion(r)} className={`px-3 py-1 rounded border ${currentRegion === r ? 'bg-blue-600 text-white' : 'bg-white'}`}>{r}</button>)}<button onClick={() => handleCopyPrepLink('Central')} className="text-xs bg-yellow-100 px-2 py-1 rounded border">中部連結</button><button onClick={() => handleCopyPrepLink('South')} className="text-xs bg-green-100 px-2 py-1 rounded border">南部連結</button></div>) : (<button onClick={handleGoToCalendar} className="bg-white border px-3 py-2 rounded">切換至行事曆</button>)}<div className="flex items-center gap-2"><label className="text-sm font-bold">截止：</label><input type="date" className={INPUT_CLASS} value={filterDate} onChange={(e) => setFilterDate(e.target.value)} /></div></div></div>
       <div className="bg-white p-4 rounded shadow mb-6"><h3 className="font-bold mb-2">備課人員 ({currentRegion})</h3><div className="flex flex-wrap gap-2">{(staffData[currentRegion] || []).map((s) => (<span key={s} className="bg-gray-100 px-3 py-1 rounded-full flex items-center">{s} {canEditStaff && <button onClick={() => removeStaff(s)} className="ml-2 text-red-500"><X size={12} /></button>}</span>))}{canEditStaff && <div className="flex items-center"><input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} placeholder="新人員" className="border p-1 w-20 text-sm" /><button onClick={addStaff} type="button" className="ml-1 bg-blue-600 text-white p-1 rounded"><Plus size={14} /></button></div>}</div></div>
       <div className="space-y-6">{prepItems.length === 0 ? <div className="text-center text-gray-400">無資料</div> : prepItems.map((item) => (
-        <div key={`\${item.quoteId}_\${item.itemIdx}`} className="bg-white rounded shadow border-l-4 border-blue-500 p-6">
+        <div key={`${item.quoteId}_${item.itemIdx}`} className="bg-white rounded shadow border-l-4 border-blue-500 p-6">
           <div className="flex justify-between mb-4"><div><h3 className="font-bold text-lg">{item.courseName}</h3><div className="text-sm text-gray-600">{item.clientName} | {item.date} {item.time} | {item.people}人</div></div></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{[...item.standardMaterials, ...item.customMaterials].map(mat => { const st = item.prepData[mat] || {}; return <div key={mat} className="flex justify-between bg-gray-50 p-2 rounded border"><label className="flex items-center"><input type="checkbox" checked={st.done} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)} className="mr-2" />{mat}</label><select value={st.staff || ''} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)} className="text-xs bg-white border rounded"><option value="">未指派</option>{staffData[currentRegion].map(s => <option key={s} value={s}>{s}</option>)}</select></div> })}</div>
           <AddMaterialRow onAdd={(n) => handleMaterialUpdate(item.quoteId, item.itemIdx, n, 'done', false)} />
@@ -2362,14 +2265,14 @@ const CalendarView = ({ quotes, regularClasses, onAddRegularClass, onUpdateRegul
   const [modal, setModal] = useState({ show: false, editId: null, data: {} });
   const events = useMemo(() => {
     const list = [];
-    quotes.filter(q => q.status !== 'draft').forEach(q => q.items?.forEach((it, idx) => list.push({ id: `\${q.id}_\${idx}`, type: 'quote', date: it.eventDate, time: it.timeRange, title: q.clientInfo.companyName, sub: it.courseName, region: it.outingRegion || it.regionType || 'North', raw: q, contact: q.clientInfo.contactPerson, phone: q.clientInfo.phone, addr: it.address, note: q.internalNote })));
+    quotes.filter(q => q.status !== 'draft').forEach(q => q.items?.forEach((it, idx) => list.push({ id: `${q.id}_${idx}`, type: 'quote', date: it.eventDate, time: it.timeRange, title: q.clientInfo.companyName, sub: it.courseName, region: it.outingRegion || it.regionType || 'North', raw: q, contact: q.clientInfo.contactPerson, phone: q.clientInfo.phone, addr: it.address, note: q.internalNote })));
     regularClasses.forEach(r => list.push({ id: r.id, type: 'regular', date: r.date, time: r.time, title: r.courseName, sub: '常態課', region: r.region || 'North', raw: r }));
     return list.filter(e => (publicRegion ? e.region === publicRegion : filterRegion === 'all' || e.region === filterRegion));
   }, [quotes, regularClasses, filterRegion, publicRegion]);
   const getDayEvents = (d) => events.filter(e => e.date === d.toISOString().slice(0, 10));
-  const handleEventClick = (e, evt) => { if (evt.type === 'regular' && !publicMode) { e.stopPropagation(); setModal({ show: true, editId: evt.id, data: { ...evt.raw } }); } else if (!publicMode) { e.stopPropagation(); alert(`\${evt.title}\n\${evt.sub}\n\${evt.time}\n\${evt.addr}`); } else { setDate(new Date(evt.date)); setView('day'); } };
-  const handleCopyLink = (r, t) => { const url = `\${window.location.href.split('?')[0]}?view=\${t}&mode=public&region=\${r}`; navigator.clipboard.writeText(url).then(() => alert('複製成功')); };
-  const renderMonth = () => (<div className="grid grid-cols-7 border bg-gray-200 gap-px">{['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="bg-gray-50 p-2 text-center">{d}</div>)}{Array(new Date(date.getFullYear(), date.getMonth(), 1).getDay()).fill(0).map((_, i) => <div key={`b\${i}`} className="bg-white h-24" />)}{Array(new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()).fill(0).map((_, i) => { const d = new Date(date.getFullYear(), date.getMonth(), i + 1); return <div key={i} onClick={() => { setDate(d); setView('day'); }} className="bg-white h-24 p-1 cursor-pointer hover:bg-blue-50"><div className="text-xs text-gray-400">{i + 1}</div>{getDayEvents(d).map(e => <div key={e.id} onClick={(ev) => handleEventClick(ev, e)} className={`text-[10px] truncate rounded px-1 mb-1 \${e.type === 'regular' ? 'bg-purple-100' : 'bg-blue-100'}`}>{e.time.slice(0, 5)} {e.title}</div>)}</div> })}</div>);
+  const handleEventClick = (e, evt) => { if (evt.type === 'regular' && !publicMode) { e.stopPropagation(); setModal({ show: true, editId: evt.id, data: { ...evt.raw } }); } else if (!publicMode) { e.stopPropagation(); alert(`${evt.title}\n${evt.sub}\n${evt.time}\n${evt.addr}`); } else { setDate(new Date(evt.date)); setView('day'); } };
+  const handleCopyLink = (r, t) => { const url = `${window.location.href.split('?')[0]}?view=${t}&mode=public&region=${r}`; navigator.clipboard.writeText(url).then(() => alert('複製成功')); };
+  const renderMonth = () => (<div className="grid grid-cols-7 border bg-gray-200 gap-px">{['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="bg-gray-50 p-2 text-center">{d}</div>)}{Array(new Date(date.getFullYear(), date.getMonth(), 1).getDay()).fill(0).map((_, i) => <div key={`b${i}`} className="bg-white h-24" />)}{Array(new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()).fill(0).map((_, i) => { const d = new Date(date.getFullYear(), date.getMonth(), i + 1); return <div key={i} onClick={() => { setDate(d); setView('day'); }} className="bg-white h-24 p-1 cursor-pointer hover:bg-blue-50"><div className="text-xs text-gray-400">{i + 1}</div>{getDayEvents(d).map(e => <div key={e.id} onClick={(ev) => handleEventClick(ev, e)} className={`text-[10px] truncate rounded px-1 mb-1 ${e.type === 'regular' ? 'bg-purple-100' : 'bg-blue-100'}`}>{e.time.slice(0, 5)} {e.title}</div>)}</div> })}</div>);
   const renderWeek = () => { const start = new Date(date); start.setDate(start.getDate() - start.getDay()); return <div className="grid grid-cols-7 gap-2">{Array(7).fill(0).map((_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return <div key={i} className="bg-white border rounded min-h-[200px]" onClick={() => { setDate(d); setView('day'); }}><div className="bg-gray-50 p-2 text-center border-b">{d.getMonth() + 1}/{d.getDate()}</div><div className="p-2 space-y-1">{getDayEvents(d).map(e => <div key={e.id} onClick={(ev) => handleEventClick(ev, e)} className="text-xs p-1 rounded border bg-blue-50">{e.time} {e.title}</div>)}</div></div> })}</div> };
   const renderDay = () => (<div className="bg-white border rounded p-6 min-h-[400px]"><h3 className="text-xl font-bold mb-4">{date.toLocaleDateString()}</h3>{getDayEvents(date).map(e => <div key={e.id} onClick={(ev) => handleEventClick(ev, e)} className="flex border-l-4 border-blue-500 pl-4 mb-4 cursor-pointer hover:bg-gray-50 p-2"><div className="w-20 font-bold">{e.time}</div><div><div className="font-bold">{e.title}</div><div>{e.sub}</div>{e.type === 'quote' && <div className="text-xs text-gray-500"><div>{e.contact} {e.phone}</div><div>{e.addr}</div>{e.note && <div className="text-red-500 bg-red-50 px-1">{e.note}</div>}</div>}</div></div>)}</div>);
 
@@ -2403,10 +2306,10 @@ const QuoteList = ({ quotes, onCreateNew, onEdit, onPreview, onDelete, onChangeS
   const months = Array.from(new Set(quotes.map(q => getSafeDate(q.createdAt).toISOString().slice(0, 7)))).sort().reverse();
   const getRegion = (q) => { if (q.items?.some(i => i.city?.includes('高雄') || i.city?.includes('台南') || i.outingRegion === 'South')) return 'South'; if (q.items?.some(i => i.city?.includes('台中') || i.outingRegion === 'Central')) return 'Central'; return 'North'; };
   const filtered = quotes.filter(q => { const d = getSafeDate(q.createdAt).toISOString().slice(0, 7); const r = getRegion(q); const kw = search.trim(); const txt = !kw || q.clientInfo.companyName?.includes(kw) || q.depositNote?.includes(kw); return (filterMonth === 'all' || d === filterMonth) && (filterStatus === 'all' || q.status === filterStatus) && (filterRegion === 'all' || r === filterRegion) && txt; });
-  const exportCSV = () => { let csv = '\uFEFFID,日期,公司,統編,聯絡人,電話,總額,狀態,區域\n'; filtered.forEach(q => csv += `\${q.id},\${formatDate(q.createdAt)},"\${q.clientInfo.companyName}",\${q.clientInfo.taxId},\${q.clientInfo.contactPerson},\${q.clientInfo.phone},\${q.totalAmount},\${q.status},\${getRegion(q)}\n`); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'quotes.csv'; link.click(); };
+  const exportCSV = () => { let csv = '\uFEFFID,日期,公司,統編,聯絡人,電話,總額,狀態,區域\n'; filtered.forEach(q => csv += `${q.id},${formatDate(q.createdAt)},"${q.clientInfo.companyName}",${q.clientInfo.taxId},${q.clientInfo.contactPerson},${q.clientInfo.phone},${q.totalAmount},${q.status},${getRegion(q)}\n`); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'quotes.csv'; link.click(); };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8"><div className="flex justify-between mb-6 gap-4"><h1 className="text-2xl font-bold flex items-center"><Folder className="mr-2"/> 報價單管理 ({quotes.length})</h1><div className="flex gap-2 items-center"><input className="border p-2 rounded text-sm" placeholder="搜尋..." value={search} onChange={e => setSearch(e.target.value)} /><div className="flex bg-white rounded border p-1"><button onClick={() => setFilterRegion('all')} className={`px-2 rounded \${filterRegion === 'all' ? 'bg-blue-600 text-white' : ''}`}>全</button><button onClick={() => setFilterRegion('North')} className={`px-2 rounded \${filterRegion === 'North' ? 'bg-blue-600 text-white' : ''}`}>北</button><button onClick={() => setFilterRegion('Central')} className={`px-2 rounded \${filterRegion === 'Central' ? 'bg-blue-600 text-white' : ''}`}>中</button><button onClick={() => setFilterRegion('South')} className={`px-2 rounded \${filterRegion === 'South' ? 'bg-blue-600 text-white' : ''}`}>南</button></div><select className="border p-2 rounded text-sm" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}><option value="all">所有月份</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select><button onClick={exportCSV} className="border p-2 rounded"><Download size={16} /></button><button onClick={() => onSwitchView('calendar')} className="border p-2 rounded flex items-center"><Calendar size={16} className="mr-1" /> 行事曆</button><button onClick={onCreateNew} className="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow flex items-center"><Plus size={16} className="mr-1" /> 新增</button></div></div>
+    <div className="max-w-7xl mx-auto p-4 md:p-8"><div className="flex justify-between mb-6 gap-4"><h1 className="text-2xl font-bold flex items-center"><Folder className="mr-2"/> 報價單管理 ({quotes.length})</h1><div className="flex gap-2 items-center"><input className="border p-2 rounded text-sm" placeholder="搜尋..." value={search} onChange={e => setSearch(e.target.value)} /><div className="flex bg-white rounded border p-1"><button onClick={() => setFilterRegion('all')} className={`px-2 rounded ${filterRegion === 'all' ? 'bg-blue-600 text-white' : ''}`}>全</button><button onClick={() => setFilterRegion('North')} className={`px-2 rounded ${filterRegion === 'North' ? 'bg-blue-600 text-white' : ''}`}>北</button><button onClick={() => setFilterRegion('Central')} className={`px-2 rounded ${filterRegion === 'Central' ? 'bg-blue-600 text-white' : ''}`}>中</button><button onClick={() => setFilterRegion('South')} className={`px-2 rounded ${filterRegion === 'South' ? 'bg-blue-600 text-white' : ''}`}>南</button></div><select className="border p-2 rounded text-sm" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}><option value="all">所有月份</option>{months.map(m => <option key={m} value={m}>{m}</option>)}</select><button onClick={exportCSV} className="border p-2 rounded"><Download size={16} /></button><button onClick={() => onSwitchView('calendar')} className="border p-2 rounded flex items-center"><Calendar size={16} className="mr-1" /> 行事曆</button><button onClick={onCreateNew} className="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow flex items-center"><Plus size={16} className="mr-1" /> 新增</button></div></div>
       <div className="bg-white rounded shadow overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-50 border-b"><tr><th className="p-3 text-left">日期</th><th className="p-3 text-left">客戶</th><th className="p-3 text-left">課程</th><th className="p-3 text-right">金額</th><th className="p-3 text-center">狀態</th><th className="p-3 text-right">操作</th></tr></thead><tbody>{filtered.length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-gray-400">無資料</td></tr> : filtered.map(q => (<tr key={q.id} className="border-t hover:bg-gray-50"><td className="p-3">{formatDate(q.createdAt)}</td><td className="p-3 font-bold">{q.clientInfo.companyName}</td><td className="p-3">{q.items?.[0]?.courseName}</td><td className="p-3 text-right font-bold">$${q.totalAmount?.toLocaleString()}</td><td className="p-3 text-center"><StatusSelector status={q.status} onChange={(v) => onChangeStatus(q, v)} /></td><td className="p-3 text-right flex justify-end gap-1"><button onClick={() => onOpenInvoiceManager(q)} className="bg-green-100 text-green-700 px-2 py-1 rounded font-bold"><Receipt size={14}/></button><button onClick={() => onOpenPayment(q)} className="bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">$</button><button onClick={() => onPreview(q)} className="border p-1 rounded"><Printer size={14} /></button><button onClick={() => onEdit(q)} className="border p-1 rounded text-blue-600"><Edit size={14} /></button><button onClick={() => onDelete(q)} className="border p-1 rounded text-red-600"><Trash2 size={14} /></button></td></tr>))}</tbody></table></div></div>
   );
 };
@@ -2450,11 +2353,11 @@ const App = () => {
       <header className="bg-white shadow-sm border-b px-4 py-3 flex justify-between items-center max-w-7xl mx-auto">
         <div className="flex items-center gap-3 font-bold text-gray-800"><div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">下</div> 下班隨手作系統 v4.3</div>
         <nav className="flex gap-2 text-sm items-center">
-          <button onClick={() => { setEditQuote(null); setView('list'); }} className={`px-3 py-1 rounded-full \${view === 'list' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>列表</button>
-          <button onClick={() => { setEditQuote({}); setView('create'); }} className={`px-3 py-1 rounded-full \${view === 'create' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>新增</button>
-          <button onClick={() => { setEditQuote(null); setView('calendar'); }} className={`px-3 py-1 rounded-full \${view === 'calendar' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>行事曆</button>
-          <button onClick={() => { setEditQuote(null); setView('prep'); }} className={`px-3 py-1 rounded-full \${view === 'prep' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>備課表</button>
-          <button onClick={() => { setEditQuote(null); setView('stats'); }} className={`px-3 py-1 rounded-full \${view === 'stats' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>統計</button>
+          <button onClick={() => { setEditQuote(null); setView('list'); }} className={`px-3 py-1 rounded-full ${view === 'list' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>列表</button>
+          <button onClick={() => { setEditQuote({}); setView('create'); }} className={`px-3 py-1 rounded-full ${view === 'create' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>新增</button>
+          <button onClick={() => { setEditQuote(null); setView('calendar'); }} className={`px-3 py-1 rounded-full ${view === 'calendar' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>行事曆</button>
+          <button onClick={() => { setEditQuote(null); setView('prep'); }} className={`px-3 py-1 rounded-full ${view === 'prep' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>備課表</button>
+          <button onClick={() => { setEditQuote(null); setView('stats'); }} className={`px-3 py-1 rounded-full ${view === 'stats' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>統計</button>
           <div className="w-px h-4 bg-gray-300 mx-1"></div>
           <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500"><Settings size={18} /></button>
         </nav>
