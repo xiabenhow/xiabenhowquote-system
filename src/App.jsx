@@ -1,3 +1,4 @@
+// 第 1 段：Imports、Firebase 設定、工具函式與課程資料
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -36,8 +37,12 @@ import {
   ClipboardList,
   Users,
   CheckSquare,
-  MessageSquare // 新增圖示
+  MessageSquare
 } from 'lucide-react';
+
+// ★★★ 新增：Excel 匯出套件 ★★★
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 // ==========  Firebase 設定  ==========
 import { initializeApp } from 'firebase/app';
@@ -312,246 +317,9 @@ const COURSE_DATA = {
   ],
 };
 
-//第二段 ========== 課程材料對照表 (依照指示更新) ==========
-// ========== 課程材料對照表 (依照指示更新) ==========
-const COURSE_MATERIALS = {
-  // --- 花藝系列 ---
-  '工業風擴香乾燥花盆': ['大理石圓盆', '繡球花材包', '大牛皮盒'],
-  '水泥六角擴香花盤': ['泥盤+乾棉', '小提袋'],
-  '浮游花瓶永生繡球夜燈': ['200ml洛克瓶', '繡球花材包', '大牛皮盒', '塑膠盒'],
-  '松果花藝名片座': ['松果底座', '小鑷子', '大提袋', '富貴豆'],
-  '工業風永生花': ['大理石八角盆', '繡球花材包', '大牛皮盒'],
-  '冬夜響鈴玫瑰永生花圈': ['鈴鐺', '永生玫瑰', '小鑷子', '大提袋'],
-  '永恆玫瑰玻璃盅永生花燈': ['花盅底座+電池', '繡球花材包', '開窗提袋'],
-  '熊熊愛上你擴香小熊': ['石膏熊熊', '白膠', '繡球花材包'],
-  '迎春花藝木框掛飾': ['框+乾棉', '大提袋', '白膠'],
-
-  // --- 多肉系列 ---
-  '多肉雙八角水泥盆': ['水泥包', '紙碗', '黑白多肉貼紙', '赤玉土'],
-  '微景觀多肉暈染石盆': ['石膏包', '紙碗', '小提袋', '赤玉土'],
-  '路燈叢林微景觀多肉梯盆': ['階梯盆', '赤玉土'],
-  '月牙多肉三角玻璃屋': ['月牙玻璃屋', '赤玉土'],
-  '微景觀多肉玻璃球': ['玻璃球', '赤玉土'], 
-  '能量礦石叢林生態瓶': ['生態玻璃盅', '礦石與裝飾小房子', '水草', '大提袋'],
-  '叢林多肉花圈': ['藤圈', '長鐵絲與短鐵支', '大提袋'],
-  '苔蘚生態玻璃球': ['裝飾小房子', '多肉專用土', '水草', '玻璃球'],
-
-  // --- 畫畫系列 ---
-  '水彩暈染星空畫': ['大小水彩筆', '水彩紙', '尺', '牙刷', '白色廣告顏料'],
-  '創作雙流體畫方形布畫與杯墊': ['方形畫布', '小冰棒棍', '養生膠帶', '膠台'],
-  '絢彩琉璃酒精畫': ['酒精顏料', '畫紙', '大牛皮紙袋', '酒精罐'],
-  '經典北歐酒精畫木托盤': ['酒精顏料', '畫紙', '黑提袋', '酒精罐'],
-  '六角石盤流體畫杯墊': ['流體顏料包', '海綿腳墊貼', '小提袋'],
-  '金箔肌理畫': ['大排刷', '扇形刷', '畫刀', '小鑷子'],
-  '雙流體熊圓形布畫': ['紙碗', '小冰棒棍', '養生膠帶', '膠台'],
-
-  // --- 蠟燭系列 ---
-  '南瓜鐵藝乾燥花蠟燭': ['南瓜容器', '塑膠盒', '蛋糕盒底座', '大紙杯'],
-  '黑曜石松果香氛蠟燭': ['黑曜石鐵盒', '熱風槍', '拉菲草', '墊片'],
-  '微醺調酒香氛蠟燭（含調酒）': ['玻璃杯', '冰塊蠟', '美工刀', '2ml精油'],
-  '乾燥花擴香蠟片': ['蠟片模具', '鐵釦', '蠟片花材包', '抽屜盒'],
-  '告白蠟燭漂流木燭台': ['漂流木燭台組', '長尾夾', '漂流木花材包', '蛋糕盒'],
-  '鐵罐乾燥花香氛蠟燭': ['鐵罐', '5ml精油', '細燭芯', '大豆軟蠟'],
-  '乾燥花圈精油手工皂': ['透明皂基', '塑膠盒', '花圈模具', '皂鋼杯'],
-  '乾燥花圈香氛手工皂': ['透明皂基', '塑膠盒', '花圈模具', '皂鋼杯'], 
-  '聖誕燭台': ['高腳杯', '小玻璃杯', '花材包', '橙片'], 
-  '乾燥花玻璃杯燭台': ['高腳杯', '小玻璃杯', '花材包', '橙片'], 
-  '花圈香氛蠟片': ['圓蠟片模具', '鐵釦', '花材包', '1/2橙片'],
-  '馬芬甜點香氛蠟燭': ['馬芬蛋糕杯', '5ml精油', '細燭芯', '塑膠盒'],
-  '果凍海洋蠟燭杯': ['玻璃杯+蓋子', '貝殼砂', '細燭芯', '小牛皮盒+繩'],
-
-  // --- 環氧系列 & 水晶系列 ---
-  '環氧夜燈': ['英文模具', '燈座', 'ＡＢ膠', '環氧顏料'],
-  '海洋風情托盤與雙杯墊': ['熱風槍', '托盤', '杯墊', '環氧顏料'],
-  '手作輕寶石水晶手鍊': ['水晶講義', '出課水晶', '剪刀', '長尾夾'],
-  '招財水晶樹': ['水晶樹枝', 'moss草', '吊牌', '尖嘴鉗'],
-  '純淨水晶礦石吊飾': ['小卡', '出課水晶（要帶吊牌）', '剪刀', '35cm鐵絲'],
-
-  // --- 法式調香系列 ---
-  '法式香水精油調香': ['調香講義', '黑抽屜盒', '抽屜盒蓋子', '原子筆'],
-  '玻尿酸天然精油調香沐浴精': ['講義', '原子筆', '水量壺', '刻度量杯'],
-};
 
 
-// ========== 車馬費表 (完整版) ==========
-
-const TRANSPORT_FEES = {
-  台北市: {
-    default: 0,
-    zones: {
-      中正區: 500,
-      大同區: 500,
-      中山區: 500,
-      大安區: 500,
-      萬華區: 500,
-      信義區: 500,
-      文山區: 800,
-      松山區: 800,
-      士林區: 800,
-      北投區: 800,
-      南港區: 1000,
-      內湖區: 1000,
-      陽明山: 1000,
-    },
-  },
-  新北市: {
-    default: 0,
-    zones: {
-      新莊區: 500,
-      板橋區: 500,
-      三重區: 500,
-      中和區: 500,
-      永和區: 500,
-      林口區: 1000,
-      五股區: 1000,
-      泰山區: 1000,
-      蘆洲區: 1000,
-      新店區: 1000,
-      深坑區: 1000,
-      石碇區: 1000,
-      汐止區: 1000,
-      土城區: 1000,
-      樹林區: 1000,
-      淡水區: 1500,
-      雙溪區: 1500,
-      三芝區: 1500,
-      三峽區: 1500,
-      鶯歌區: 1500,
-      烏來區: 1500,
-      八里區: 1800,
-      萬里區: 1800,
-      金山區: 1800,
-      石門區: 1800,
-      瑞芳區: 1800,
-      平溪區: 1800,
-      坪林區: 1800,
-      貢寮區: 1800,
-    },
-  },
-  基隆市: { default: 2000, zones: {} },
-  桃園市: { default: 2000, zones: {} },
-  新竹縣市: { default: 2500, zones: {} },
-  宜蘭縣: { default: 2500, holiday: 3500, zones: {} },
-  苗栗縣: { default: 2800, zones: {} },
-  '台中市(北部出發)': { default: 3500, zones: {} },
-  '彰化縣(北部出發)': { default: 3800, zones: {} },
-  '南投縣(北部出發)': { default: 4800, zones: {} },
-  '雲林縣(北部出發)': { default: 5000, zones: {} },
-  '嘉義縣市(北部出發)': { default: 5500, zones: {} },
-  '台南市(北部出發)': { default: 6500, zones: {} },
-  '高雄市(北部出發)': { default: 6500, zones: {} },
-
-  台中市: {
-    default: 0,
-    zones: {
-      中區: 500,
-      東區: 500,
-      南區: 500,
-      西區: 500,
-      北區: 500,
-      西屯區: 500,
-      南屯區: 500,
-      北屯區: 500,
-      太平區: 800,
-      大里區: 800,
-      霧峰區: 800,
-      烏日區: 800,
-      豐原區: 1200,
-      后里區: 1200,
-      石岡區: 1200,
-      東勢區: 1200,
-      和平區: 1200,
-      新社區: 1200,
-      潭子區: 1200,
-      大雅區: 1200,
-      神岡區: 1200,
-      大肚區: 1200,
-      外埔區: 1200,
-      沙鹿區: 1500,
-      龍井區: 1500,
-      梧棲區: 1500,
-      清水區: 1500,
-      大甲區: 1500,
-      大安區: 1500,
-    },
-  },
-  彰化縣: { default: 1800, zones: {} },
-  南投縣: { default: 1800, zones: {} },
-  '苗栗縣(中部出發)': { default: 1800, zones: {} },
-
-  高雄市: {
-    default: 0,
-    zones: {
-      前金區: 500,
-      新興區: 500,
-      鹽埕區: 500,
-      鼓山區: 500,
-      旗津區: 500,
-      左營區: 500,
-      楠梓區: 500,
-      三民區: 500,
-      苓雅區: 500,
-      前鎮區: 500,
-      小港區: 500,
-      鳳山區: 800,
-      大寮區: 800,
-      仁武區: 800,
-      大樹區: 800,
-      大社區: 800,
-      橋頭區: 800,
-      梓官區: 800,
-      鳥松區: 1000,
-      彌陀區: 1000,
-      永安區: 1000,
-      岡山區: 1000,
-      燕巢區: 1000,
-      阿蓮區: 1000,
-      路竹區: 1000,
-      林園區: 1500,
-      田寮區: 1500,
-      湖內區: 1500,
-      '山區(茂林/桃源等)': 2500,
-    },
-  },
-  台南市: { default: 1500, zones: {} },
-  嘉義縣市: { default: 2200, zones: {} },
-  '雲林縣(南部出發)': { default: 2500, zones: {} },
-  屏東縣: {
-    default: 0,
-    zones: {
-      屏東市區: 2000,
-      其他地區: 2500,
-    },
-  },
-};
-
-const getAvailableCities = (region) => {
-  if (region === 'North') {
-    return [
-      '台北市',
-      '新北市',
-      '基隆市',
-      '桃園市',
-      '新竹縣市',
-      '宜蘭縣',
-      '苗栗縣',
-      '台中市(北部出發)',
-      '彰化縣(北部出發)',
-      '南投縣(北部出發)',
-      '雲林縣(北部出發)',
-      '嘉義縣市(北部出發)',
-      '台南市(北部出發)',
-      '高雄市(北部出發)',
-    ];
-  }
-  if (region === 'Central') {
-    return ['台中市', '彰化縣', '南投縣', '苗栗縣(中部出發)'];
-  }
-  if (region === 'South') {
-    return ['高雄市', '台南市', '嘉義縣市', '屏東縣', '雲林縣(南部出發)'];
-  }
-  return [];
-};
+// 第 3 段：價格計算與車馬費去重邏輯
 
 // ========== 價格計算邏輯 ==========
 
@@ -698,6 +466,8 @@ const applyTransportDedup = (itemsWithCalc) => {
   });
 };
 
+// 第 4 段：UI 小元件、後台鎖定與報價單預覽 (含新增 Excel 下載按鈕 - 修正條款全文)
+
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
@@ -782,7 +552,7 @@ const AdminLock = ({ onUnlock }) => {
   );
 };
 
-// ========== 報價單預覽 ==========
+// ========== 報價單預覽 (PDF 顯示用) ==========
 
 const QuotePreview = ({
   clientInfo,
@@ -1229,11 +999,200 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== PreviewModal ==========
+// ========== PreviewModal (★ 新增 Excel 下載邏輯) ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
+
+  // ★★★ 新增：產生 Excel 的核心函式 (已修正條款全文) ★★★
+  const generateExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('報價單');
+
+    // 1. 設定欄寬 (模擬 PDF 版面)
+    // A: 項目, B: 單價, C: 人數, D: 小計
+    worksheet.columns = [
+      { key: 'A', width: 45 },
+      { key: 'B', width: 15 },
+      { key: 'C', width: 10 },
+      { key: 'D', width: 20 },
+    ];
+
+    // 2. 標題
+    const titleRow = worksheet.addRow(['下班隨手作活動報價單']);
+    worksheet.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
+    titleRow.getCell(1).font = { name: '微軟正黑體', size: 20, bold: true };
+    titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    
+    // 日期
+    const dateRow1 = worksheet.addRow(['', '', '', `報價日期: ${displayDateStr}`]);
+    worksheet.mergeCells(`A${dateRow1.number}:C${dateRow1.number}`); // 空白佔位
+    dateRow1.getCell(4).font = { size: 10 };
+    dateRow1.getCell(4).alignment = { horizontal: 'right' };
+
+    const dateRow2 = worksheet.addRow(['', '', '', '有效期限：3天']);
+    worksheet.mergeCells(`A${dateRow2.number}:C${dateRow2.number}`);
+    dateRow2.getCell(4).font = { size: 10, bold: true };
+    dateRow2.getCell(4).alignment = { horizontal: 'right' };
+
+    worksheet.addRow([]); // 空行
+
+    // 3. 雙欄資訊 (品牌單位 | 客戶資料)
+    const infoStartRow = worksheet.lastRow.number + 1;
+    
+    // 左邊：品牌單位
+    worksheet.getCell(`A${infoStartRow}`).value = '品牌單位';
+    worksheet.getCell(`A${infoStartRow}`).font = { bold: true, size: 12 };
+    worksheet.getCell(`A${infoStartRow}`).border = { bottom: { style: 'thin' } };
+    
+    worksheet.getCell(`A${infoStartRow + 1}`).value = '公司行號: 下班文化國際有限公司';
+    worksheet.getCell(`A${infoStartRow + 2}`).value = '統一編號: 83475827';
+    worksheet.getCell(`A${infoStartRow + 3}`).value = '聯絡電話: 02-2371-4171';
+    worksheet.getCell(`A${infoStartRow + 4}`).value = '聯絡人: 下班隨手作';
+
+    // 右邊：客戶資料 (合併 B, C, D)
+    const rightCol = 'B';
+    worksheet.getCell(`${rightCol}${infoStartRow}`).value = '客戶資料';
+    worksheet.mergeCells(`${rightCol}${infoStartRow}:D${infoStartRow}`);
+    worksheet.getCell(`${rightCol}${infoStartRow}`).font = { bold: true, size: 12 };
+    worksheet.getCell(`${rightCol}${infoStartRow}`).border = { bottom: { style: 'thin' } };
+
+    worksheet.getCell(`${rightCol}${infoStartRow + 1}`).value = `名稱: ${quote.clientInfo.companyName || '-'}`;
+    worksheet.mergeCells(`${rightCol}${infoStartRow + 1}:D${infoStartRow + 1}`);
+    
+    worksheet.getCell(`${rightCol}${infoStartRow + 2}`).value = `統編: ${quote.clientInfo.taxId || '-'}`;
+    worksheet.mergeCells(`${rightCol}${infoStartRow + 2}:D${infoStartRow + 2}`);
+
+    worksheet.getCell(`${rightCol}${infoStartRow + 3}`).value = `聯絡人: ${quote.clientInfo.contactPerson || '-'}`;
+    worksheet.mergeCells(`${rightCol}${infoStartRow + 3}:D${infoStartRow + 3}`);
+
+    worksheet.getCell(`${rightCol}${infoStartRow + 4}`).value = `電話: ${quote.clientInfo.phone || '-'}`;
+    worksheet.mergeCells(`${rightCol}${infoStartRow + 4}:D${infoStartRow + 4}`);
+
+    worksheet.addRow([]); // 空行
+    worksheet.addRow([]); 
+
+    // 4. 表格表頭
+    const headerRow = worksheet.addRow(['項目', '單價', '人數', '小計']);
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } }; // 深灰色
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+      cell.alignment = { horizontal: 'center' };
+    });
+    headerRow.getCell(1).alignment = { horizontal: 'left' }; // 項目靠左
+    headerRow.getCell(4).alignment = { horizontal: 'right' }; // 小計靠右
+
+    // 5. 填入項目
+    quote.items.forEach((item) => {
+        // 主要項目
+        const itemRow = worksheet.addRow([
+            item.courseName, 
+            item.price, 
+            item.peopleCount, 
+            item.calc.subTotal
+        ]);
+        itemRow.getCell(1).font = { bold: true };
+        itemRow.getCell(2).numFmt = '"$"#,##0';
+        itemRow.getCell(4).numFmt = '"$"#,##0';
+        itemRow.getCell(4).font = { bold: true };
+
+        // 備註/時間/地點 (顯示在同一格，換行)
+        let details = [];
+        if (item.itemNote) details.push(`[備註] ${item.itemNote}`);
+        if (item.eventDate) details.push(`時間: ${formatDateWithDay(item.eventDate)} ${item.timeRange || ''}`);
+        if (item.address) details.push(`地點: ${item.address}`);
+        
+        if (details.length > 0) {
+            const detailRow = worksheet.addRow([details.join('\n')]);
+            worksheet.mergeCells(`A${detailRow.number}:D${detailRow.number}`);
+            detailRow.height = details.length * 15; // 自動調整高度
+            detailRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+            detailRow.getCell(1).font = { color: { argb: 'FF666666' }, size: 10 };
+        }
+
+        // 折扣
+        if (item.calc.isDiscountApplied || item.customDiscount > 0) {
+            const val = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
+            const row = worksheet.addRow(['', '', '折扣優惠', -val]);
+            worksheet.mergeCells(`A${row.number}:B${row.number}`);
+            row.getCell(3).font = { color: { argb: 'FFFF0000' } }; // 紅字
+            row.getCell(4).font = { color: { argb: 'FFFF0000' }, bold: true };
+            row.getCell(4).numFmt = '"-$"#,##0';
+        }
+
+        // 車馬費
+        if (item.calc.transportFee > 0) {
+            const row = worksheet.addRow(['', '', '車馬費', item.calc.transportFee]);
+            worksheet.mergeCells(`A${row.number}:B${row.number}`);
+            row.getCell(3).value = `車馬費 (${item.city}${item.area})`;
+            row.getCell(4).numFmt = '"+"$"#,##0';
+        }
+
+        // 師資費
+        if (item.calc.teacherFee > 0) {
+            const row = worksheet.addRow(['', '', '師資費', item.calc.teacherFee]);
+            worksheet.mergeCells(`A${row.number}:B${row.number}`);
+            row.getCell(4).numFmt = '"+"$"#,##0';
+        }
+
+        // 額外費用
+        if (item.extraFees) {
+            item.extraFees.filter(f => f.isEnabled).forEach(fee => {
+                const row = worksheet.addRow(['', '', `加價: ${fee.description}`, parseInt(fee.amount)]);
+                worksheet.mergeCells(`A${row.number}:B${row.number}`);
+                row.getCell(4).numFmt = '"+"$"#,##0';
+            });
+        }
+
+        // 稅金
+        if (item.hasInvoice) {
+            const row = worksheet.addRow(['', '', '營業稅 (5%)', item.calc.tax]);
+            worksheet.mergeCells(`A${row.number}:B${row.number}`);
+            row.getCell(4).numFmt = '"+"$"#,##0';
+        }
+
+        // 項目分隔線
+        worksheet.addRow([]);
+    });
+
+    // 6. 總金額
+    worksheet.addRow([]);
+    const totalRow = worksheet.addRow(['', '', '總金額', totalAmount]);
+    worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`); // 空白
+    totalRow.getCell(3).font = { size: 14, bold: true };
+    totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF0000FF' } }; // 藍色
+    totalRow.getCell(4).numFmt = '"$"#,##0';
+    totalRow.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' };
+    totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
+
+    // 7. 注意事項
+    worksheet.addRow([]);
+    const noteTitle = worksheet.addRow(['注意事項 / 條款：']);
+    noteTitle.getCell(1).font = { bold: true };
+    
+    const notes = [
+        '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+        '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
+        '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
+        '4. 客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
+        '5. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
+        '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
+        '銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201'
+    ];
+
+    notes.forEach(note => {
+        const r = worksheet.addRow([note]);
+        worksheet.mergeCells(`A${r.number}:D${r.number}`);
+        r.getCell(1).alignment = { wrapText: true };
+        if (note.includes('付款方式')) r.getCell(1).font = { color: { argb: 'FFFF0000' }, bold: true }; // 紅字強調
+    });
+
+    // 匯出
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `${quote.clientInfo.companyName || '報價單'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
@@ -1287,6 +1246,15 @@ const PreviewModal = ({ quote, onClose }) => {
               </span>
             </label>
 
+            {/* ★★★ 新增：下載編輯檔按鈕 ★★★ */}
+            <button
+              onClick={generateExcel}
+              className="px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 flex items-center shadow"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              下載編輯檔 (Excel)
+            </button>
+
             <button
               onClick={handleDownload}
               className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
@@ -1322,6 +1290,8 @@ const PreviewModal = ({ quote, onClose }) => {
     </div>
   );
 };
+
+// 第 5 段：QuoteCreator (新增/編輯報價單)
 
 //第四部份 ========== QuoteCreator ==========
 
@@ -1604,14 +1574,14 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           {/* ★★★ 新增：內部備註輸入框 ★★★ */}
           <div className="mt-4 pt-4 border-t border-gray-100">
              <label className="block text-sm font-bold text-red-600 mb-1 flex items-center">
-                <Lock className="w-3 h-3 mr-1"/> 內部備註 (不會顯示在報價單上，僅顯示於行事曆)
+               <Lock className="w-3 h-3 mr-1"/> 內部備註 (不會顯示在報價單上，僅顯示於行事曆)
              </label>
              <textarea
-                className={INPUT_CLASS}
-                rows="2"
-                placeholder="例如：客戶偏好、注意事項、內部交代事項..."
-                value={internalNote}
-                onChange={(e) => setInternalNote(e.target.value)}
+               className={INPUT_CLASS}
+               rows="2"
+               placeholder="例如：客戶偏好、注意事項、內部交代事項..."
+               value={internalNote}
+               onChange={(e) => setInternalNote(e.target.value)}
              />
           </div>
         </section>
@@ -1777,7 +1747,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     
                     {/* ★★★ 新增：是否套用車馬費 ★★★ */}
                     <div className="md:col-span-3">
-                         <label className="flex items-center cursor-pointer select-none">
+                          <label className="flex items-center cursor-pointer select-none">
                             <input 
                                 type="checkbox" 
                                 className="mr-2 w-4 h-4 text-blue-600" 
@@ -1785,7 +1755,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                                 onChange={(e) => updateItem(idx, 'applyTransportFee', e.target.checked)} 
                             />
                             <span className="text-sm font-bold text-gray-700">是否計算車馬費？ (取消勾選則車馬費為 $0)</span>
-                         </label>
+                          </label>
                     </div>
 
                   </div>
@@ -1869,6 +1839,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     </div>
   );
 };
+
+// 第 6 段：統計頁面、備註與材料元件
 
 // 第五部份========== 統計頁面 (含北中南對比圖) ==========
 
@@ -2194,7 +2166,9 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
-// ========== 備課表 View (修正版：修復人員新增Bug, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
+// 第 7 段：備課表 (PreparationView)
+
+// ========== 備課表 View ==========
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   const validQuotes = quotes.filter(
     (q) => q.status === 'confirmed' || q.status === 'paid',
@@ -2242,9 +2216,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   };
 
   const addStaff = (e) => {
-    // ★★★ 修正：防止事件冒泡與預設行為 ★★★
     if (e) e.preventDefault();
-    
     if (newStaffName.trim()) {
       const name = newStaffName.trim();
       const currentList = staffData[currentRegion] || [];
@@ -2382,11 +2354,11 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                 <div className="flex gap-2">
                      {['North', 'Central', 'South'].map(r => (
                          <button
-                            key={r}
-                            onClick={() => setCurrentRegion(r)}
-                            className={`px-3 py-1 rounded text-sm font-bold border ${currentRegion === r ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}
+                           key={r}
+                           onClick={() => setCurrentRegion(r)}
+                           className={`px-3 py-1 rounded text-sm font-bold border ${currentRegion === r ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}
                          >
-                            {r === 'North' ? '北部' : r === 'Central' ? '中部' : '南部'}
+                           {r === 'North' ? '北部' : r === 'Central' ? '中部' : '南部'}
                          </button>
                      ))}
                      <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -2429,7 +2401,6 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
               )}
             </span>
           ))}
-          {/* ★★★ 修改：按鈕樣式與事件綁定，確保能點擊 ★★★ */}
           {canEditStaff && (
               <div className="flex items-center ml-2">
                 <input 
@@ -2505,8 +2476,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                                 </label>
                                 <div className="flex items-center">
                                     <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500 mr-1" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
-                                        <option value="">未指派</option>
-                                        {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
+                                            <option value="">未指派</option>
+                                            {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
                                     </select>
                                     <button onClick={() => handleRemoveCustomMaterial(item.quoteId, item.itemIdx, mat)} className="text-gray-400 hover:text-red-500 p-1 rounded"><X className="w-3 h-3" /></button>
                                 </div>
@@ -2528,7 +2499,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   );
 };
 
-// ========== 第七部分行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉) ==========
+// 第 8 段：行事曆視圖 (CalendarView)
 
 // ========== 行事曆視圖 (含連結生成功能 + 強制區域鎖定 + 互相跳轉 + 週視圖 + 手機點擊修復) ==========
 
@@ -2819,7 +2790,7 @@ const CalendarView = ({
                       </div>
                   )}
                   {evt.type === 'regular' && (
-                     <div className="text-sm text-gray-500 mt-1"><MapPin className="w-4 h-4 inline mr-1"/>{evt.location}</div>
+                      <div className="text-sm text-gray-500 mt-1"><MapPin className="w-4 h-4 inline mr-1"/>{evt.location}</div>
                   )}
                 </div>
               </div>
@@ -2919,9 +2890,9 @@ const CalendarView = ({
     </div>
   );
 };
+// 第 9 段：報價單列表 (QuoteList) 與 主程式 (App)
 
-// ========== 第八部份報價單列表 (★ 修正：回復原狀無區域 Tabs，保留 CSV 完整功能) ==========
-
+// ========== 報價單列表 (★ 修正：移除發票按鈕) ==========
 
 const QuoteList = ({
   quotes,
@@ -2937,7 +2908,7 @@ const QuoteList = ({
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState('all'); // 月份過濾
   const [filterStatus, setFilterStatus] = useState('all'); // 狀態過濾
-  const [filterRegion, setFilterRegion] = useState('all'); // ★ 新增區域過濾
+  const [filterRegion, setFilterRegion] = useState('all'); // ★ 區域過濾
   const fileInputRef = useRef(null);
 
   // 計算可用月份
@@ -3157,7 +3128,7 @@ const QuoteList = ({
 
           {/* 過濾器區域 */}
           <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-            {/* ★★★ 新增：區域篩選 Tabs ★★★ */}
+            {/* 區域篩選 Tabs */}
             <div className="flex bg-white rounded p-0.5 border border-gray-200 mr-2">
                 {['all', 'North', 'Central', 'South'].map((r) => (
                     <button
@@ -3184,7 +3155,6 @@ const QuoteList = ({
               ))}
             </select>
             <div className="w-px h-4 bg-gray-300 mx-1"></div>
-            {/* ★ 修改：過濾選項只剩四種 */}
             <select
               className="bg-transparent text-sm border-none focus:ring-0 text-gray-700 font-bold cursor-pointer"
               value={filterStatus}
@@ -3319,7 +3289,7 @@ const QuoteList = ({
                   </td>
                   <td className="px-4 py-2 text-right align-middle">
                     <div className="flex justify-end gap-2">
-                      {/* ★ 修改：款項按鈕 - 只有已付訂 (paid) 顯示 */}
+                      {/* 款項按鈕 - 只有已付訂 (paid) 顯示 */}
                       {q.status === 'paid' && (
                         <button
                           onClick={() => onOpenPayment(q)}
@@ -3329,6 +3299,8 @@ const QuoteList = ({
                           $
                         </button>
                       )}
+
+                      {/* ★ 注意：已移除「發票」按鈕 */}
 
                       <button
                         onClick={() => onPreview(q)}
@@ -3363,7 +3335,7 @@ const QuoteList = ({
   );
 };
 
-// ========== App 主程式 (★ 修正：路由與安全鎖定邏輯) ==========
+// ========== App 主程式 (★ 修正：移除 InvoiceModal 渲染與狀態) ==========
 
 const App = () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -3380,6 +3352,8 @@ const App = () => {
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
   const [paymentQuote, setPaymentQuote] = useState(null); // 款項 Modal
+  
+  // ★ 已移除: const [invoiceQuote, setInvoiceQuote] = useState(null);
 
   // ★ 新增：解鎖狀態 (預設 false)
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -3579,7 +3553,7 @@ const App = () => {
     return (
       <div className="min-h-screen bg-gray-100 py-4">
         {urlView === 'prep' ? (
-             <PreparationView 
+              <PreparationView 
                 quotes={quotes} 
                 onUpdateQuote={handleUpdateQuoteDirect}
                 publicMode 
