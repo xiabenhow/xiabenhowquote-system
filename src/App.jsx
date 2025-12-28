@@ -1234,7 +1234,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-/// ========== PreviewModal ==========
+// ========== PreviewModal (修正 Excel PDF 轉檔錯誤 + 印章顯示) ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1270,26 +1270,13 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★★★ 修改：下載 Excel 編輯檔 (加入印章圖片 + 修正列印設定) ★★★
+  // ★★★ 修改：下載 Excel 編輯檔 (修復 PDF 轉檔錯誤 + 確保印章顯示) ★★★
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // ★ 設定列印屬性 (解決轉存 PDF 報錯問題)
-      sheet.pageSetup = {
-        paperSize: 9, // 9 = A4
-        orientation: 'portrait',
-        fitToPage: true, // 強制縮放至一頁寬
-        fitToWidth: 1,
-        fitToHeight: 0, // 高度不限
-        margins: {
-          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
-          header: 0.3, footer: 0.3
-        }
-      };
-
-      // 設定欄寬
+      // 1. 設定基本欄寬
       sheet.columns = [
         { header: '', key: 'item', width: 40 }, 
         { header: '', key: 'price', width: 15 }, 
@@ -1297,14 +1284,14 @@ const PreviewModal = ({ quote, onClose }) => {
         { header: '', key: 'total', width: 20 }, 
       ];
 
-      // 標題
+      // 2. 標題
       sheet.mergeCells('A1:D1');
       const titleCell = sheet.getCell('A1');
       titleCell.value = '下班隨手作活動報價單';
       titleCell.font = { size: 20, bold: true };
       titleCell.alignment = { horizontal: 'center' };
 
-      // 日期
+      // 3. 日期
       sheet.mergeCells('A2:D2');
       const dateCell = sheet.getCell('A2');
       dateCell.value = `報價日期: ${displayDateStr} (有效期限：3天)`;
@@ -1312,7 +1299,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
 
-      // 品牌與客戶資料
+      // 4. 品牌與客戶資料
       sheet.addRow(['品牌單位', '', '客戶資料', '']);
       ['A4', 'C4'].forEach(key => {
         const cell = sheet.getCell(key);
@@ -1327,7 +1314,7 @@ const PreviewModal = ({ quote, onClose }) => {
       
       sheet.addRow([]);
 
-      // 表格標頭
+      // 5. 表格標頭
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
@@ -1335,7 +1322,7 @@ const PreviewModal = ({ quote, onClose }) => {
         cell.border = { bottom: { style: 'thin' } };
       });
 
-      // 內容填充
+      // 6. 內容填充
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
         const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
@@ -1388,7 +1375,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
 
-      // 總金額
+      // 7. 總金額
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
       totalRow.getCell(3).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
       totalRow.getCell(4).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
@@ -1396,7 +1383,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
       
-      // 條款
+      // 8. 條款
       sheet.addRow(['注意事項 / 條款：']);
       sheet.addRow(['1. 本報價單有效時間以接到合作案3天為主...']);
       sheet.addRow(['2. 人數以報價單協議人數為主...']);
@@ -1407,34 +1394,51 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.addRow([]);
       sheet.addRow([]);
 
-      // 簽名欄位置
+      // 9. 簽名欄 (紀錄行號以便插入圖片)
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
       
       // ★★★ 處理印章圖片 ★★★
       if (isSigned) {
         try {
-          // 1. 抓取印章圖片
+          // 抓取印章圖片 (使用 fetch 轉 arrayBuffer)
+          // 注意：請確保 public 資料夾下有 stamp.png
           const response = await fetch(STAMP_URL);
           const buffer = await response.arrayBuffer();
           
-          // 2. 加入 Workbook
           const imageId = workbook.addImage({
             buffer: buffer,
             extension: 'png',
           });
 
-          // 3. 放置到 Worksheet (定位在簽名欄上方)
-          // `signRow.number` 是目前的行號，我們稍微往上放一點
+          // 放置圖片：col: 0.2 代表在 A 欄稍微往右, row: 簽名欄行號 - 2.5 代表往上浮動
           sheet.addImage(imageId, {
-            tl: { col: 0.2, row: signRow.number - 2.5 }, // 左上角座標 (col, row)
-            ext: { width: 150, height: 150 }, // 圖片大小
-            editAs: 'oneCell'
+            tl: { col: 0.2, row: signRow.number - 2.5 }, 
+            ext: { width: 150, height: 150 },
+            editAs: 'oneCell' // 重要：讓圖片附著在儲存格上
           });
         } catch (imgErr) {
           console.error("無法載入印章圖片", imgErr);
-          alert("印章圖片載入失敗，Excel 將不會顯示印章");
+          // 不跳 alert 干擾流程，直接忽略印章繼續下載
         }
       }
+
+      // ★★★ 關鍵修正：設定列印範圍與紙張 (解決 PDF 轉檔報錯) ★★★
+      // 計算目前總行數
+      const totalRows = sheet.rowCount;
+      sheet.pageSetup = {
+        paperSize: 9, // A4
+        orientation: 'portrait',
+        fitToPage: true, // 強制調整成一頁寬
+        fitToWidth: 1,
+        fitToHeight: 0, // 高度自動延伸
+        horizontalCentered: true, // 水平置中
+        margins: {
+          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
+          header: 0.3, footer: 0.3
+        },
+        // ★ 強制指定列印區域：從 A1 到 D欄的最後一行 + 緩衝
+        printArea: `A1:D${totalRows + 2}`
+      };
 
       // 匯出
       const buffer = await workbook.xlsx.writeBuffer();
@@ -1443,7 +1447,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
     } catch (err) {
       console.error('Excel export failed', err);
-      alert('Excel 產生失敗');
+      alert('Excel 產生失敗: ' + err.message);
     }
   };
 
