@@ -1234,7 +1234,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== PreviewModal ==========
+/// ========== PreviewModal ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1270,18 +1270,31 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★★★ 新增：下載 Excel 編輯檔 (使用 exceljs) ★★★
+  // ★★★ 修改：下載 Excel 編輯檔 (加入印章圖片 + 修正列印設定) ★★★
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 設定欄寬 (模擬 A4 配置)
+      // ★ 設定列印屬性 (解決轉存 PDF 報錯問題)
+      sheet.pageSetup = {
+        paperSize: 9, // 9 = A4
+        orientation: 'portrait',
+        fitToPage: true, // 強制縮放至一頁寬
+        fitToWidth: 1,
+        fitToHeight: 0, // 高度不限
+        margins: {
+          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
+          header: 0.3, footer: 0.3
+        }
+      };
+
+      // 設定欄寬
       sheet.columns = [
-        { header: '', key: 'item', width: 40 }, // A: 項目
-        { header: '', key: 'price', width: 15 }, // B: 單價
-        { header: '', key: 'count', width: 10 }, // C: 人數
-        { header: '', key: 'total', width: 20 }, // D: 小計
+        { header: '', key: 'item', width: 40 }, 
+        { header: '', key: 'price', width: 15 }, 
+        { header: '', key: 'count', width: 10 }, 
+        { header: '', key: 'total', width: 20 }, 
       ];
 
       // 標題
@@ -1291,25 +1304,20 @@ const PreviewModal = ({ quote, onClose }) => {
       titleCell.font = { size: 20, bold: true };
       titleCell.alignment = { horizontal: 'center' };
 
-      // 日期 (右對齊)
+      // 日期
       sheet.mergeCells('A2:D2');
       const dateCell = sheet.getCell('A2');
       dateCell.value = `報價日期: ${displayDateStr} (有效期限：3天)`;
       dateCell.alignment = { horizontal: 'right' };
 
-      sheet.addRow([]); // 空行
+      sheet.addRow([]);
 
-      // 品牌與客戶資料 (使用簡單的 Row 插入)
+      // 品牌與客戶資料
       sheet.addRow(['品牌單位', '', '客戶資料', '']);
-      // 設定標題樣式
       ['A4', 'C4'].forEach(key => {
         const cell = sheet.getCell(key);
         cell.font = { bold: true };
-        cell.fill = {
-           type: 'pattern',
-           pattern: 'solid',
-           fgColor: { argb: 'FFF3F4F6' } // bg-gray-50
-        };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
       });
 
       sheet.addRow(['公司: 下班文化國際有限公司', '', `名稱: ${quote.clientInfo.companyName || ''}`, '']);
@@ -1317,88 +1325,64 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.addRow(['電話: 02-2371-4171', '', `電話: ${quote.clientInfo.phone || ''}`, '']);
       sheet.addRow(['聯絡人: 下班隨手作', '', `聯絡人: ${quote.clientInfo.contactPerson || ''}`, '']);
       
-      sheet.addRow([]); // 空行
+      sheet.addRow([]);
 
       // 表格標頭
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
       headerRow.eachCell((cell) => {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF1F2937' }, // gray-800
-        };
-        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }; // white
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
         cell.border = { bottom: { style: 'thin' } };
       });
 
-      // 課程項目資料填充
+      // 內容填充
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
         const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
         const addressText = item.address ? `地點：${item.address}` : '';
         
-        // 項目名稱與備註
         const itemName = item.courseName + (item.itemNote ? ` (備註: ${item.itemNote})` : '');
         const itemDesc = [itemName, dateText, addressText].filter(Boolean).join('\n');
 
         const row = sheet.addRow([
-          itemDesc,
-          item.price,
-          item.peopleCount,
-          item.calc.subTotal
+          itemDesc, item.price, item.peopleCount, item.calc.subTotal
         ]);
         
         row.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         row.getCell(2).numFmt = '"$"#,##0';
         row.getCell(4).numFmt = '"$"#,##0';
 
-        // 折扣行
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
             const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
-            const discRow = sheet.addRow([
-                `折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, 
-                '', 
-                '', 
-                -discountAmount
-            ]);
-            discRow.getCell(1).font = { color: { argb: 'FFDC2626' } }; // red-600
+            const discRow = sheet.addRow([`折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, '', '', -discountAmount]);
+            discRow.getCell(1).font = { color: { argb: 'FFDC2626' } };
             discRow.getCell(4).font = { color: { argb: 'FFDC2626' }, bold: true };
             discRow.getCell(4).numFmt = '-"$"#,##0';
         }
 
-        // 車馬費
         if (item.calc.transportFee > 0) {
-            const transRow = sheet.addRow([
-                `車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee
-            ]);
-            transRow.getCell(1).font = { color: { argb: 'FF065F46' } }; // green
+            const transRow = sheet.addRow([`車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee]);
+            transRow.getCell(1).font = { color: { argb: 'FF065F46' } };
             transRow.getCell(4).numFmt = '+"$"#,##0';
         }
         
-        // 額外費用
         if (item.extraFees) {
             item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-                 const feeRow = sheet.addRow([
-                    `額外加價 (${fee.description})`, '', '', parseInt(fee.amount)
-                 ]);
+                 const feeRow = sheet.addRow([`額外加價 (${fee.description})`, '', '', parseInt(fee.amount)]);
                  feeRow.getCell(1).font = { color: { argb: 'FF065F46' } };
                  feeRow.getCell(4).numFmt = '+"$"#,##0';
             });
         }
 
-        // 營業稅
         if (item.hasInvoice) {
              const taxRow = sheet.addRow(['營業稅 (5%)', '', '', item.calc.tax]);
              taxRow.getCell(1).font = { color: { argb: 'FF065F46' } };
              taxRow.getCell(4).numFmt = '+"$"#,##0';
         }
         
-        // 項目總計
         const subTotalRow = sheet.addRow(['項目總計', '', '', item.calc.finalTotal]);
         subTotalRow.font = { bold: true };
         subTotalRow.getCell(4).numFmt = '"$"#,##0';
-        
-        // 分隔線
         subTotalRow.border = { bottom: { style: 'thin' } };
       });
 
@@ -1406,28 +1390,53 @@ const PreviewModal = ({ quote, onClose }) => {
 
       // 總金額
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
-      totalRow.getCell(3).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } }; // blue-900
+      totalRow.getCell(3).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
       totalRow.getCell(4).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
       totalRow.getCell(4).numFmt = '"$"#,##0';
 
       sheet.addRow([]);
       
-      // 注意事項
+      // 條款
       sheet.addRow(['注意事項 / 條款：']);
       sheet.addRow(['1. 本報價單有效時間以接到合作案3天為主...']);
       sheet.addRow(['2. 人數以報價單協議人數為主...']);
       sheet.addRow(['3. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金...']);
-      
       const bankRow = sheet.addRow(['銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201']);
       bankRow.font = { bold: true };
       
       sheet.addRow([]);
       sheet.addRow([]);
 
-      // 簽名欄
-      sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
+      // 簽名欄位置
+      const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
       
-      // 匯出檔案
+      // ★★★ 處理印章圖片 ★★★
+      if (isSigned) {
+        try {
+          // 1. 抓取印章圖片
+          const response = await fetch(STAMP_URL);
+          const buffer = await response.arrayBuffer();
+          
+          // 2. 加入 Workbook
+          const imageId = workbook.addImage({
+            buffer: buffer,
+            extension: 'png',
+          });
+
+          // 3. 放置到 Worksheet (定位在簽名欄上方)
+          // `signRow.number` 是目前的行號，我們稍微往上放一點
+          sheet.addImage(imageId, {
+            tl: { col: 0.2, row: signRow.number - 2.5 }, // 左上角座標 (col, row)
+            ext: { width: 150, height: 150 }, // 圖片大小
+            editAs: 'oneCell'
+          });
+        } catch (imgErr) {
+          console.error("無法載入印章圖片", imgErr);
+          alert("印章圖片載入失敗，Excel 將不會顯示印章");
+        }
+      }
+
+      // 匯出
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `${quote.clientInfo.companyName || '報價單'}_編輯檔.xlsx`;
       saveAs(new Blob([buffer]), fileName);
@@ -1460,7 +1469,7 @@ const PreviewModal = ({ quote, onClose }) => {
               </span>
             </label>
 
-            {/* ★★★ 新增：下載 Excel 按鈕 ★★★ */}
+            {/* 下載 Excel 按鈕 */}
             <button
               onClick={handleDownloadExcel}
               className="px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 flex items-center shadow"
