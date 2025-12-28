@@ -1003,10 +1003,10 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false); // ★★★ 新增：載入狀態
+  const [isGenerating, setIsGenerating] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
 
-  // ★★★ 修正：產生 Excel 的核心函式 (加上錯誤處理與載入狀態) ★★★
+  // ★★★ 修正：產生 Excel 的核心函式 (加上更多樣式) ★★★
   const generateExcel = async () => {
     if (isGenerating) return;
     setIsGenerating(true);
@@ -1014,19 +1014,16 @@ const PreviewModal = ({ quote, onClose }) => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定欄寬 (模擬 PDF 版面)
       worksheet.columns = [
         { key: 'A', width: 45 }, { key: 'B', width: 15 },
         { key: 'C', width: 10 }, { key: 'D', width: 20 },
       ];
 
-      // 2. 標題
       const titleRow = worksheet.addRow(['下班隨手作活動報價單']);
       worksheet.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
       titleRow.getCell(1).font = { name: '微軟正黑體', size: 20, bold: true };
       titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
       
-      // 日期
       const dateRow1 = worksheet.addRow(['', '', '', `報價日期: ${displayDateStr}`]);
       worksheet.mergeCells(`A${dateRow1.number}:C${dateRow1.number}`);
       dateRow1.getCell(4).font = { size: 10 };
@@ -1037,7 +1034,6 @@ const PreviewModal = ({ quote, onClose }) => {
       dateRow2.getCell(4).alignment = { horizontal: 'right' };
       worksheet.addRow([]);
 
-      // 3. 雙欄資訊
       const infoStartRow = worksheet.lastRow.number + 1;
       worksheet.getCell(`A${infoStartRow}`).value = '品牌單位';
       worksheet.getCell(`A${infoStartRow}`).font = { bold: true, size: 12 };
@@ -1063,7 +1059,6 @@ const PreviewModal = ({ quote, onClose }) => {
       worksheet.addRow([]);
       worksheet.addRow([]);
 
-      // 4. 表格表頭
       const headerRow = worksheet.addRow(['項目', '單價', '人數', '小計']);
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
@@ -1073,7 +1068,6 @@ const PreviewModal = ({ quote, onClose }) => {
       headerRow.getCell(1).alignment = { horizontal: 'left' };
       headerRow.getCell(4).alignment = { horizontal: 'right' };
 
-      // 5. 填入項目
       quote.items.forEach((item) => {
           const itemRow = worksheet.addRow([item.courseName, item.price, item.peopleCount, item.calc.subTotal]);
           itemRow.getCell(1).font = { bold: true };
@@ -1100,44 +1094,66 @@ const PreviewModal = ({ quote, onClose }) => {
               row.getCell(3).font = { color: { argb: 'FFFF0000' } };
               row.getCell(4).font = { color: { argb: 'FFFF0000' }, bold: true };
               row.getCell(4).numFmt = '"-$"#,##0';
+              row.eachCell(c => c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF0F0' } }); // 淡紅色背景
           }
 
           if (item.calc.transportFee > 0) {
               const row = worksheet.addRow(['', '', `車馬費 (${item.city}${item.area})`, item.calc.transportFee]);
               worksheet.mergeCells(`A${row.number}:B${row.number}`);
-              row.getCell(4).numFmt = '"+""$"#,##0';
+              row.getCell(4).numFmt = '"+"#,##0';
           }
           if (item.calc.teacherFee > 0) {
               const row = worksheet.addRow(['', '', '師資費', item.calc.teacherFee]);
               worksheet.mergeCells(`A${row.number}:B${row.number}`);
-              row.getCell(4).numFmt = '"+""$"#,##0';
+              row.getCell(4).numFmt = '"+"#,##0';
           }
           if (item.extraFees) {
               item.extraFees.filter(f => f.isEnabled).forEach(fee => {
                   const row = worksheet.addRow(['', '', `加價: ${fee.description}`, parseInt(fee.amount)]);
                   worksheet.mergeCells(`A${row.number}:B${row.number}`);
-                  row.getCell(4).numFmt = '"+""$"#,##0';
+                  row.getCell(4).numFmt = '"+"#,##0';
               });
           }
           if (item.hasInvoice) {
               const row = worksheet.addRow(['', '', '營業稅 (5%)', item.calc.tax]);
               worksheet.mergeCells(`A${row.number}:B${row.number}`);
-              row.getCell(4).numFmt = '"+""$"#,##0';
+              row.getCell(4).numFmt = '"+"#,##0';
           }
+          
+          // ★★★ 新增：項目總計列 ★★★
+          const itemTotalRow = worksheet.addRow(['', '', '項目總計', item.calc.finalTotal]);
+          worksheet.mergeCells(`A${itemTotalRow.number}:B${itemTotalRow.number}`);
+          itemTotalRow.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } }; // 灰色背景
+            c.font = { bold: true };
+          });
+          itemTotalRow.getCell(4).numFmt = '"$"#,##0';
+          itemTotalRow.getCell(3).alignment = { horizontal: 'right' };
+          itemTotalRow.getCell(4).alignment = { horizontal: 'right' };
+
           worksheet.addRow([]);
       });
 
-      // 6. 總金額
       worksheet.addRow([]);
       const totalRow = worksheet.addRow(['', '', '總金額', quote.totalAmount]);
       worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
-      totalRow.getCell(3).font = { size: 14, bold: true };
-      totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF0000FF' } };
-      totalRow.getCell(4).numFmt = '"$"#,##0';
-      totalRow.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' };
-      totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
+      
+      // ★★★ 新增：總金額區塊樣式 ★★★
+      const totalCellC = totalRow.getCell(3);
+      const totalCellD = totalRow.getCell(4);
+      totalCellC.font = { size: 14, bold: true };
+      totalCellC.alignment = { horizontal: 'right', vertical: 'middle' };
+      totalCellD.font = { size: 16, bold: true, color: { argb: 'FF0000FF' } };
+      totalCellD.numFmt = '"$"#,##0';
+      totalCellD.alignment = { horizontal: 'right', vertical: 'middle' };
+      [totalCellC, totalCellD].forEach(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+      });
 
-      // 7. 注意事項
       worksheet.addRow([]);
       const noteTitle = worksheet.addRow(['注意事項 / 條款：']);
       noteTitle.getCell(1).font = { bold: true };
@@ -1157,7 +1173,6 @@ const PreviewModal = ({ quote, onClose }) => {
           if (note.includes('付款方式')) r.getCell(1).font = { color: { argb: 'FFFF0000' }, bold: true };
       });
 
-      // 匯出
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `${quote.clientInfo.companyName || '報價單'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
