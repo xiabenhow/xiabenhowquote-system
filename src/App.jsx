@@ -1003,231 +1003,198 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false); // ★★★ 新增：載入狀態
   const displayDateStr = formatDate(quote.createdAt || new Date());
 
-  // ★★★ 新增：產生 Excel 的核心函式 (已修正條款全文) ★★★
+  // ★★★ 修正：產生 Excel 的核心函式 (加上錯誤處理與載入狀態) ★★★
   const generateExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('報價單');
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('報價單');
 
-    // 1. 設定欄寬 (模擬 PDF 版面)
-    // A: 項目, B: 單價, C: 人數, D: 小計
-    worksheet.columns = [
-      { key: 'A', width: 45 },
-      { key: 'B', width: 15 },
-      { key: 'C', width: 10 },
-      { key: 'D', width: 20 },
-    ];
+      // 1. 設定欄寬 (模擬 PDF 版面)
+      worksheet.columns = [
+        { key: 'A', width: 45 }, { key: 'B', width: 15 },
+        { key: 'C', width: 10 }, { key: 'D', width: 20 },
+      ];
 
-    // 2. 標題
-    const titleRow = worksheet.addRow(['下班隨手作活動報價單']);
-    worksheet.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
-    titleRow.getCell(1).font = { name: '微軟正黑體', size: 20, bold: true };
-    titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-    
-    // 日期
-    const dateRow1 = worksheet.addRow(['', '', '', `報價日期: ${displayDateStr}`]);
-    worksheet.mergeCells(`A${dateRow1.number}:C${dateRow1.number}`); // 空白佔位
-    dateRow1.getCell(4).font = { size: 10 };
-    dateRow1.getCell(4).alignment = { horizontal: 'right' };
+      // 2. 標題
+      const titleRow = worksheet.addRow(['下班隨手作活動報價單']);
+      worksheet.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
+      titleRow.getCell(1).font = { name: '微軟正黑體', size: 20, bold: true };
+      titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+      
+      // 日期
+      const dateRow1 = worksheet.addRow(['', '', '', `報價日期: ${displayDateStr}`]);
+      worksheet.mergeCells(`A${dateRow1.number}:C${dateRow1.number}`);
+      dateRow1.getCell(4).font = { size: 10 };
+      dateRow1.getCell(4).alignment = { horizontal: 'right' };
+      const dateRow2 = worksheet.addRow(['', '', '', '有效期限：3天']);
+      worksheet.mergeCells(`A${dateRow2.number}:C${dateRow2.number}`);
+      dateRow2.getCell(4).font = { size: 10, bold: true };
+      dateRow2.getCell(4).alignment = { horizontal: 'right' };
+      worksheet.addRow([]);
 
-    const dateRow2 = worksheet.addRow(['', '', '', '有效期限：3天']);
-    worksheet.mergeCells(`A${dateRow2.number}:C${dateRow2.number}`);
-    dateRow2.getCell(4).font = { size: 10, bold: true };
-    dateRow2.getCell(4).alignment = { horizontal: 'right' };
+      // 3. 雙欄資訊
+      const infoStartRow = worksheet.lastRow.number + 1;
+      worksheet.getCell(`A${infoStartRow}`).value = '品牌單位';
+      worksheet.getCell(`A${infoStartRow}`).font = { bold: true, size: 12 };
+      worksheet.getCell(`A${infoStartRow}`).border = { bottom: { style: 'thin' } };
+      worksheet.getCell(`A${infoStartRow + 1}`).value = '公司行號: 下班文化國際有限公司';
+      worksheet.getCell(`A${infoStartRow + 2}`).value = '統一編號: 83475827';
+      worksheet.getCell(`A${infoStartRow + 3}`).value = '聯絡電話: 02-2371-4171';
+      worksheet.getCell(`A${infoStartRow + 4}`).value = '聯絡人: 下班隨手作';
 
-    worksheet.addRow([]); // 空行
+      const rightCol = 'B';
+      worksheet.getCell(`${rightCol}${infoStartRow}`).value = '客戶資料';
+      worksheet.mergeCells(`${rightCol}${infoStartRow}:D${infoStartRow}`);
+      worksheet.getCell(`${rightCol}${infoStartRow}`).font = { bold: true, size: 12 };
+      worksheet.getCell(`${rightCol}${infoStartRow}`).border = { bottom: { style: 'thin' } };
+      worksheet.getCell(`${rightCol}${infoStartRow + 1}`).value = `名稱: ${quote.clientInfo.companyName || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 1}:D${infoStartRow + 1}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 2}`).value = `統編: ${quote.clientInfo.taxId || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 2}:D${infoStartRow + 2}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 3}`).value = `聯絡人: ${quote.clientInfo.contactPerson || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 3}:D${infoStartRow + 3}`);
+      worksheet.getCell(`${rightCol}${infoStartRow + 4}`).value = `電話: ${quote.clientInfo.phone || '-'}`;
+      worksheet.mergeCells(`${rightCol}${infoStartRow + 4}:D${infoStartRow + 4}`);
+      worksheet.addRow([]);
+      worksheet.addRow([]);
 
-    // 3. 雙欄資訊 (品牌單位 | 客戶資料)
-    const infoStartRow = worksheet.lastRow.number + 1;
-    
-    // 左邊：品牌單位
-    worksheet.getCell(`A${infoStartRow}`).value = '品牌單位';
-    worksheet.getCell(`A${infoStartRow}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${infoStartRow}`).border = { bottom: { style: 'thin' } };
-    
-    worksheet.getCell(`A${infoStartRow + 1}`).value = '公司行號: 下班文化國際有限公司';
-    worksheet.getCell(`A${infoStartRow + 2}`).value = '統一編號: 83475827';
-    worksheet.getCell(`A${infoStartRow + 3}`).value = '聯絡電話: 02-2371-4171';
-    worksheet.getCell(`A${infoStartRow + 4}`).value = '聯絡人: 下班隨手作';
+      // 4. 表格表頭
+      const headerRow = worksheet.addRow(['項目', '單價', '人數', '小計']);
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.alignment = { horizontal: 'center' };
+      });
+      headerRow.getCell(1).alignment = { horizontal: 'left' };
+      headerRow.getCell(4).alignment = { horizontal: 'right' };
 
-    // 右邊：客戶資料 (合併 B, C, D)
-    const rightCol = 'B';
-    worksheet.getCell(`${rightCol}${infoStartRow}`).value = '客戶資料';
-    worksheet.mergeCells(`${rightCol}${infoStartRow}:D${infoStartRow}`);
-    worksheet.getCell(`${rightCol}${infoStartRow}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`${rightCol}${infoStartRow}`).border = { bottom: { style: 'thin' } };
+      // 5. 填入項目
+      quote.items.forEach((item) => {
+          const itemRow = worksheet.addRow([item.courseName, item.price, item.peopleCount, item.calc.subTotal]);
+          itemRow.getCell(1).font = { bold: true };
+          itemRow.getCell(2).numFmt = '"$"#,##0';
+          itemRow.getCell(4).numFmt = '"$"#,##0';
+          itemRow.getCell(4).font = { bold: true };
 
-    worksheet.getCell(`${rightCol}${infoStartRow + 1}`).value = `名稱: ${quote.clientInfo.companyName || '-'}`;
-    worksheet.mergeCells(`${rightCol}${infoStartRow + 1}:D${infoStartRow + 1}`);
-    
-    worksheet.getCell(`${rightCol}${infoStartRow + 2}`).value = `統編: ${quote.clientInfo.taxId || '-'}`;
-    worksheet.mergeCells(`${rightCol}${infoStartRow + 2}:D${infoStartRow + 2}`);
+          let details = [];
+          if (item.itemNote) details.push(`[備註] ${item.itemNote}`);
+          if (item.eventDate) details.push(`時間: ${formatDateWithDay(item.eventDate)} ${item.timeRange || ''}`);
+          if (item.address) details.push(`地點: ${item.address}`);
+          if (details.length > 0) {
+              const detailRow = worksheet.addRow([details.join('\n')]);
+              worksheet.mergeCells(`A${detailRow.number}:D${detailRow.number}`);
+              detailRow.height = details.length * 15;
+              detailRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+              detailRow.getCell(1).font = { color: { argb: 'FF666666' }, size: 10 };
+          }
 
-    worksheet.getCell(`${rightCol}${infoStartRow + 3}`).value = `聯絡人: ${quote.clientInfo.contactPerson || '-'}`;
-    worksheet.mergeCells(`${rightCol}${infoStartRow + 3}:D${infoStartRow + 3}`);
+          if (item.calc.isDiscountApplied || item.customDiscount > 0) {
+              const val = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
+              const row = worksheet.addRow(['', '', '折扣優惠', -val]);
+              worksheet.mergeCells(`A${row.number}:B${row.number}`);
+              row.getCell(3).font = { color: { argb: 'FFFF0000' } };
+              row.getCell(4).font = { color: { argb: 'FFFF0000' }, bold: true };
+              row.getCell(4).numFmt = '"-$"#,##0';
+          }
 
-    worksheet.getCell(`${rightCol}${infoStartRow + 4}`).value = `電話: ${quote.clientInfo.phone || '-'}`;
-    worksheet.mergeCells(`${rightCol}${infoStartRow + 4}:D${infoStartRow + 4}`);
+          if (item.calc.transportFee > 0) {
+              const row = worksheet.addRow(['', '', `車馬費 (${item.city}${item.area})`, item.calc.transportFee]);
+              worksheet.mergeCells(`A${row.number}:B${row.number}`);
+              row.getCell(4).numFmt = '"+""$"#,##0';
+          }
+          if (item.calc.teacherFee > 0) {
+              const row = worksheet.addRow(['', '', '師資費', item.calc.teacherFee]);
+              worksheet.mergeCells(`A${row.number}:B${row.number}`);
+              row.getCell(4).numFmt = '"+""$"#,##0';
+          }
+          if (item.extraFees) {
+              item.extraFees.filter(f => f.isEnabled).forEach(fee => {
+                  const row = worksheet.addRow(['', '', `加價: ${fee.description}`, parseInt(fee.amount)]);
+                  worksheet.mergeCells(`A${row.number}:B${row.number}`);
+                  row.getCell(4).numFmt = '"+""$"#,##0';
+              });
+          }
+          if (item.hasInvoice) {
+              const row = worksheet.addRow(['', '', '營業稅 (5%)', item.calc.tax]);
+              worksheet.mergeCells(`A${row.number}:B${row.number}`);
+              row.getCell(4).numFmt = '"+""$"#,##0';
+          }
+          worksheet.addRow([]);
+      });
 
-    worksheet.addRow([]); // 空行
-    worksheet.addRow([]); 
+      // 6. 總金額
+      worksheet.addRow([]);
+      const totalRow = worksheet.addRow(['', '', '總金額', totalAmount]);
+      worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
+      totalRow.getCell(3).font = { size: 14, bold: true };
+      totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF0000FF' } };
+      totalRow.getCell(4).numFmt = '"$"#,##0';
+      totalRow.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' };
+      totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
 
-    // 4. 表格表頭
-    const headerRow = worksheet.addRow(['項目', '單價', '人數', '小計']);
-    headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } }; // 深灰色
-      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-      cell.alignment = { horizontal: 'center' };
-    });
-    headerRow.getCell(1).alignment = { horizontal: 'left' }; // 項目靠左
-    headerRow.getCell(4).alignment = { horizontal: 'right' }; // 小計靠右
+      // 7. 注意事項
+      worksheet.addRow([]);
+      const noteTitle = worksheet.addRow(['注意事項 / 條款：']);
+      noteTitle.getCell(1).font = { bold: true };
+      const notes = [
+          '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+          '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
+          '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
+          '4. 客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
+          '5. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
+          '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
+          '銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201'
+      ];
+      notes.forEach(note => {
+          const r = worksheet.addRow([note]);
+          worksheet.mergeCells(`A${r.number}:D${r.number}`);
+          r.getCell(1).alignment = { wrapText: true };
+          if (note.includes('付款方式')) r.getCell(1).font = { color: { argb: 'FFFF0000' }, bold: true };
+      });
 
-    // 5. 填入項目
-    quote.items.forEach((item) => {
-        // 主要項目
-        const itemRow = worksheet.addRow([
-            item.courseName, 
-            item.price, 
-            item.peopleCount, 
-            item.calc.subTotal
-        ]);
-        itemRow.getCell(1).font = { bold: true };
-        itemRow.getCell(2).numFmt = '"$"#,##0';
-        itemRow.getCell(4).numFmt = '"$"#,##0';
-        itemRow.getCell(4).font = { bold: true };
+      // 匯出
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `${quote.clientInfo.companyName || '報價單'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-        // 備註/時間/地點 (顯示在同一格，換行)
-        let details = [];
-        if (item.itemNote) details.push(`[備註] ${item.itemNote}`);
-        if (item.eventDate) details.push(`時間: ${formatDateWithDay(item.eventDate)} ${item.timeRange || ''}`);
-        if (item.address) details.push(`地點: ${item.address}`);
-        
-        if (details.length > 0) {
-            const detailRow = worksheet.addRow([details.join('\n')]);
-            worksheet.mergeCells(`A${detailRow.number}:D${detailRow.number}`);
-            detailRow.height = details.length * 15; // 自動調整高度
-            detailRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-            detailRow.getCell(1).font = { color: { argb: 'FF666666' }, size: 10 };
-        }
-
-        // 折扣
-        if (item.calc.isDiscountApplied || item.customDiscount > 0) {
-            const val = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
-            const row = worksheet.addRow(['', '', '折扣優惠', -val]);
-            worksheet.mergeCells(`A${row.number}:B${row.number}`);
-            row.getCell(3).font = { color: { argb: 'FFFF0000' } }; // 紅字
-            row.getCell(4).font = { color: { argb: 'FFFF0000' }, bold: true };
-            row.getCell(4).numFmt = '"-$"#,##0';
-        }
-
-        // 車馬費
-        if (item.calc.transportFee > 0) {
-            const row = worksheet.addRow(['', '', '車馬費', item.calc.transportFee]);
-            worksheet.mergeCells(`A${row.number}:B${row.number}`);
-            row.getCell(3).value = `車馬費 (${item.city}${item.area})`;
-            row.getCell(4).numFmt = '"+"$"#,##0';
-        }
-
-        // 師資費
-        if (item.calc.teacherFee > 0) {
-            const row = worksheet.addRow(['', '', '師資費', item.calc.teacherFee]);
-            worksheet.mergeCells(`A${row.number}:B${row.number}`);
-            row.getCell(4).numFmt = '"+"$"#,##0';
-        }
-
-        // 額外費用
-        if (item.extraFees) {
-            item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-                const row = worksheet.addRow(['', '', `加價: ${fee.description}`, parseInt(fee.amount)]);
-                worksheet.mergeCells(`A${row.number}:B${row.number}`);
-                row.getCell(4).numFmt = '"+"$"#,##0';
-            });
-        }
-
-        // 稅金
-        if (item.hasInvoice) {
-            const row = worksheet.addRow(['', '', '營業稅 (5%)', item.calc.tax]);
-            worksheet.mergeCells(`A${row.number}:B${row.number}`);
-            row.getCell(4).numFmt = '"+"$"#,##0';
-        }
-
-        // 項目分隔線
-        worksheet.addRow([]);
-    });
-
-    // 6. 總金額
-    worksheet.addRow([]);
-    const totalRow = worksheet.addRow(['', '', '總金額', totalAmount]);
-    worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`); // 空白
-    totalRow.getCell(3).font = { size: 14, bold: true };
-    totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF0000FF' } }; // 藍色
-    totalRow.getCell(4).numFmt = '"$"#,##0';
-    totalRow.getCell(3).alignment = { horizontal: 'right', vertical: 'middle' };
-    totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
-
-    // 7. 注意事項
-    worksheet.addRow([]);
-    const noteTitle = worksheet.addRow(['注意事項 / 條款：']);
-    noteTitle.getCell(1).font = { bold: true };
-    
-    const notes = [
-        '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
-        '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
-        '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
-        '4. 客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
-        '5. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
-        '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
-        '銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201'
-    ];
-
-    notes.forEach(note => {
-        const r = worksheet.addRow([note]);
-        worksheet.mergeCells(`A${r.number}:D${r.number}`);
-        r.getCell(1).alignment = { wrapText: true };
-        if (note.includes('付款方式')) r.getCell(1).font = { color: { argb: 'FFFF0000' }, bold: true }; // 紅字強調
-    });
-
-    // 匯出
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `${quote.clientInfo.companyName || '報價單'}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) {
+      console.error("產生 Excel 失敗:", error);
+      alert(`抱歉，產生 Excel 檔案時發生錯誤：\n${error.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
     if (!element) return;
-
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
-
     if (!window.html2pdf) {
       try {
-        await loadScript(
-          'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-        );
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
       } catch {
         alert('無法載入 PDF 產生器，請檢查網路連線。');
         return;
       }
     }
-
     const opt = {
-      margin: 5,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
+      margin: 5, filename, image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
-
     window.html2pdf().from(element).set(opt).save();
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center overflow-auto p-4 md:p-8">
       <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-full">
-        {/* 工具列 */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 sticky top-0 z-10 rounded-t-lg flex-wrap gap-2">
           <h3 className="font-bold text-lg text-gray-700 flex items-center">
             <Printer className="w-5 h-5 mr-2" />
@@ -1235,24 +1202,17 @@ const PreviewModal = ({ quote, onClose }) => {
           </h3>
           <div className="flex gap-2 items-center flex-wrap">
             <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-              <input
-                type="checkbox"
-                checked={isSigned}
-                onChange={(e) => setIsSigned(e.target.checked)}
-                className="w-5 h-5 text-blue-600"
-              />
-              <span className="text-sm font-bold text-blue-800">
-                蓋上印章
-              </span>
+              <input type="checkbox" checked={isSigned} onChange={(e) => setIsSigned(e.target.checked)} className="w-5 h-5 text-blue-600" />
+              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
             </label>
 
-            {/* ★★★ 新增：下載編輯檔按鈕 ★★★ */}
             <button
               onClick={generateExcel}
-              className="px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 flex items-center shadow"
+              disabled={isGenerating}
+              className={`px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 flex items-center shadow disabled:bg-gray-400 disabled:cursor-not-allowed`}
             >
               <FileText className="w-4 h-4 mr-2" />
-              下載編輯檔 (Excel)
+              {isGenerating ? '產生中...' : '下載編輯檔 (Excel)'}
             </button>
 
             <button
@@ -1263,16 +1223,12 @@ const PreviewModal = ({ quote, onClose }) => {
               下載 PDF
             </button>
 
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
-            >
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
               <X />
             </button>
           </div>
         </div>
 
-        {/* 內容 */}
         <div className="flex-1 overflow-auto p-4 bg-gray-100">
           <div className="shadow-lg mx-auto">
             <QuotePreview
