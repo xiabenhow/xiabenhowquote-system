@@ -1234,7 +1234,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== PreviewModal (修正：客戶資料排版、自動換行、多頁列印與印章顯示) ==========
+// ========== PreviewModal (修正：Excel 樣式仿造 PDF、補齊條款、修復列印錯誤) ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1270,29 +1270,29 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★★★ 修改：下載 Excel 編輯檔 (修復版面、換行與分頁) ★★★
+  // ★★★ 修改：下載 Excel 編輯檔 (高度還原 PDF 樣式與解決列印問題) ★★★
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定基本欄寬 (調整比例以適應 A4)
+      // 1. 設定欄寬 (調整比例)
       sheet.columns = [
-        { header: '', key: 'item', width: 45 },  // A: 項目 (加寬)
+        { header: '', key: 'item', width: 50 },  // A: 項目內容 (加寬以容納長文字)
         { header: '', key: 'price', width: 12 }, // B: 單價
         { header: '', key: 'count', width: 8 },  // C: 人數
-        { header: '', key: 'total', width: 15 }, // D: 小計
+        { header: '', key: 'total', width: 18 }, // D: 小計
       ];
 
-      // 2. 設定列印屬性 (關鍵修正：允許自動分頁)
+      // 2. 設定列印屬性 (關鍵修正：解決 PDF 存檔錯誤與分頁截斷)
       sheet.pageSetup = {
-        paperSize: 9, // A4
+        paperSize: 9, // 9 = A4
         orientation: 'portrait',
-        fitToPage: false, // ★ 關閉強制一頁，允許長內容分頁
-        fitToWidth: 1,    // 強制寬度為 1 頁
-        fitToHeight: 0,   // ★ 高度設為 0 (自動)，讓它能延伸到第二頁
+        fitToPage: false, // 關閉強制一頁，允許垂直分頁
+        fitToWidth: 1,    // 強制寬度為 1 頁 (解決寬度卡到)
+        fitToHeight: 0,   // 高度自動 (0 表示不限制頁數)
         margins: {
-          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
+          left: 0.5, right: 0.5, top: 0.5, bottom: 0.5,
           header: 0.3, footer: 0.3
         }
       };
@@ -1301,7 +1301,7 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.mergeCells('A1:D1');
       const titleCell = sheet.getCell('A1');
       titleCell.value = '下班隨手作活動報價單';
-      titleCell.font = { size: 20, bold: true };
+      titleCell.font = { size: 20, bold: true, name: 'Microsoft JhengHei' }; // 設定字體
       titleCell.alignment = { horizontal: 'center' };
 
       // 4. 日期
@@ -1309,143 +1309,201 @@ const PreviewModal = ({ quote, onClose }) => {
       const dateCell = sheet.getCell('A2');
       dateCell.value = `報價日期: ${displayDateStr} (有效期限：3天)`;
       dateCell.alignment = { horizontal: 'right' };
+      dateCell.font = { size: 10, name: 'Microsoft JhengHei' };
 
       sheet.addRow([]);
 
-      // 5. 品牌與客戶資料 (修正：使用合併儲存格避免重疊)
-      const sectionTitleRow = sheet.addRow(['品牌單位', '', '客戶資料', '']);
-      sheet.mergeCells(`A${sectionTitleRow.number}:B${sectionTitleRow.number}`); // 合併左標題
-      sheet.mergeCells(`C${sectionTitleRow.number}:D${sectionTitleRow.number}`); // 合併右標題
+      // 5. 品牌與客戶資料 (修正排版避免卡到)
+      const brandRow = sheet.addRow(['品牌單位', '', '客戶資料', '']);
+      sheet.mergeCells(`A${brandRow.number}:B${brandRow.number}`);
+      sheet.mergeCells(`C${brandRow.number}:D${brandRow.number}`);
       
+      // 設定標題背景色 (淺灰)
       ['A', 'C'].forEach(col => {
-        const cell = sheet.getCell(`${col}${sectionTitleRow.number}`);
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+        const cell = sheet.getCell(`${col}${brandRow.number}`);
+        cell.font = { bold: true, name: 'Microsoft JhengHei' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }; // gray-100
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
       });
 
-      // 定義資料列 helper
-      const addInfoRow = (leftLabel, leftVal, rightLabel, rightVal) => {
-        const r = sheet.addRow([`${leftLabel} ${leftVal}`, '', `${rightLabel} ${rightVal}`, '']);
-        sheet.mergeCells(`A${r.number}:B${r.number}`); // 左側資訊合併 A-B
-        sheet.mergeCells(`C${r.number}:D${r.number}`); // 右側資訊合併 C-D
-        // 設定自動換行以防內容過長
+      // 輔助函式：新增資訊列
+      const addInfoRow = (label1, val1, label2, val2) => {
+        const r = sheet.addRow([`${label1} ${val1}`, '', `${label2} ${val2}`, '']);
+        sheet.mergeCells(`A${r.number}:B${r.number}`);
+        sheet.mergeCells(`C${r.number}:D${r.number}`);
+        r.font = { size: 10, name: 'Microsoft JhengHei' };
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         r.getCell(3).alignment = { wrapText: true, vertical: 'top' };
       };
 
-      addInfoRow('公司:', '下班文化國際有限公司', '名稱:', quote.clientInfo.companyName || '');
-      addInfoRow('統編:', '83475827', '統編:', quote.clientInfo.taxId || '');
-      addInfoRow('電話:', '02-2371-4171', '電話:', quote.clientInfo.phone || '');
-      addInfoRow('聯絡人:', '下班隨手作', '聯絡人:', quote.clientInfo.contactPerson || '');
+      addInfoRow('公司:', '下班文化國際有限公司', '名稱:', quote.clientInfo.companyName || '-');
+      addInfoRow('統編:', '83475827', '統編:', quote.clientInfo.taxId || '-');
+      addInfoRow('電話:', '02-2371-4171', '電話:', quote.clientInfo.phone || '-');
+      addInfoRow('聯絡人:', '下班隨手作', '聯絡人:', quote.clientInfo.contactPerson || '-');
       
-      sheet.addRow([]);
+      sheet.addRow([]); // 空行
 
-      // 6. 表格標頭
+      // 6. 表格標頭 (深色背景，白色文字)
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
+      headerRow.height = 20;
       headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        cell.border = { bottom: { style: 'thin' } };
-        cell.alignment = { horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }; // gray-800
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Microsoft JhengHei' };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
 
-      // 7. 內容填充
+      // 7. 課程項目內容填充
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
         const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
         const addressText = item.address ? `地點：${item.address}` : '';
         
+        // 組合項目描述 (使用換行符號)
         const itemName = item.courseName + (item.itemNote ? ` (備註: ${item.itemNote})` : '');
         const itemDesc = [itemName, dateText, addressText].filter(Boolean).join('\n');
 
-        const row = sheet.addRow([
-          itemDesc, item.price, item.peopleCount, item.calc.subTotal
+        // 主要項目列
+        const mainRow = sheet.addRow([
+          itemDesc, 
+          item.price, 
+          item.peopleCount, 
+          item.calc.subTotal
         ]);
         
-        row.getCell(1).alignment = { wrapText: true, vertical: 'top' }; // 確保內容換行
-        row.getCell(2).numFmt = '"$"#,##0';
-        row.getCell(4).numFmt = '"$"#,##0';
+        mainRow.font = { name: 'Microsoft JhengHei', size: 11 };
+        // A欄自動換行
+        mainRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        // 數字格式
+        mainRow.getCell(2).numFmt = '"$"#,##0';
+        mainRow.getCell(2).alignment = { vertical: 'top', horizontal: 'right' };
+        mainRow.getCell(3).alignment = { vertical: 'top', horizontal: 'right' };
+        mainRow.getCell(4).numFmt = '"$"#,##0';
+        mainRow.getCell(4).alignment = { vertical: 'top', horizontal: 'right' };
 
+        // --- 折扣顯示 (仿造 PDF 紅色樣式) ---
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
             const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
-            const discRow = sheet.addRow([`折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, '', '', -discountAmount]);
-            discRow.getCell(1).font = { color: { argb: 'FFDC2626' } };
+            const discRow = sheet.addRow([
+                `折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, 
+                '', 
+                '', 
+                -discountAmount
+            ]);
+            // 設定整列淺紅背景
+            discRow.eachCell((cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } }; // bg-red-50
+                cell.font = { color: { argb: 'FFDC2626' }, name: 'Microsoft JhengHei' }; // text-red-600
+                cell.border = { top: {style:'dotted', color: {argb:'FFE5E7EB'}} };
+            });
+            // 金額加粗
             discRow.getCell(4).font = { color: { argb: 'FFDC2626' }, bold: true };
             discRow.getCell(4).numFmt = '-"$"#,##0';
         }
 
+        // --- 車馬費 ---
         if (item.calc.transportFee > 0) {
-            const transRow = sheet.addRow([`車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee]);
-            transRow.getCell(1).font = { color: { argb: 'FF065F46' } };
+            const transRow = sheet.addRow([
+                `車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee
+            ]);
+            transRow.eachCell(c => c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}}); // green-50
+            transRow.getCell(1).font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei' };
             transRow.getCell(4).numFmt = '+"$"#,##0';
+            transRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true };
         }
         
+        // --- 額外費用 ---
         if (item.extraFees) {
             item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-                 const feeRow = sheet.addRow([`額外加價 (${fee.description})`, '', '', parseInt(fee.amount)]);
-                 feeRow.getCell(1).font = { color: { argb: 'FF065F46' } };
+                 const feeRow = sheet.addRow([
+                    `額外加價 (${fee.description})`, '', '', parseInt(fee.amount)
+                 ]);
+                 feeRow.eachCell(c => c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}});
+                 feeRow.getCell(1).font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei' };
                  feeRow.getCell(4).numFmt = '+"$"#,##0';
+                 feeRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true };
             });
         }
 
+        // --- 營業稅 ---
         if (item.hasInvoice) {
              const taxRow = sheet.addRow(['營業稅 (5%)', '', '', item.calc.tax]);
-             taxRow.getCell(1).font = { color: { argb: 'FF065F46' } };
+             taxRow.eachCell(c => c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}});
+             taxRow.getCell(1).font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei' };
              taxRow.getCell(4).numFmt = '+"$"#,##0';
+             taxRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true };
         }
         
+        // --- 項目總計 (加粗，黑色) ---
         const subTotalRow = sheet.addRow(['項目總計', '', '', item.calc.finalTotal]);
-        subTotalRow.font = { bold: true };
+        subTotalRow.font = { bold: true, name: 'Microsoft JhengHei' };
         subTotalRow.getCell(4).numFmt = '"$"#,##0';
-        subTotalRow.border = { bottom: { style: 'thin' } };
-      });
+        subTotalRow.getCell(4).alignment = { horizontal: 'right' };
+        
+        // 項目分隔線 (粗黑線)
+        subTotalRow.border = { bottom: { style: 'medium' } };
+        
+        // 增加一點間距
+        // sheet.addRow([]); 
+    }); // 結束 items 迴圈
 
       sheet.addRow([]);
 
-      // 8. 總金額
+      // 8. 總金額 (仿造 PDF: 大字體、藍色)
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
-      totalRow.getCell(3).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
-      totalRow.getCell(4).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
+      totalRow.height = 30; // 增加行高
+      totalRow.getCell(3).font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Microsoft JhengHei' }; // text-blue-900
+      totalRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'right' };
+      
+      totalRow.getCell(4).font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Microsoft JhengHei' };
       totalRow.getCell(4).numFmt = '"$"#,##0';
+      totalRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'right' };
 
       sheet.addRow([]);
       
-      // 9. 條款與注意事項 (修正：確保換行)
+      // 9. 注意事項 / 條款 (補齊 6 點)
       const noteTitleRow = sheet.addRow(['注意事項 / 條款：']);
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
+      noteTitleRow.font = { bold: true, name: 'Microsoft JhengHei' };
       
+      // 完整條款內容
       const notes = [
         '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
         '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
-        '3. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
-        '4. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。'
+        '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
+        '4. 客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
+        '5. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
+        '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。'
       ];
 
       notes.forEach(note => {
         const r = sheet.addRow([note]);
-        // 合併整列 A-D
         sheet.mergeCells(`A${r.number}:D${r.number}`);
-        // ★ 關鍵：設定 wrapText 讓過長的文字自動換行，不會被截斷
+        // 設定 wrapText 自動換行
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        // 可以稍微增加行高確保閱讀舒適
-        r.height = 30; 
+        r.font = { size: 9, name: 'Microsoft JhengHei' };
+        // 自動調整行高 (大約估算)
+        if (note.length > 50) r.height = 25; 
       });
 
+      // 銀行帳號
       const bankRow = sheet.addRow(['銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201']);
       sheet.mergeCells(`A${bankRow.number}:D${bankRow.number}`);
-      bankRow.font = { bold: true };
+      bankRow.font = { bold: true, name: 'Microsoft JhengHei', size: 10 };
+      bankRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
       
       sheet.addRow([]);
       sheet.addRow([]);
 
       // 10. 簽名欄
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
+      signRow.font = { bold: true, name: 'Microsoft JhengHei' };
+      signRow.height = 40; // 增加簽名欄高度
+      signRow.getCell(1).alignment = { vertical: 'bottom' };
+      signRow.getCell(3).alignment = { vertical: 'bottom' };
       
-      // 11. ★ 緩衝區 (解決印章被截斷問題)
-      // 加入足夠多的空白列，撐開列印範圍，確保印章有地方放
-      for(let i=0; i<8; i++) {
-          sheet.addRow([]); 
-      }
+      // 11. 緩衝區 (確保印章有空間，不會被切斷，並觸發自動分頁)
+      // 加入 6 行空白，如果頁面不夠會自動跳到下一頁
+      for(let i=0; i<6; i++) sheet.addRow([]);
 
       // 12. 處理印章圖片
       if (isSigned) {
@@ -1458,10 +1516,11 @@ const PreviewModal = ({ quote, onClose }) => {
             extension: 'png',
           });
 
-          // 放置圖片 (定位在簽名欄 A 欄上方)
+          // 將印章放置在「下班隨手作代表」的上方
+          // 使用 editAs: 'oneCell' 讓圖片浮動，不會被儲存格大小限制
           sheet.addImage(imageId, {
-            tl: { col: 0.2, row: signRow.number - 2.5 }, 
-            ext: { width: 150, height: 150 },
+            tl: { col: 0.1, row: signRow.number - 3.5 }, // 往上偏移約 3.5 行
+            ext: { width: 160, height: 160 },
             editAs: 'oneCell'
           });
         } catch (imgErr) {
@@ -1469,12 +1528,7 @@ const PreviewModal = ({ quote, onClose }) => {
         }
       }
 
-      // ★ 強制設定列印範圍 (包含緩衝區)
-      // 這能解決 iOS 轉 PDF 時的錯誤，並確保第二頁被包含
-      const totalRows = sheet.rowCount;
-      sheet.pageSetup.printArea = `A1:D${totalRows}`;
-
-      // 匯出
+      // 13. 匯出檔案
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `${quote.clientInfo.companyName || '報價單'}_編輯檔.xlsx`;
       saveAs(new Blob([buffer]), fileName);
@@ -1546,552 +1600,6 @@ const PreviewModal = ({ quote, onClose }) => {
               stampUrl={STAMP_URL}
             />
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ========== 【第二部分：下半部】==========
-// (包含 QuoteCreator、PreparationView、StatsView、CalendarView、QuoteList、App)
-
-const QuoteCreator = ({ initialData, onSave, onCancel }) => {
-  const [clientInfo, setClientInfo] = useState(
-    initialData?.clientInfo || {
-      companyName: '',
-      taxId: '',
-      contactPerson: '',
-      phone: '',
-      address: '',
-    },
-  );
-  const [status] = useState(initialData?.status || 'draft');
-  const [internalNote, setInternalNote] = useState(initialData?.internalNote || '');
-  const [isSigned, setIsSigned] = useState(false);
-
-  // 初始化 items
-  const [items, setItems] = useState(() => {
-    if (initialData?.items) {
-      return initialData.items.map((raw) => {
-        const item = { ...raw };
-        if (!item.extraFees) item.extraFees = [];
-
-        // 確保有預設的 applyTransportFee
-        if (item.applyTransportFee === undefined) item.applyTransportFee = true;
-        // 確保有自訂模式旗標
-        if (item.isCustom === undefined) item.isCustom = false;
-        // 確保有 85 折旗標
-        if (item.enableDiscount85 === undefined) item.enableDiscount85 = false;
-
-        if (item.extraFee > 0 && item.extraFees.length === 0) {
-          item.extraFees.push({
-            id: generateId(),
-            description: item.extraFeeDesc || '額外加價',
-            amount: item.extraFee,
-            isEnabled: true,
-          });
-          item.extraFee = 0;
-          item.extraFeeDesc = '';
-        }
-
-        if (!item.timeRange) {
-          if (item.startTime && item.endTime) {
-            item.timeRange = `${item.startTime}-${item.endTime}`;
-          } else if (item.startTime) {
-            item.timeRange = item.startTime;
-          } else {
-            item.timeRange = '';
-          }
-        }
-        return item;
-      });
-    }
-
-    return [
-      {
-        id: generateId(),
-        courseSeries: '水晶系列',
-        courseName: '手作輕寶石水晶手鍊',
-        price: 980,
-        peopleCount: 1,
-        locationMode: 'store',
-        regionType: 'North',
-        outingRegion: 'North',
-        city: '台北市',
-        area: '',
-        eventDate: '',
-        timeRange: '',
-        hasInvoice: false,
-        enableDiscount90: false,
-        enableDiscount85: false,
-        customDiscount: 0,
-        customDiscountDesc: '',
-        extraFees: [],
-        extraFee: 0,
-        extraFeeDesc: '',
-        address: '',
-        itemNote: '',
-        applyTransportFee: true,
-        isCustom: false,
-      },
-    ];
-  });
-
-  const calculatedItems = useMemo(() => {
-    const withCalc = items.map((item) => ({
-      ...item,
-      calc: calculateItem(item),
-    }));
-    return applyTransportDedup(withCalc);
-  }, [items]);
-
-  const totalAmount = calculatedItems.reduce(
-    (sum, item) => sum + (item.calc.finalTotal || 0),
-    0,
-  );
-
-  const updateItem = (index, field, value) => {
-    const newItems = [...items];
-    const item = { ...newItems[index], [field]: value };
-    
-    // 課程選單連動單價 (僅在非自訂模式下生效)
-    if (!item.isCustom) {
-        if (field === 'courseName') {
-            const series = COURSE_DATA[item.courseSeries];
-            const course = series?.find((c) => c.name === value);
-            if (course) item.price = course.price;
-        }
-        if (field === 'courseSeries') {
-            const series = COURSE_DATA[value];
-            if (series && series.length > 0) {
-                item.courseName = series[0].name;
-                item.price = series[0].price;
-            }
-        }
-    }
-
-    if (field === 'outingRegion') {
-      const available = getAvailableCities(value);
-      item.city = available[0] || '';
-      item.area = '';
-    }
-    if (field === 'city') {
-      item.area = '';
-    }
-    
-    newItems[index] = item;
-    setItems(newItems);
-  };
-
-  const toggleCustomMode = (index) => {
-      const newItems = [...items];
-      const current = newItems[index];
-      // 切換模式時
-      if (!current.isCustom) {
-          // 變成自訂
-          current.isCustom = true;
-          // 清除 9 折，避免混淆 (自訂模式用 85 折)
-          current.enableDiscount90 = false;
-      } else {
-          // 變回選單
-          current.isCustom = false;
-          current.courseSeries = '水晶系列'; 
-          const series = COURSE_DATA['水晶系列'];
-          if(series) {
-              current.courseName = series[0].name;
-              current.price = series[0].price;
-          }
-          // 清除 85 折
-          current.enableDiscount85 = false;
-      }
-      setItems(newItems);
-  };
-
-  const addItem = () =>
-    setItems((prev) => [
-      ...prev,
-      {
-        ...prev[prev.length - 1],
-        id: generateId(),
-        itemNote: '',
-        enableDiscount90: false,
-        enableDiscount85: false,
-        extraFees: [],
-        extraFee: 0,
-        timeRange: '',
-        isCustom: false,
-        applyTransportFee: true,
-      },
-    ]);
-
-  const removeItem = (index) =>
-    setItems((prev) => prev.filter((_, i) => i !== index));
-
-  const addExtraFee = (index) => {
-    const newItems = [...items];
-    if (!newItems[index].extraFees) newItems[index].extraFees = [];
-    newItems[index].extraFees.push({
-      id: generateId(),
-      description: '',
-      amount: 0,
-      isEnabled: true,
-    });
-    setItems(newItems);
-  };
-
-  const removeExtraFee = (itemIndex, feeId) => {
-    const newItems = [...items];
-    newItems[itemIndex].extraFees = newItems[itemIndex].extraFees.filter(
-      (f) => f.id !== feeId,
-    );
-    setItems(newItems);
-  };
-
-  const updateExtraFee = (itemIndex, feeId, field, value) => {
-    const newItems = [...items];
-    const feeIndex = newItems[itemIndex].extraFees.findIndex(
-      (f) => f.id === feeId,
-    );
-    if (feeIndex > -1) {
-      newItems[itemIndex].extraFees[feeIndex][field] = value;
-      setItems(newItems);
-    }
-  };
-
-  const handleSave = () => {
-    const hasError = calculatedItems.some((i) => i.calc.error);
-    if (hasError) {
-      alert('報價單中有項目不符合規則，請修正後再儲存。');
-      return;
-    }
-    onSave({
-      clientInfo,
-      items: calculatedItems,
-      totalAmount,
-      status,
-      internalNote,
-    });
-  };
-
-  return (
-    <div className="flex flex-col gap-8 max-w-5xl mx-auto p-4 md:p-8">
-      {/* 客戶資訊 */}
-      <div className="print:hidden space-y-6">
-        <section className={SECTION_CLASS}>
-          <h3 className="text-lg font-bold mb-4 border-b pb-2 text-gray-700 flex items-center">
-            <div className="w-1 h-6 bg-slate-800 mr-2 rounded" />
-            客戶基本資料 (報價單抬頭)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL_CLASS}>公司/客戶名稱</label>
-              <input
-                className={INPUT_CLASS}
-                placeholder="請輸入名稱"
-                value={clientInfo.companyName}
-                onChange={(e) =>
-                  setClientInfo((prev) => ({ ...prev, companyName: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>統一編號</label>
-              <input
-                className={INPUT_CLASS}
-                placeholder="選填"
-                value={clientInfo.taxId}
-                onChange={(e) =>
-                  setClientInfo((prev) => ({ ...prev, taxId: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>聯絡人</label>
-              <input
-                className={INPUT_CLASS}
-                placeholder="請輸入聯絡人"
-                value={clientInfo.contactPerson}
-                onChange={(e) =>
-                  setClientInfo((prev) => ({ ...prev, contactPerson: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className={LABEL_CLASS}>電話</label>
-              <input
-                className={INPUT_CLASS}
-                placeholder="請輸入電話"
-                value={clientInfo.phone}
-                onChange={(e) =>
-                  setClientInfo((prev) => ({ ...prev, phone: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          
-          {/* ★★★ 新增：內部備註輸入框 ★★★ */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-             <label className="block text-sm font-bold text-red-600 mb-1 flex items-center">
-                <Lock className="w-3 h-3 mr-1"/> 內部備註 (不會顯示在報價單上，僅顯示於行事曆)
-             </label>
-             <textarea
-                className={INPUT_CLASS}
-                rows="2"
-                placeholder="例如：客戶偏好、注意事項、內部交代事項..."
-                value={internalNote}
-                onChange={(e) => setInternalNote(e.target.value)}
-             />
-          </div>
-        </section>
-
-        {/* 課程項目 */}
-        {items.map((item, idx) => {
-          const calcItem = calculatedItems[idx];
-          return (
-            <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                  <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
-                </h3>
-                {items.length > 1 && (
-                  <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded">
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-              
-              {/* ★★★ 新增：手動/選單模式切換按鈕 ★★★ */}
-              <div className="flex justify-end mb-2">
-                 <button 
-                    type="button"
-                    onClick={() => toggleCustomMode(idx)}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition-colors"
-                 >
-                     {item.isCustom ? "↩ 切換回選單選擇" : "✎ 改為手動輸入名稱與價格"}
-                 </button>
-              </div>
-
-              {/* 課程選擇 or 手動輸入 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {/* 如果是手動模式：
-                   1. 隱藏系列選單
-                   2. 課程名稱變成 input
-                   3. 單價變成 number input
-                */}
-                {!item.isCustom ? (
-                    <>
-                        <div>
-                          <label className={LABEL_CLASS}>課程系列</label>
-                          <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
-                            {Object.keys(COURSE_DATA).map((s) => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
-                          <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
-                            {COURSE_DATA[item.courseSeries]?.map((c) => (
-                              <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
-                            ))}
-                          </select>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <div className="md:col-span-2">
-                             <label className={LABEL_CLASS}>課程名稱 (自訂)</label>
-                             <input 
-                                className={INPUT_CLASS} 
-                                value={item.courseName} 
-                                onChange={(e) => updateItem(idx, 'courseName', e.target.value)} 
-                                placeholder="請輸入課程名稱"
-                             />
-                        </div>
-                        <div>
-                             <label className={LABEL_CLASS}>單價</label>
-                             <input 
-                                type="number"
-                                className={INPUT_CLASS} 
-                                value={item.price} 
-                                onChange={(e) => updateItem(idx, 'price', e.target.value)} 
-                                placeholder="請輸入單價"
-                             />
-                        </div>
-                    </>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
-                
-                {/* ★★★ 修改：日期欄位一律顯示，但在自訂模式下標記為選填 ★★★ */}
-                <div>
-                    <label className={LABEL_CLASS}>
-                        日期 {item.isCustom ? '(選填)' : ''}
-                    </label>
-                    <input 
-                        type="date" 
-                        className={INPUT_CLASS} 
-                        value={item.eventDate} 
-                        onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} 
-                    />
-                </div>
-                
-                <div><label className={LABEL_CLASS}>時間（手動輸入）</label><input type="text" className={INPUT_CLASS} placeholder="例如：12:00-14:00" value={item.timeRange || ''} onChange={(e) => updateItem(idx, 'timeRange', e.target.value)} /></div>
-              </div>
-
-              <div className="flex flex-col gap-2 mb-4">
-                <div className="flex gap-4">
-                  <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
-                    <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={(e) => updateItem(idx, 'hasInvoice', e.target.checked)} />
-                    <span className="text-sm font-medium text-gray-700">是否開立發票？（加 5%）</span>
-                  </label>
-                  
-                  {/* ★★★ 修改：根據模式顯示 9折 或 85折 ★★★ */}
-                  <label className="flex items-center cursor-pointer select-none p-2 bg-red-50 rounded border border-red-100 flex-1">
-                    <input 
-                        type="checkbox" 
-                        className="mr-2 w-4 h-4" 
-                        checked={item.isCustom ? (item.enableDiscount85 || false) : (item.enableDiscount90 || false)} 
-                        onChange={(e) => updateItem(idx, item.isCustom ? 'enableDiscount85' : 'enableDiscount90', e.target.checked)} 
-                    />
-                    <span className="text-sm font-medium text-red-700">
-                        {item.isCustom ? '套用 85 折優惠 (自訂模式)' : '套用 9 折優惠'}
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
-                <div className="flex gap-6 mb-4">
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
-                </div>
-
-                {item.locationMode === 'outing' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className={LABEL_CLASS}>車馬費計算區域</label>
-                      <select className={INPUT_CLASS} value={item.outingRegion} onChange={(e) => updateItem(idx, 'outingRegion', e.target.value)}>
-                        <option value="North">北部出課</option>
-                        <option value="Central">中部老師出課</option>
-                        <option value="South">南部老師出課</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>縣市 {calcItem.calc.transportFee > 0 && !calcItem.area && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">預估: ${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
-                      <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
-                        {getAvailableCities(item.outingRegion).map((c) => (
-                          <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
-                        <div>
-                          <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
-                          <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
-                            <option value="">選擇區域...</option>
-                            {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
-                              <option key={zone} value={zone}>{zone} (+${fee})</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    <div className="md:col-span-3">
-                      <label className={LABEL_CLASS}>詳細地址</label>
-                      <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
-                    </div>
-                    
-                    {/* ★★★ 新增：是否套用車馬費 ★★★ */}
-                    <div className="md:col-span-3">
-                          <label className="flex items-center cursor-pointer select-none">
-                            <input 
-                                type="checkbox" 
-                                className="mr-2 w-4 h-4 text-blue-600" 
-                                checked={item.applyTransportFee} 
-                                onChange={(e) => updateItem(idx, 'applyTransportFee', e.target.checked)} 
-                            />
-                            <span className="text-sm font-bold text-gray-700">是否計算車馬費？ (取消勾選則車馬費為 $0)</span>
-                          </label>
-                    </div>
-
-                  </div>
-                ) : (
-                  <div className="flex gap-4">
-                    <div>
-                      <label className={LABEL_CLASS}>店內區域</label>
-                      <select className={INPUT_CLASS} value={item.regionType || 'North'} onChange={(e) => updateItem(idx, 'regionType', e.target.value)}>
-                        <option value="North">北部店內</option>
-                        <option value="Central">中部店內</option>
-                        <option value="South">南部店內</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mb-4">
-                <label className={LABEL_CLASS}>該堂課備註說明（選填）</label>
-                <input type="text" className={INPUT_CLASS} placeholder="例如：需提前半小時進場、特殊需求..." value={item.itemNote || ''} onChange={(e) => updateItem(idx, 'itemNote', e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-red-50 p-4 rounded border border-red-100">
-                  <label className={LABEL_CLASS + ' text-red-800'}>手動折扣（減項）</label>
-                  <div className="flex flex-col gap-2">
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500 font-bold">-</span>
-                      <input type="number" className={INPUT_CLASS + ' pl-6'} placeholder="金額" value={item.customDiscount} onChange={(e) => updateItem(idx, 'customDiscount', e.target.value)} />
-                    </div>
-                    <input type="text" className={INPUT_CLASS} placeholder="折扣說明" value={item.customDiscountDesc || ''} onChange={(e) => updateItem(idx, 'customDiscountDesc', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 p-4 rounded border border-blue-100">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className={LABEL_CLASS + ' text-blue-800 mb-0'}>額外加價（加項）</label>
-                    <button onClick={() => addExtraFee(idx)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold flex items-center"><Plus className="w-3 h-3 mr-1" /> 新增</button>
-                  </div>
-                  <div className="space-y-2">
-                    {item.extraFees && item.extraFees.map((fee) => (
-                        <div key={fee.id} className="flex gap-2 items-center">
-                          <input type="checkbox" className="w-5 h-5 cursor-pointer accent-blue-600" checked={fee.isEnabled} onChange={(e) => updateExtraFee(idx, fee.id, 'isEnabled', e.target.checked)} />
-                          <input type="text" className={INPUT_CLASS + ' flex-1 ' + (!fee.isEnabled ? 'opacity-50' : '')} placeholder="加價說明" value={fee.description} onChange={(e) => updateExtraFee(idx, fee.id, 'description', e.target.value)} disabled={!fee.isEnabled} />
-                          <div className="relative w-32">
-                            <span className="absolute left-2 top-2 text-gray-500 font-bold">+</span>
-                            <input type="number" className={INPUT_CLASS + ' pl-5 ' + (!fee.isEnabled ? 'opacity-50' : '')} placeholder="金額" value={fee.amount} onChange={(e) => updateExtraFee(idx, fee.id, 'amount', e.target.value)} disabled={!fee.isEnabled} />
-                          </div>
-                          <button onClick={() => removeExtraFee(idx, fee.id)} className="text-red-400 hover:text-red-600 p-2"><X className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        <button onClick={addItem} className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg">
-          <Plus className="w-6 h-6 mr-2" /> 增加更多課程
-        </button>
-      </div>
-
-      <div className="mt-10 border-t-4 border-gray-800 pt-8 print:border-none print:mt-0 print:pt-0">
-        <div className="flex justify-between items-center mb-6 print:hidden flex-wrap gap-4">
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center"><Eye className="mr-2" /> 即時報價單預覽</h3>
-          <div className="flex gap-4 items-center flex-wrap">
-            <label className="flex items-center space-x-2 cursor-pointer select-none bg-blue-50 px-3 py-2 rounded border border-blue-200">
-              <input type="checkbox" checked={isSigned} onChange={(e) => setIsSigned(e.target.checked)} className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-bold text-blue-800">蓋上印章</span>
-            </label>
-            <button onClick={handleSave} className="px-8 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow flex items-center"><Save className="w-4 h-4 mr-2" /> 儲存至資料庫</button>
-            <button onClick={onCancel} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
-          </div>
-        </div>
-
-        <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-          <QuotePreview idName="creator-preview-area" clientInfo={clientInfo} items={calculatedItems} totalAmount={totalAmount} dateStr={new Date().toISOString().slice(0, 10)} isSigned={isSigned} stampUrl={STAMP_URL} />
         </div>
       </div>
     </div>
