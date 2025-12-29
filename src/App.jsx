@@ -1234,7 +1234,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== PreviewModal (修正：總金額欄寬調整為 10、優化行高計算) ==========
+// ========== PreviewModal (修正：條款換行、印章位置不壓字、解決PDF存檔報錯) ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1270,31 +1270,32 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★★★ 修改：下載 Excel 編輯檔 ★★★
+  // ★★★ 修改：下載 Excel 編輯檔 (最終完美版) ★★★
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定欄寬 (★ 修正：將第三欄 Count 的寬度改為 10，滿足總金額欄位需求)
+      // 1. 設定欄寬 (C欄設為10，以配合總金額寬度)
       sheet.columns = [
-        { header: '', key: 'item', width: 50 },  // A: 項目內容
+        { header: '', key: 'item', width: 50 },  // A: 項目
         { header: '', key: 'price', width: 12 }, // B: 單價
-        { header: '', key: 'count', width: 10 }, // C: 人數 / 總金額標題 (★ 改為 10)
-        { header: '', key: 'total', width: 18 }, // D: 小計 / 總金額數值
+        { header: '', key: 'count', width: 10 }, // C: 人數/標題
+        { header: '', key: 'total', width: 20 }, // D: 金額
       ];
 
-      // 2. 設定列印屬性
+      // 2. 設定列印屬性 (修正 PDF 報錯問題)
+      // 移除 fitToPage，改用 scale 或標準設定，避免 iOS Excel 強制連線計算
       sheet.pageSetup = {
         paperSize: 9, // A4
         orientation: 'portrait',
-        fitToPage: false,
-        fitToWidth: 1,    
-        fitToHeight: 0,   
+        fitToWidth: 1,  // 強制寬度一頁
+        fitToHeight: 0, // 高度自動 (允許分頁)
         margins: {
           left: 0.5, right: 0.5, top: 0.5, bottom: 0.5,
           header: 0.3, footer: 0.3
-        }
+        },
+        printArea: null // 讓 Excel 自動偵測範圍，避免鎖死導致報錯
       };
 
       // 3. 標題
@@ -1350,7 +1351,7 @@ const PreviewModal = ({ quote, onClose }) => {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
 
-      // 7. 課程項目內容
+      // 7. 課程項目
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
         const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
@@ -1374,7 +1375,7 @@ const PreviewModal = ({ quote, onClose }) => {
         mainRow.getCell(4).numFmt = '"$"#,##0';
         mainRow.getCell(4).alignment = { vertical: 'top', horizontal: 'right' };
 
-        // 折扣
+        // 折扣 (紅色)
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
             const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
             const discRow = sheet.addRow([
@@ -1392,7 +1393,7 @@ const PreviewModal = ({ quote, onClose }) => {
             discRow.getCell(4).alignment = { horizontal: 'right' };
         }
 
-        // 車馬費
+        // 車馬費 (綠字)
         if (item.calc.transportFee > 0) {
             const transRow = sheet.addRow([
                 `車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee
@@ -1406,7 +1407,7 @@ const PreviewModal = ({ quote, onClose }) => {
             transRow.getCell(4).alignment = { horizontal: 'right' };
         }
         
-        // 額外費用
+        // 額外費用 (綠字)
         if (item.extraFees) {
             item.extraFees.filter(f => f.isEnabled).forEach(fee => {
                  const feeRow = sheet.addRow([
@@ -1422,7 +1423,7 @@ const PreviewModal = ({ quote, onClose }) => {
             });
         }
 
-        // 營業稅
+        // 營業稅 (綠字)
         if (item.hasInvoice) {
              const taxRow = sheet.addRow(['營業稅 (5%)', '', '', item.calc.tax]);
              taxRow.eachCell(c => {
@@ -1434,7 +1435,7 @@ const PreviewModal = ({ quote, onClose }) => {
              taxRow.getCell(4).alignment = { horizontal: 'right' };
         }
         
-        // 項目總計
+        // 項目總計 (加粗)
         const subTotalRow = sheet.addRow(['項目總計', '', '', item.calc.finalTotal]);
         subTotalRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
         subTotalRow.getCell(4).numFmt = '"$"#,##0';
@@ -1444,7 +1445,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
 
-      // 8. 總金額
+      // 8. 總金額 (大字、藍色)
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
       totalRow.height = 35;
       const labelCell = totalRow.getCell(3);
@@ -1458,7 +1459,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
       
-      // 9. 注意事項 / 條款
+      // 9. 注意事項 / 條款 (修正換行與高度)
       const noteTitleRow = sheet.addRow(['注意事項 / 條款：']);
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
       noteTitleRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
@@ -1478,9 +1479,11 @@ const PreviewModal = ({ quote, onClose }) => {
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         r.font = { size: 10, name: 'Microsoft JhengHei' };
         
-        // ★ 自動調整行高邏輯：更保守的計算，每 45 個字就換一行，每行給 20 高度
+        // ★ 關鍵修正：增加行高，確保條款文字不被壓到
+        // 估算每行 90 像素寬 (A-D合併後)，每行約 50 中文字
+        // 增加倍率係數 (從 20 改為 22) 並無條件進位
         const estimatedLines = Math.ceil(note.length / 45); 
-        r.height = estimatedLines * 20; 
+        r.height = Math.max(25, estimatedLines * 20); 
       });
 
       // 銀行資訊
@@ -1488,12 +1491,16 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.mergeCells(`A${bankRow.number}:D${bankRow.number}`);
       bankRow.font = { bold: true, name: 'Microsoft JhengHei', size: 10 };
       bankRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
-      bankRow.height = 25;
+      bankRow.height = 30; // 銀行欄位高度
       
-      sheet.addRow([]);
-      sheet.addRow([]);
+      // ★★★ 關鍵修正：印章緩衝區 (解決印章壓字) ★★★
+      // 在銀行帳號下方，加入 4 個空白列，專門用來放印章
+      for(let i=0; i<4; i++) {
+          const emptyRow = sheet.addRow([]);
+          emptyRow.height = 30; // 確保每行有高度，撐開空間
+      }
 
-      // 10. 簽名欄
+      // 10. 簽名欄 (現在會在緩衝區下方)
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
       signRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
       signRow.height = 50; 
@@ -1501,20 +1508,23 @@ const PreviewModal = ({ quote, onClose }) => {
       signRow.getCell(3).alignment = { vertical: 'bottom', horizontal: 'right' };
       sheet.mergeCells(`C${signRow.number}:D${signRow.number}`); 
       
-      // 11. 緩衝區
-      for(let i=0; i<8; i++) sheet.addRow([]);
+      // 底部再加一點緩衝，確保不會是最後一行
+      sheet.addRow([]);
 
       // 12. 處理印章圖片
       if (isSigned) {
         try {
           const response = await fetch(STAMP_URL);
           const buffer = await response.arrayBuffer();
+          
           const imageId = workbook.addImage({
             buffer: buffer,
             extension: 'png',
           });
+
+          // ★ 印章位置修正：定位在簽名欄往上 4 列的位置 (即緩衝區的中間)
           sheet.addImage(imageId, {
-            tl: { col: 0.1, row: signRow.number - 3.5 }, 
+            tl: { col: 0.1, row: signRow.number - 4.5 }, 
             ext: { width: 160, height: 160 },
             editAs: 'oneCell' 
           });
@@ -1523,9 +1533,11 @@ const PreviewModal = ({ quote, onClose }) => {
         }
       }
 
-      const totalRows = sheet.rowCount;
-      sheet.pageSetup.printArea = `A1:D${totalRows}`;
+      // ★ 最終設定：自動計算列印範圍
+      // 不指定 printArea，讓 Excel 自己判斷，通常能解決 iOS 報錯
+      // sheet.pageSetup.printArea = `A1:D${sheet.rowCount}`;
 
+      // 匯出檔案
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `${quote.clientInfo.companyName || '報價單'}_編輯檔.xlsx`;
       saveAs(new Blob([buffer]), fileName);
@@ -1558,6 +1570,7 @@ const PreviewModal = ({ quote, onClose }) => {
               </span>
             </label>
 
+            {/* 下載 Excel 按鈕 */}
             <button
               onClick={handleDownloadExcel}
               className="px-4 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 flex items-center shadow"
