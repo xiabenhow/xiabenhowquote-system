@@ -1234,7 +1234,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   );
 };
 
-// ========== PreviewModal (修正 Excel PDF 轉檔錯誤 + 印章顯示) ==========
+// ========== PreviewModal (修正：客戶資料排版、自動換行、多頁列印與印章顯示) ==========
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
@@ -1270,28 +1270,41 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★★★ 修改：下載 Excel 編輯檔 (修復 PDF 轉檔錯誤 + 確保印章顯示) ★★★
+  // ★★★ 修改：下載 Excel 編輯檔 (修復版面、換行與分頁) ★★★
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定基本欄寬
+      // 1. 設定基本欄寬 (調整比例以適應 A4)
       sheet.columns = [
-        { header: '', key: 'item', width: 40 }, 
-        { header: '', key: 'price', width: 15 }, 
-        { header: '', key: 'count', width: 10 }, 
-        { header: '', key: 'total', width: 20 }, 
+        { header: '', key: 'item', width: 45 },  // A: 項目 (加寬)
+        { header: '', key: 'price', width: 12 }, // B: 單價
+        { header: '', key: 'count', width: 8 },  // C: 人數
+        { header: '', key: 'total', width: 15 }, // D: 小計
       ];
 
-      // 2. 標題
+      // 2. 設定列印屬性 (關鍵修正：允許自動分頁)
+      sheet.pageSetup = {
+        paperSize: 9, // A4
+        orientation: 'portrait',
+        fitToPage: false, // ★ 關閉強制一頁，允許長內容分頁
+        fitToWidth: 1,    // 強制寬度為 1 頁
+        fitToHeight: 0,   // ★ 高度設為 0 (自動)，讓它能延伸到第二頁
+        margins: {
+          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
+          header: 0.3, footer: 0.3
+        }
+      };
+
+      // 3. 標題
       sheet.mergeCells('A1:D1');
       const titleCell = sheet.getCell('A1');
       titleCell.value = '下班隨手作活動報價單';
       titleCell.font = { size: 20, bold: true };
       titleCell.alignment = { horizontal: 'center' };
 
-      // 3. 日期
+      // 4. 日期
       sheet.mergeCells('A2:D2');
       const dateCell = sheet.getCell('A2');
       dateCell.value = `報價日期: ${displayDateStr} (有效期限：3天)`;
@@ -1299,30 +1312,44 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
 
-      // 4. 品牌與客戶資料
-      sheet.addRow(['品牌單位', '', '客戶資料', '']);
-      ['A4', 'C4'].forEach(key => {
-        const cell = sheet.getCell(key);
+      // 5. 品牌與客戶資料 (修正：使用合併儲存格避免重疊)
+      const sectionTitleRow = sheet.addRow(['品牌單位', '', '客戶資料', '']);
+      sheet.mergeCells(`A${sectionTitleRow.number}:B${sectionTitleRow.number}`); // 合併左標題
+      sheet.mergeCells(`C${sectionTitleRow.number}:D${sectionTitleRow.number}`); // 合併右標題
+      
+      ['A', 'C'].forEach(col => {
+        const cell = sheet.getCell(`${col}${sectionTitleRow.number}`);
         cell.font = { bold: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
       });
 
-      sheet.addRow(['公司: 下班文化國際有限公司', '', `名稱: ${quote.clientInfo.companyName || ''}`, '']);
-      sheet.addRow(['統編: 83475827', '', `統編: ${quote.clientInfo.taxId || ''}`, '']);
-      sheet.addRow(['電話: 02-2371-4171', '', `電話: ${quote.clientInfo.phone || ''}`, '']);
-      sheet.addRow(['聯絡人: 下班隨手作', '', `聯絡人: ${quote.clientInfo.contactPerson || ''}`, '']);
+      // 定義資料列 helper
+      const addInfoRow = (leftLabel, leftVal, rightLabel, rightVal) => {
+        const r = sheet.addRow([`${leftLabel} ${leftVal}`, '', `${rightLabel} ${rightVal}`, '']);
+        sheet.mergeCells(`A${r.number}:B${r.number}`); // 左側資訊合併 A-B
+        sheet.mergeCells(`C${r.number}:D${r.number}`); // 右側資訊合併 C-D
+        // 設定自動換行以防內容過長
+        r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        r.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+      };
+
+      addInfoRow('公司:', '下班文化國際有限公司', '名稱:', quote.clientInfo.companyName || '');
+      addInfoRow('統編:', '83475827', '統編:', quote.clientInfo.taxId || '');
+      addInfoRow('電話:', '02-2371-4171', '電話:', quote.clientInfo.phone || '');
+      addInfoRow('聯絡人:', '下班隨手作', '聯絡人:', quote.clientInfo.contactPerson || '');
       
       sheet.addRow([]);
 
-      // 5. 表格標頭
+      // 6. 表格標頭
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
         cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
         cell.border = { bottom: { style: 'thin' } };
+        cell.alignment = { horizontal: 'center' };
       });
 
-      // 6. 內容填充
+      // 7. 內容填充
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
         const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
@@ -1335,7 +1362,7 @@ const PreviewModal = ({ quote, onClose }) => {
           itemDesc, item.price, item.peopleCount, item.calc.subTotal
         ]);
         
-        row.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        row.getCell(1).alignment = { wrapText: true, vertical: 'top' }; // 確保內容換行
         row.getCell(2).numFmt = '"$"#,##0';
         row.getCell(4).numFmt = '"$"#,##0';
 
@@ -1375,7 +1402,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
 
-      // 7. 總金額
+      // 8. 總金額
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
       totalRow.getCell(3).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
       totalRow.getCell(4).font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
@@ -1383,25 +1410,46 @@ const PreviewModal = ({ quote, onClose }) => {
 
       sheet.addRow([]);
       
-      // 8. 條款
-      sheet.addRow(['注意事項 / 條款：']);
-      sheet.addRow(['1. 本報價單有效時間以接到合作案3天為主...']);
-      sheet.addRow(['2. 人數以報價單協議人數為主...']);
-      sheet.addRow(['3. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金...']);
+      // 9. 條款與注意事項 (修正：確保換行)
+      const noteTitleRow = sheet.addRow(['注意事項 / 條款：']);
+      sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
+      
+      const notes = [
+        '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+        '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
+        '3. 付款方式：確認日期金額，回傳報價單，並蓋章付50%訂金方可協議出課，於課當天結束後7天內匯款付清尾款。',
+        '4. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。'
+      ];
+
+      notes.forEach(note => {
+        const r = sheet.addRow([note]);
+        // 合併整列 A-D
+        sheet.mergeCells(`A${r.number}:D${r.number}`);
+        // ★ 關鍵：設定 wrapText 讓過長的文字自動換行，不會被截斷
+        r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        // 可以稍微增加行高確保閱讀舒適
+        r.height = 30; 
+      });
+
       const bankRow = sheet.addRow(['銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201']);
+      sheet.mergeCells(`A${bankRow.number}:D${bankRow.number}`);
       bankRow.font = { bold: true };
       
       sheet.addRow([]);
       sheet.addRow([]);
 
-      // 9. 簽名欄 (紀錄行號以便插入圖片)
+      // 10. 簽名欄
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
       
-      // ★★★ 處理印章圖片 ★★★
+      // 11. ★ 緩衝區 (解決印章被截斷問題)
+      // 加入足夠多的空白列，撐開列印範圍，確保印章有地方放
+      for(let i=0; i<8; i++) {
+          sheet.addRow([]); 
+      }
+
+      // 12. 處理印章圖片
       if (isSigned) {
         try {
-          // 抓取印章圖片 (使用 fetch 轉 arrayBuffer)
-          // 注意：請確保 public 資料夾下有 stamp.png
           const response = await fetch(STAMP_URL);
           const buffer = await response.arrayBuffer();
           
@@ -1410,35 +1458,21 @@ const PreviewModal = ({ quote, onClose }) => {
             extension: 'png',
           });
 
-          // 放置圖片：col: 0.2 代表在 A 欄稍微往右, row: 簽名欄行號 - 2.5 代表往上浮動
+          // 放置圖片 (定位在簽名欄 A 欄上方)
           sheet.addImage(imageId, {
             tl: { col: 0.2, row: signRow.number - 2.5 }, 
             ext: { width: 150, height: 150 },
-            editAs: 'oneCell' // 重要：讓圖片附著在儲存格上
+            editAs: 'oneCell'
           });
         } catch (imgErr) {
           console.error("無法載入印章圖片", imgErr);
-          // 不跳 alert 干擾流程，直接忽略印章繼續下載
         }
       }
 
-      // ★★★ 關鍵修正：設定列印範圍與紙張 (解決 PDF 轉檔報錯) ★★★
-      // 計算目前總行數
+      // ★ 強制設定列印範圍 (包含緩衝區)
+      // 這能解決 iOS 轉 PDF 時的錯誤，並確保第二頁被包含
       const totalRows = sheet.rowCount;
-      sheet.pageSetup = {
-        paperSize: 9, // A4
-        orientation: 'portrait',
-        fitToPage: true, // 強制調整成一頁寬
-        fitToWidth: 1,
-        fitToHeight: 0, // 高度自動延伸
-        horizontalCentered: true, // 水平置中
-        margins: {
-          left: 0.7, right: 0.7, top: 0.75, bottom: 0.75,
-          header: 0.3, footer: 0.3
-        },
-        // ★ 強制指定列印區域：從 A1 到 D欄的最後一行 + 緩衝
-        printArea: `A1:D${totalRows + 2}`
-      };
+      sheet.pageSetup.printArea = `A1:D${totalRows}`;
 
       // 匯出
       const buffer = await workbook.xlsx.writeBuffer();
