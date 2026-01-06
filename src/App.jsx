@@ -151,9 +151,33 @@ const LABEL_CLASS = 'block text-sm font-bold text-gray-700 mb-1';
 const SECTION_CLASS =
   'bg-white p-6 rounded-lg shadow-sm border border-gray-200';
 
-// ========== 課程資料 (完整版) ==========
+// ========== 課程資料 (完整版 + 新增材料包系列) ==========
 
 const COURSE_DATA = {
+  材料包系列: [
+    { name: '手作DIY材料包 | 迷你水苔多肉藤圈', price: 490 },
+    { name: '手作DIY材料包 | 六角石盤流體畫杯墊', price: 490 },
+    { name: '手作DIY材料包 | 熊熊愛上妳擴香座', price: 490 },
+    { name: '手作DIY材料包 | 紳士兔松果擴香座', price: 490 },
+    { name: '手作DIY材料包 | 水泥盆乾燥花香氛蠟燭', price: 490 },
+    { name: '手作DIY材料包 | 大理石紋雙八角多肉', price: 490 },
+    { name: '手作DIY材料包 | 乾燥花圈精油手工皂', price: 490 },
+    { name: '手作DIY材料包 | 多肉盆栽造型蠟燭手把杯', price: 550 },
+    { name: '手作DIY材料包 | 工業風乾燥擴香花', price: 590 },
+    { name: '手作DIY材料包 | 水泥六角擴香花盤', price: 590 },
+    { name: '手作DIY材料包 | 水晶礦石寶石皂', price: 590 },
+    { name: '手作DIY材料包 | 鐵罐乾燥花香氛蠟燭', price: 590 },
+    { name: '手作DIY材料包 | 雙摩艾多肉暈染石盆', price: 590 },
+    { name: '手作DIY材料包 | 擴香花音樂盒', price: 590 },
+    { name: '手作DIY材料包 | 永生繡球大浮游花瓶', price: 590 },
+    { name: '手作DIY材料包 | 微景觀多肉生態瓶', price: 690 },
+    { name: '手作DIY材料包 | 永生繡球樹擴香盆花', price: 690 },
+    { name: '手作DIY材料包 | 能量水晶手鍊系列', price: 890 },
+    { name: '手作DIY材料包 | 環氧樹脂金箔暈染字夜燈', price: 890 },
+    { name: '手作DIY材料包 | 永生繡球大浮游花瓶+燈座', price: 940 },
+    { name: '手作DIY材料包 | 告白蠟燭漂流木燭台', price: 980 },
+    { name: '手作DIY材料包 | 摩天輪玫瑰永生花圈', price: 1580 },
+  ],
   平板課程: [
     { name: '平板課程-招財水晶樹', price: 690 },
     { name: '平板課程-純淨水晶礦石吊飾', price: 590 },
@@ -303,7 +327,7 @@ const COURSE_DATA = {
   ],
   手工皂系列: [{ name: '乾燥花圈精油手工皂', price: 650 }],
   藍染系列: [
-    { name: '創意染零錢包與提繩', price: 580 },   
+    { name: '創意染零錢包與提繩', price: 580 },    
     { name: '創意染鑰匙套與編織杯袋', price: 650 },
     { name: '創意染鑰匙套編織手鍊', price: 650 },
     { name: '手染遮陽帽與老公公吊飾', price: 680 },
@@ -558,7 +582,7 @@ const getAvailableCities = (region) => {
   return [];
 };
 
-// ========== 價格計算邏輯 ==========
+// ========== 價格計算邏輯 (修正版：含材料包運費規則與85折修復) ==========
 
 const calculateItem = (item) => {
   const {
@@ -573,8 +597,10 @@ const calculateItem = (item) => {
     extraFees,
     extraFee,
     enableDiscount90,
+    enableDiscount85, // ★ 確保解構出 85 折選項
     applyTransportFee = true,
-    isCustom = false, // ★★★ 新增：自訂模式標記
+    isCustom = false,
+    courseSeries, // ★ 解構出課程系列以判斷是否為材料包
   } = item;
 
   let error = null;
@@ -594,8 +620,9 @@ const calculateItem = (item) => {
       .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
-  // ★★★ 關鍵修改：如果是自訂模式 (isCustom)，完全跳過最低人數與師資費規則檢查 ★★★
-  if (!isCustom) {
+  // --- 一般課程最低人數與師資費規則 (僅非自訂且非材料包時檢查) ---
+  // ★ 如果是材料包，不需要檢查「最低出課人數」或「師資費」
+  if (!isCustom && courseSeries !== '材料包系列') {
       if (locationMode === 'outing') {
         if (outingRegion === 'North') {
           const isRemote =
@@ -625,6 +652,7 @@ const calculateItem = (item) => {
           }
         }
       } else {
+        // 店內包班
         if (outingRegion === 'Central') {
           if (count < 10) error = '中部店內包班最低人數 10 人';
         } else if (outingRegion === 'South') {
@@ -633,13 +661,32 @@ const calculateItem = (item) => {
       }
   }
 
-  // --- 九折優惠 ---
-  if (enableDiscount90) {
+  // --- 折扣邏輯 (含手動勾選修復) ---
+  if (enableDiscount85) {
+    // ★ 修復：新增 85 折邏輯
+    discountRate = 0.85;
+    isDiscountApplied = true;
+  } else if (enableDiscount90) {
     discountRate = 0.9;
     isDiscountApplied = true;
   }
 
-  // --- 車馬費計算 ---
+  // --- 材料包專屬折扣規則 (網購商品體系) ---
+  // 規則：200份可享9折且含運，300份可享85折且含運
+  if (courseSeries === '材料包系列') {
+      if (count >= 300) {
+          discountRate = 0.85;
+          isDiscountApplied = true;
+      } else if (count >= 200) {
+          // 如果手動已經勾了85折(enableDiscount85)，則維持0.85，否則自動給0.9
+          if (discountRate > 0.85) {
+             discountRate = 0.9;
+             isDiscountApplied = true;
+          }
+      }
+  }
+
+  // --- 車馬費/運費計算 ---
   if (locationMode === 'outing' && city && applyTransportFee) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
@@ -650,8 +697,16 @@ const calculateItem = (item) => {
       }
     }
   } else {
-    // 沒選地點，或者使用者手動取消了車馬費 (即使在自訂模式，若勾選套用車馬費依然會算)
     transportFee = 0;
+  }
+
+  // --- 材料包專屬運費規則 ---
+  // 規則：滿 $2000 免運，或滿 200 份以上免運 (含運)
+  if (courseSeries === '材料包系列') {
+      const originalTotal = unitPrice * count;
+      if (originalTotal >= 2000 || count >= 200) {
+          transportFee = 0;
+      }
   }
 
   const subTotal = unitPrice * count;
