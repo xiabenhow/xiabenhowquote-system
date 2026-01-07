@@ -153,6 +153,8 @@ const SECTION_CLASS =
 
 // ========== 課程資料 (完整版 + 新增材料包系列) ==========
 
+// ========== 課程資料 (完整版) ==========
+
 const COURSE_DATA = {
   材料包系列: [
     { name: '手作DIY材料包 | 迷你水苔多肉藤圈', price: 490 },
@@ -584,6 +586,8 @@ const getAvailableCities = (region) => {
 
 // ========== 價格計算邏輯 (修正版：含材料包運費規則與85折修復) ==========
 
+// ========== 價格計算邏輯 (修正版：含商品模式與85折修復) ==========
+
 const calculateItem = (item) => {
   const {
     price,
@@ -600,7 +604,8 @@ const calculateItem = (item) => {
     enableDiscount85, // ★ 確保解構出 85 折選項
     applyTransportFee = true,
     isCustom = false,
-    courseSeries, // ★ 解構出課程系列以判斷是否為材料包
+    isProductMode = false, // ★ 新增：商品模式
+    courseSeries, 
   } = item;
 
   let error = null;
@@ -620,9 +625,8 @@ const calculateItem = (item) => {
       .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
-  // --- 一般課程最低人數與師資費規則 (僅非自訂且非材料包時檢查) ---
-  // ★ 如果是材料包，不需要檢查「最低出課人數」或「師資費」
-  if (!isCustom && courseSeries !== '材料包系列') {
+  // --- 一般課程最低人數與師資費規則 (僅非自訂且非商品模式時檢查) ---
+  if (!isCustom && !isProductMode && courseSeries !== '材料包系列') {
       if (locationMode === 'outing') {
         if (outingRegion === 'North') {
           const isRemote =
@@ -663,23 +667,27 @@ const calculateItem = (item) => {
 
   // --- 折扣邏輯 (含手動勾選修復) ---
   if (enableDiscount85) {
-    // ★ 修復：新增 85 折邏輯
+    // ★ 手動勾選 85 折 (優先權高)
     discountRate = 0.85;
     isDiscountApplied = true;
   } else if (enableDiscount90) {
+    // ★ 手動勾選 9 折
     discountRate = 0.9;
     isDiscountApplied = true;
   }
 
-  // --- 材料包專屬折扣規則 (網購商品體系) ---
-  // 規則：200份可享9折且含運，300份可享85折且含運
-  if (courseSeries === '材料包系列') {
+  // --- 材料包/商品模式 專屬折扣規則 ---
+  // 規則：200份可享9折，300份可享85折 (自動套用，除非手動已選更優折扣)
+  if (isProductMode || courseSeries === '材料包系列') {
       if (count >= 300) {
-          discountRate = 0.85;
-          isDiscountApplied = true;
-      } else if (count >= 200) {
-          // 如果手動已經勾了85折(enableDiscount85)，則維持0.85，否則自動給0.9
+          // 如果手動沒勾或勾9折，自動升級為85折
           if (discountRate > 0.85) {
+             discountRate = 0.85;
+             isDiscountApplied = true;
+          }
+      } else if (count >= 200) {
+          // 如果手動沒勾，自動給9折
+          if (discountRate > 0.9) {
              discountRate = 0.9;
              isDiscountApplied = true;
           }
@@ -687,6 +695,7 @@ const calculateItem = (item) => {
   }
 
   // --- 車馬費/運費計算 ---
+  // 商品模式下，locationMode 會被強制設為 outing (為了顯示地址)，我們照樣計算運費
   if (locationMode === 'outing' && city && applyTransportFee) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
@@ -700,9 +709,9 @@ const calculateItem = (item) => {
     transportFee = 0;
   }
 
-  // --- 材料包專屬運費規則 ---
-  // 規則：滿 $2000 免運，或滿 200 份以上免運 (含運)
-  if (courseSeries === '材料包系列') {
+  // --- 材料包/商品模式 專屬免運規則 ---
+  // 規則：滿 $2000 免運，或滿 200 份以上免運
+  if (isProductMode || courseSeries === '材料包系列') {
       const originalTotal = unitPrice * count;
       if (originalTotal >= 2000 || count >= 200) {
           transportFee = 0;
@@ -1670,6 +1679,8 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // ========== QuoteCreator ==========
 
+// ========== QuoteCreator ==========
+
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
@@ -1691,11 +1702,10 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         const item = { ...raw };
         if (!item.extraFees) item.extraFees = [];
 
-        // 確保有預設的 applyTransportFee
+        // 確保屬性存在
         if (item.applyTransportFee === undefined) item.applyTransportFee = true;
-        // 確保有自訂模式旗標
         if (item.isCustom === undefined) item.isCustom = false;
-        // 確保有 85 折旗標
+        if (item.isProductMode === undefined) item.isProductMode = false; // ★ 新增
         if (item.enableDiscount85 === undefined) item.enableDiscount85 = false;
 
         if (item.extraFee > 0 && item.extraFees.length === 0) {
@@ -1749,6 +1759,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         itemNote: '',
         applyTransportFee: true,
         isCustom: false,
+        isProductMode: false, // ★ 新增預設
       },
     ];
   });
@@ -1770,7 +1781,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
     const newItems = [...items];
     const item = { ...newItems[index], [field]: value };
     
-    // 課程選單連動單價 (僅在非自訂模式下生效)
+    // 課程選單連動單價 (僅在非自訂且非手動模式生效)
     if (!item.isCustom) {
         if (field === 'courseName') {
             const series = COURSE_DATA[item.courseSeries];
@@ -1802,12 +1813,12 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const toggleCustomMode = (index) => {
       const newItems = [...items];
       const current = newItems[index];
-      // 切換模式時
+      // 切換為手動模式
       if (!current.isCustom) {
-          // 變成自訂
           current.isCustom = true;
-          // 清除 9 折，避免混淆 (自訂模式用 85 折)
+          current.isProductMode = false; // 互斥
           current.enableDiscount90 = false;
+          current.enableDiscount85 = false;
       } else {
           // 變回選單
           current.isCustom = false;
@@ -1817,8 +1828,36 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
               current.courseName = series[0].name;
               current.price = series[0].price;
           }
-          // 清除 85 折
-          current.enableDiscount85 = false;
+      }
+      setItems(newItems);
+  };
+
+  // ★ 新增：切換商品模式
+  const toggleProductMode = (index) => {
+      const newItems = [...items];
+      const current = newItems[index];
+      
+      if (!current.isProductMode) {
+          // 進入商品模式
+          current.isProductMode = true;
+          current.isCustom = false; // 互斥
+          current.courseSeries = '材料包系列';
+          current.locationMode = 'outing'; // 強制為外派(運送)邏輯以計算運費
+          const series = COURSE_DATA['材料包系列'];
+          if(series) {
+              current.courseName = series[0].name;
+              current.price = series[0].price;
+          }
+      } else {
+          // 離開商品模式，回到一般選單
+          current.isProductMode = false;
+          current.courseSeries = '水晶系列';
+          current.locationMode = 'store'; // 預設回店內
+          const series = COURSE_DATA['水晶系列'];
+          if(series) {
+              current.courseName = series[0].name;
+              current.price = series[0].price;
+          }
       }
       setItems(newItems);
   };
@@ -1836,6 +1875,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         extraFee: 0,
         timeRange: '',
         isCustom: false,
+        isProductMode: false,
         applyTransportFee: true,
       },
     ]);
@@ -1970,7 +2010,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
             <div key={item.id} className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500 relative">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-blue-800 flex items-center">
-                  <Plus className="w-5 h-5 mr-2" /> 課程項目 ({idx + 1})
+                  <Plus className="w-5 h-5 mr-2" /> 
+                  {item.isProductMode ? '商品項目 (材料包)' : `課程項目 (${idx + 1})`}
                 </h3>
                 {items.length > 1 && (
                   <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded">
@@ -1979,38 +2020,27 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 )}
               </div>
               
-              <div className="flex justify-end mb-2">
+              <div className="flex justify-end mb-2 gap-2">
                  <button 
                     type="button"
                     onClick={() => toggleCustomMode(idx)}
-                    className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition-colors"
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${item.isCustom ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'}`}
                  >
                      {item.isCustom ? "↩ 切換回選單選擇" : "✎ 改為手動輸入名稱與價格"}
                  </button>
+                 <button 
+                    type="button"
+                    onClick={() => toggleProductMode(idx)}
+                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${item.isProductMode ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'}`}
+                 >
+                     {item.isProductMode ? "↩ 切換回一般課程" : "📦 切換為商品模式"}
+                 </button>
               </div>
 
-              {/* 課程選擇 or 手動輸入 */}
+              {/* 課程選擇 or 手動輸入 or 商品模式 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {!item.isCustom ? (
-                    <>
-                        <div>
-                          <label className={LABEL_CLASS}>課程系列</label>
-                          <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
-                            {Object.keys(COURSE_DATA).map((s) => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
-                          <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
-                            {COURSE_DATA[item.courseSeries]?.map((c) => (
-                              <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
-                            ))}
-                          </select>
-                        </div>
-                    </>
-                ) : (
+                {/* 情況 1: 手動模式 */}
+                {item.isCustom && (
                     <>
                         <div className="md:col-span-2">
                              <label className={LABEL_CLASS}>課程名稱 (自訂)</label>
@@ -2033,14 +2063,56 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                         </div>
                     </>
                 )}
+
+                {/* 情況 2: 商品模式 (鎖定類別) */}
+                {item.isProductMode && (
+                    <>
+                        <div>
+                          <label className={LABEL_CLASS}>商品系列</label>
+                          <select className={INPUT_CLASS} disabled value="材料包系列">
+                            <option value="材料包系列">材料包系列</option>
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className={LABEL_CLASS}>商品名稱 （單價: ${item.price}）</label>
+                          <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
+                            {COURSE_DATA['材料包系列']?.map((c) => (
+                              <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
+                            ))}
+                          </select>
+                        </div>
+                    </>
+                )}
+
+                {/* 情況 3: 一般課程模式 */}
+                {!item.isCustom && !item.isProductMode && (
+                    <>
+                        <div>
+                          <label className={LABEL_CLASS}>課程系列</label>
+                          <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
+                            {Object.keys(COURSE_DATA).filter(k => k !== '材料包系列').map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
+                          <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
+                            {COURSE_DATA[item.courseSeries]?.map((c) => (
+                              <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
+                            ))}
+                          </select>
+                        </div>
+                    </>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div><label className={LABEL_CLASS}>人數</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
+                <div><label className={LABEL_CLASS}>{item.isProductMode ? '數量(份)' : '人數'}</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
                 
                 <div>
                     <label className={LABEL_CLASS}>
-                        日期 {item.isCustom ? '(選填)' : ''}
+                        日期 {item.isCustom || item.isProductMode ? '(選填)' : ''}
                     </label>
                     <input 
                         type="date" 
@@ -2054,7 +2126,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
               </div>
 
               <div className="flex flex-col gap-2 mb-4">
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                   <label className="flex items-center cursor-pointer select-none p-2 bg-yellow-50 rounded border border-yellow-100 flex-1">
                     <input type="checkbox" className="mr-2 w-4 h-4" checked={item.hasInvoice} onChange={(e) => updateItem(idx, 'hasInvoice', e.target.checked)} />
                     <span className="text-sm font-medium text-gray-700">是否開立發票？（加 5%）</span>
@@ -2064,85 +2136,137 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                     <input 
                         type="checkbox" 
                         className="mr-2 w-4 h-4" 
-                        checked={item.isCustom ? (item.enableDiscount85 || false) : (item.enableDiscount90 || false)} 
-                        onChange={(e) => updateItem(idx, item.isCustom ? 'enableDiscount85' : 'enableDiscount90', e.target.checked)} 
+                        checked={item.enableDiscount90 || false} 
+                        onChange={(e) => {
+                            updateItem(idx, 'enableDiscount90', e.target.checked);
+                            if(e.target.checked) updateItem(idx, 'enableDiscount85', false); // 互斥
+                        }} 
                     />
-                    <span className="text-sm font-medium text-red-700">
-                        {item.isCustom ? '套用 85 折優惠 (自訂模式)' : '套用 9 折優惠'}
-                    </span>
+                    <span className="text-sm font-medium text-red-700">套用 9 折優惠</span>
+                  </label>
+
+                  <label className="flex items-center cursor-pointer select-none p-2 bg-red-100 rounded border border-red-200 flex-1">
+                    <input 
+                        type="checkbox" 
+                        className="mr-2 w-4 h-4" 
+                        checked={item.enableDiscount85 || false} 
+                        onChange={(e) => {
+                            updateItem(idx, 'enableDiscount85', e.target.checked);
+                            if(e.target.checked) updateItem(idx, 'enableDiscount90', false); // 互斥
+                        }} 
+                    />
+                    <span className="text-sm font-bold text-red-800">套用 85 折優惠</span>
                   </label>
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
-                <div className="flex gap-6 mb-4">
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
-                  <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
-                </div>
-
-                {item.locationMode === 'outing' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className={LABEL_CLASS}>車馬費計算區域</label>
-                      <select className={INPUT_CLASS} value={item.outingRegion} onChange={(e) => updateItem(idx, 'outingRegion', e.target.value)}>
-                        <option value="North">北部出課</option>
-                        <option value="Central">中部老師出課</option>
-                        <option value="South">南部老師出課</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>縣市 {calcItem.calc.transportFee > 0 && !calcItem.area && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">預估: ${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
-                      <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
-                        {getAvailableCities(item.outingRegion).map((c) => (
-                          <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
+              {/* 地點設定：商品模式時僅顯示地址欄位，隱藏外派/店內選項 */}
+              {item.isProductMode ? (
+                  <div className="bg-purple-50 p-4 rounded border border-purple-200 mb-4">
+                      <div className="mb-2 font-bold text-purple-800 flex items-center">
+                          <Store className="w-4 h-4 mr-2"/> 商品寄送資訊
+                          {calcItem.calc.transportFee === 0 ? 
+                             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">符合免運資格</span> : 
+                             <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">未滿免運門檻</span>
+                          }
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
-                          <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
-                            <option value="">選擇區域...</option>
-                            {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
-                              <option key={zone} value={zone}>{zone} (+${fee})</option>
+                          <label className={LABEL_CLASS}>縣市 (計算運費用)</label>
+                          <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
+                            {getAvailableCities('North').map((c) => (
+                              <option key={c} value={c}>{c.replace('(北部出發)', '')}</option>
                             ))}
                           </select>
                         </div>
-                      )}
-                    <div className="md:col-span-3">
-                      <label className={LABEL_CLASS}>詳細地址</label>
-                      <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
-                    </div>
-                    
-                    <div className="md:col-span-3">
-                          <label className="flex items-center cursor-pointer select-none">
-                            <input 
-                                type="checkbox" 
-                                className="mr-2 w-4 h-4 text-blue-600" 
-                                checked={item.applyTransportFee} 
-                                onChange={(e) => updateItem(idx, 'applyTransportFee', e.target.checked)} 
-                            />
-                            <span className="text-sm font-bold text-gray-700">是否計算車馬費？ (取消勾選則車馬費為 $0)</span>
-                          </label>
+                        {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
+                            <div>
+                              <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
+                              <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
+                                <option value="">選擇區域...</option>
+                                {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
+                                  <option key={zone} value={zone}>{zone} (+${fee})</option>
+                                ))}
+                              </select>
+                            </div>
+                        )}
+                        <div className="md:col-span-3">
+                          <label className={LABEL_CLASS}>詳細寄送地址</label>
+                          <input className={INPUT_CLASS} placeholder="請輸入收件地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
+                        </div>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-4">
+                    <div className="flex gap-6 mb-4">
+                      <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'outing'} onChange={() => updateItem(idx, 'locationMode', 'outing')} /> 外派教學</label>
+                      <label className="flex items-center cursor-pointer font-bold text-gray-700"><input type="radio" name={`mode-${item.id}`} className="mr-2 w-4 h-4" checked={item.locationMode === 'store'} onChange={() => updateItem(idx, 'locationMode', 'store')} /> 店內包班</label>
                     </div>
 
+                    {item.locationMode === 'outing' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className={LABEL_CLASS}>車馬費計算區域</label>
+                          <select className={INPUT_CLASS} value={item.outingRegion} onChange={(e) => updateItem(idx, 'outingRegion', e.target.value)}>
+                            <option value="North">北部出課</option>
+                            <option value="Central">中部老師出課</option>
+                            <option value="South">南部老師出課</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={LABEL_CLASS}>縣市 {calcItem.calc.transportFee > 0 && !calcItem.area && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">預估: ${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
+                          <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
+                            {getAvailableCities(item.outingRegion).map((c) => (
+                              <option key={c} value={c}>{c.replace('(北部出發)', '').replace('(中部出發)', '').replace('(南部出發)', '')}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
+                            <div>
+                              <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
+                              <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
+                                <option value="">選擇區域...</option>
+                                {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
+                                  <option key={zone} value={zone}>{zone} (+${fee})</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        <div className="md:col-span-3">
+                          <label className={LABEL_CLASS}>詳細地址</label>
+                          <input className={INPUT_CLASS} placeholder="請輸入詳細地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
+                        </div>
+                        
+                        <div className="md:col-span-3">
+                              <label className="flex items-center cursor-pointer select-none">
+                                <input 
+                                    type="checkbox" 
+                                    className="mr-2 w-4 h-4 text-blue-600" 
+                                    checked={item.applyTransportFee} 
+                                    onChange={(e) => updateItem(idx, 'applyTransportFee', e.target.checked)} 
+                                />
+                                <span className="text-sm font-bold text-gray-700">是否計算車馬費？ (取消勾選則車馬費為 $0)</span>
+                              </label>
+                        </div>
+
+                      </div>
+                    ) : (
+                      <div className="flex gap-4">
+                        <div>
+                          <label className={LABEL_CLASS}>店內區域</label>
+                          <select className={INPUT_CLASS} value={item.regionType || 'North'} onChange={(e) => updateItem(idx, 'regionType', e.target.value)}>
+                            <option value="North">北部店內</option>
+                            <option value="Central">中部店內</option>
+                            <option value="South">南部店內</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex gap-4">
-                    <div>
-                      <label className={LABEL_CLASS}>店內區域</label>
-                      <select className={INPUT_CLASS} value={item.regionType || 'North'} onChange={(e) => updateItem(idx, 'regionType', e.target.value)}>
-                        <option value="North">北部店內</option>
-                        <option value="Central">中部店內</option>
-                        <option value="South">南部店內</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
 
               <div className="mb-4">
-                <label className={LABEL_CLASS}>該堂課備註說明（選填）</label>
+                <label className={LABEL_CLASS}>該品項備註說明（選填）</label>
                 <input type="text" className={INPUT_CLASS} placeholder="例如：需提前半小時進場、特殊需求..." value={item.itemNote || ''} onChange={(e) => updateItem(idx, 'itemNote', e.target.value)} />
               </div>
 
@@ -2183,7 +2307,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         })}
 
         <button onClick={addItem} className="w-full py-4 bg-white border-2 border-dashed border-gray-300 shadow-sm rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition flex justify-center items-center font-bold text-lg">
-          <Plus className="w-6 h-6 mr-2" /> 增加更多課程
+          <Plus className="w-6 h-6 mr-2" /> 增加更多項目
         </button>
       </div>
 
