@@ -2143,8 +2143,15 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                         className="mr-2 w-4 h-4" 
                         checked={item.enableDiscount90 || false} 
                         onChange={(e) => {
-                            updateItem(idx, 'enableDiscount90', e.target.checked);
-                            if(e.target.checked) updateItem(idx, 'enableDiscount85', false); // 互斥
+                            const checked = e.target.checked;
+                            const newItems = [...items];
+                            // 在一次更新中同時處理兩個狀態，避免衝突
+                            newItems[idx] = {
+                                ...newItems[idx],
+                                enableDiscount90: checked,
+                                enableDiscount85: checked ? false : newItems[idx].enableDiscount85
+                            };
+                            setItems(newItems);
                         }} 
                     />
                     <span className="text-sm font-medium text-red-700">套用 9 折優惠</span>
@@ -2156,8 +2163,15 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                         className="mr-2 w-4 h-4" 
                         checked={item.enableDiscount85 || false} 
                         onChange={(e) => {
-                            updateItem(idx, 'enableDiscount85', e.target.checked);
-                            if(e.target.checked) updateItem(idx, 'enableDiscount90', false); // 互斥
+                            const checked = e.target.checked;
+                            const newItems = [...items];
+                            // 在一次更新中同時處理兩個狀態，避免衝突
+                            newItems[idx] = {
+                                ...newItems[idx],
+                                enableDiscount85: checked,
+                                enableDiscount90: checked ? false : newItems[idx].enableDiscount90
+                            };
+                            setItems(newItems);
                         }} 
                     />
                     <span className="text-sm font-bold text-red-800">套用 85 折優惠</span>
