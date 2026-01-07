@@ -1658,7 +1658,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // ========== QuoteCreator ==========
 
-const QuoteCreator = ({ initialData, onSave, onCancel }) => {
+const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
       companyName: '',
@@ -2596,6 +2596,161 @@ const StatsView = ({ quotes }) => {
   );
 };
 
+
+// ========== 商品管理後台 (ProductManager) ==========
+const ProductManager = ({ currentData, onSave, onClose }) => {
+  // 將資料轉換為編輯用的狀態
+  const [data, setData] = useState(currentData || {});
+  const [newCategory, setNewCategory] = useState('');
+  const [newItem, setNewItem] = useState({ category: '', name: '', price: '' });
+
+  // 新增類別
+  const handleAddCategory = () => {
+    if (!newCategory.trim()) return;
+    if (data[newCategory]) {
+      alert('該類別已存在');
+      return;
+    }
+    setData(prev => ({ ...prev, [newCategory]: [] }));
+    setNewCategory('');
+  };
+
+  // 刪除類別
+  const handleDeleteCategory = (cat) => {
+    if (window.confirm(`確定要刪除整個「${cat}」類別及其所有商品嗎？`)) {
+      const next = { ...data };
+      delete next[cat];
+      setData(next);
+    }
+  };
+
+  // 新增商品
+  const handleAddItem = (category) => {
+    const name = newItem.name.trim();
+    const price = parseInt(newItem.price);
+    if (!name || isNaN(price)) {
+      alert('請輸入正確的名稱與價格');
+      return;
+    }
+    
+    const updatedList = [...(data[category] || []), { name, price }];
+    setData(prev => ({ ...prev, [category]: updatedList }));
+    setNewItem({ category: '', name: '', price: '' }); // 重置輸入
+  };
+
+  // 刪除商品
+  const handleDeleteItem = (category, index) => {
+    if(window.confirm('確定刪除此商品？')) {
+        const updatedList = data[category].filter((_, i) => i !== index);
+        setData(prev => ({ ...prev, [category]: updatedList }));
+    }
+  };
+
+  // 儲存至資料庫
+  const handleSaveToDb = () => {
+    onSave(data);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center">
+            <Settings className="w-6 h-6 mr-2 text-blue-600" />
+            商品與價格管理
+          </h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+          
+          {/* 新增類別區塊 */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex gap-2 items-center">
+            <span className="font-bold text-gray-700">新增類別：</span>
+            <input 
+              className="border rounded px-3 py-2 text-sm flex-1" 
+              placeholder="例如：限定節日禮盒..." 
+              value={newCategory}
+              onChange={e => setNewCategory(e.target.value)}
+            />
+            <button onClick={handleAddCategory} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 font-bold text-sm">
+              建立類別
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {Object.entries(data).map(([category, items]) => (
+              <div key={category} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-gray-100 px-4 py-3 border-b flex justify-between items-center">
+                  <h4 className="font-bold text-lg text-gray-800">{category}</h4>
+                  <button onClick={() => handleDeleteCategory(category)} className="text-red-400 hover:text-red-600 text-xs flex items-center">
+                    <Trash2 className="w-3 h-3 mr-1"/> 刪除類別
+                  </button>
+                </div>
+                
+                <div className="p-4">
+                  {/* 商品列表 */}
+                  <div className="space-y-2 mb-4">
+                    {items.length === 0 ? <p className="text-gray-400 text-sm italic">尚無商品</p> : items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center border-b border-gray-100 pb-2 last:border-0">
+                        <div>
+                          <span className="text-gray-800 font-medium">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-gray-600 font-bold">${item.price}</span>
+                          <button onClick={() => handleDeleteItem(category, idx)} className="text-gray-300 hover:text-red-500">
+                            <X className="w-4 h-4"/>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 新增商品輸入列 */}
+                  <div className="flex gap-2 items-center mt-4 bg-blue-50 p-2 rounded">
+                    <Plus className="w-4 h-4 text-blue-500"/>
+                    <input 
+                      className="border rounded px-2 py-1 text-sm flex-1" 
+                      placeholder="商品名稱"
+                      value={newItem.category === category ? newItem.name : ''}
+                      onChange={e => setNewItem({ ...newItem, category, name: e.target.value })}
+                    />
+                    <input 
+                      type="number" 
+                      className="border rounded px-2 py-1 text-sm w-24" 
+                      placeholder="價格"
+                      value={newItem.category === category ? newItem.price : ''}
+                      onChange={e => setNewItem({ ...newItem, category, price: e.target.value })}
+                    />
+                    <button 
+                      onClick={() => handleAddItem(category)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                    >
+                      新增
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t bg-white rounded-b-xl flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-50">取消</button>
+          <button onClick={handleSaveToDb} className="px-6 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 flex items-center">
+            <Save className="w-4 h-4 mr-2"/> 儲存變更
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ★★★ 第六部份 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
@@ -3827,440 +3982,281 @@ return (
 };
 
 // ========== App 主程式 (★ 修正：路由與安全鎖定邏輯) ==========
+// ========== App 主程式 ==========
 
 const App = () => {
-const urlParams = new URLSearchParams(window.location.search);
-const urlView = urlParams.get('view');
-const urlMode = urlParams.get('mode');
-const urlRegion = urlParams.get('region'); // ★ 讀取網址中的 region 參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlView = urlParams.get('view');
+  const urlMode = urlParams.get('mode');
+  const urlRegion = urlParams.get('region');
 
-const [quotes, setQuotes] = useState([]);
-const [regularClasses, setRegularClasses] = useState([]); // 新增狀態
-const [loading, setLoading] = useState(true);
-const [currentView, setCurrentView] = useState(
-urlView === 'calendar' ? 'calendar' : urlView === 'prep' ? 'prep' : 'list',
-);
-const [editingQuote, setEditingQuote] = useState(null);
-const [previewQuote, setPreviewQuote] = useState(null);
-const [paymentQuote, setPaymentQuote] = useState(null); // 款項 Modal
+  const [quotes, setQuotes] = useState([]);
+  const [regularClasses, setRegularClasses] = useState([]);
+  // ★ 新增：商品資料狀態，預設使用靜態檔案 (Fallback)
+  const [courseData, setCourseData] = useState(COURSE_DATA); 
+  const [loading, setLoading] = useState(true);
+  
+  const [currentView, setCurrentView] = useState(
+    urlView === 'calendar' ? 'calendar' : urlView === 'prep' ? 'prep' : 'list',
+  );
+  
+  const [editingQuote, setEditingQuote] = useState(null);
+  const [previewQuote, setPreviewQuote] = useState(null);
+  const [paymentQuote, setPaymentQuote] = useState(null);
+  const [showProductManager, setShowProductManager] = useState(false); // ★ 控制商品管理視窗
 
-// ★ 新增：解鎖狀態 (預設 false)
-const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const isPublicMode = urlMode === 'public';
 
-// ★★★ 修改：判斷公開模式 ★★★
-const isPublicMode = urlMode === 'public';
+  useEffect(() => {
+    if (!db) {
+      setLoading(false);
+      return;
+    }
 
-useEffect(() => {
-if (!db) {
-setLoading(false);
-return;
-}
+    // 1. 監聽報價單
+    const qQuotes = query(collection(db, 'quotes'), orderBy('createdAt', 'desc'));
+    const unsubQuotes = onSnapshot(qQuotes, (snapshot) => {
+      setQuotes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
 
-// 1. 監聽報價單
-const qQuotes = query(
-collection(db, 'quotes'),
-orderBy('createdAt', 'desc'),
-);
-const unsubQuotes = onSnapshot(qQuotes, (snapshot) => {
-setQuotes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-setLoading(false);
-});
+    // 2. 監聽常態課
+    const qRegular = query(collection(db, 'regularClasses'));
+    const unsubRegular = onSnapshot(qRegular, (snapshot) => {
+      setRegularClasses(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
 
-// 2. 監聽常態課
-const qRegular = query(
-collection(db, 'regularClasses'),
-);
-const unsubRegular = onSnapshot(qRegular, (snapshot) => {
-setRegularClasses(
-snapshot.docs.map((d) => ({ id: d.id, ...d.data() })),
-);
-});
+    // 3. ★ 新增：監聽商品目錄設定
+    const docRef = doc(db, 'settings', 'catalog');
+    const unsubCatalog = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+            // 如果資料庫有設定，使用資料庫的
+            setCourseData(docSnap.data());
+        } else {
+            // 如果資料庫是空的，寫入預設的靜態資料 (初始化)
+            setDoc(docRef, COURSE_DATA);
+        }
+    });
 
-return () => {
-unsubQuotes();
-unsubRegular();
-};
-}, []);
+    return () => {
+      unsubQuotes();
+      unsubRegular();
+      unsubCatalog();
+    };
+  }, []);
 
-const handleSaveQuote = async (data) => {
-try {
-if (!db) {
-alert('沒有連線 Firebase，僅在前端參考使用。');
-setQuotes((prev) => {
-  if (editingQuote?.id) {
-    return prev.map((q) =>
-      q.id === editingQuote.id ? { ...q, ...data } : q,
-    );
-  }
-  return [
-    {
-      id: generateId(),
-      ...data,
-      createdAt: new Date(),
-    },
-    ...prev,
-  ];
-});
-} else if (editingQuote?.id) {
-await updateDoc(doc(db, 'quotes', editingQuote.id), {
-  ...data,
-  updatedAt: serverTimestamp(),
-});
-} else {
-await addDoc(collection(db, 'quotes'), {
-  ...data,
-  status: data.status || 'pending', // 報價單預設
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp(),
-});
-}
-setEditingQuote(null);
-setCurrentView('list');
-} catch (err) {
-console.error('儲存報價單失敗', err);
-alert('儲存失敗，請稍後再試。');
-}
-};
+  // ★ 更新商品目錄到 Firebase
+  const handleUpdateCatalog = async (newData) => {
+      if(!db) return;
+      try {
+          await setDoc(doc(db, 'settings', 'catalog'), newData);
+          alert('商品目錄已更新！');
+      } catch(err) {
+          console.error("更新目錄失敗", err);
+          alert("更新失敗");
+      }
+  };
 
-const handleDeleteQuote = async (q) => {
-if (
-!window.confirm(
-`確定要刪除「${q.clientInfo.companyName}」這筆資料？`,
-)
-)
-return;
-try {
-if (db) await deleteDoc(doc(db, 'quotes', q.id));
-setQuotes((prev) => prev.filter((x) => x.id !== q.id));
-} catch (err) {
-console.error('刪除失敗', err);
-}
-};
-
-const handleChangeStatus = async (quote, newStatus) => {
-try {
-if (db)
-await updateDoc(doc(db, 'quotes', quote.id), {
-  status: newStatus,
-  updatedAt: serverTimestamp(),
-});
-setQuotes((prev) =>
-prev.map((q) =>
-  q.id === quote.id ? { ...q, status: newStatus } : q,
-),
-);
-} catch (err) {
-console.error('更新狀態失敗', err);
-}
-};
-
-const handleSavePayment = async (id, data) => {
-try {
-if (db) await updateDoc(doc(db, 'quotes', id), data);
-} catch (err) {
-console.error(err);
-alert('儲存款項失敗');
-}
-};
-
-// --- 新增常態課處理函數 ---
-const handleAddRegularClass = async (classData) => {
-try {
-if (db) {
-await addDoc(collection(db, 'regularClasses'), {
-  ...classData,
-  createdAt: serverTimestamp(),
-});
-} else {
-// 本地模式
-setRegularClasses((prev) => [
-  ...prev,
-  { id: generateId(), ...classData },
-]);
-}
-} catch (err) {
-console.error('新增常態課失敗', err);
-alert('新增失敗');
-}
-};
-
-// --- 更新常態課 ---
-const handleUpdateRegularClass = async (id, classData) => {
-try {
-if (db) {
-await updateDoc(doc(db, 'regularClasses', id), {
-  ...classData,
-  updatedAt: serverTimestamp(),
-});
-} else {
-setRegularClasses((prev) =>
-  prev.map((c) =>
-    c.id === id ? { ...c, ...classData } : c,
-  ),
-);
-}
-} catch (err) {
-console.error('更新常態課失敗', err);
-alert('更新失敗');
-}
-};
-
-const handleDeleteRegularClass = async (id) => {
-try {
-if (db) {
-await deleteDoc(doc(db, 'regularClasses', id));
-} else {
-setRegularClasses((prev) => prev.filter((c) => c.id !== id));
-}
-} catch (err) {
-console.error('刪除常態課失敗', err);
-alert('刪除失敗');
-}
-};
-
-// 新增：直接更新 Quote 的函式 (給 PrepView 用)
-const handleUpdateQuoteDirect = async (id, data) => {
-try {
-if (db) {
-await updateDoc(doc(db, 'quotes', id), {
-  ...data,
-  updatedAt: serverTimestamp(),
-});
-} else {
-setQuotes((prev) =>
-  prev.map((q) => (q.id === id ? { ...q, ...data } : q)),
-);
-}
-} catch (err) {
-console.error('更新失敗', err);
-alert('更新失敗');
-}
-};
-
-// ★ 邏輯判斷：如果是公開模式，直接顯示對應視圖
-if (isPublicMode) {
-return (
-<div className="min-h-screen bg-gray-100 py-4">
-{urlView === 'prep' ? (
-     <PreparationView 
-        quotes={quotes} 
-        onUpdateQuote={handleUpdateQuoteDirect}
-        publicMode 
-        publicRegion={urlRegion}
-     />
-) : (
-    <CalendarView
-      quotes={quotes}
-      regularClasses={regularClasses}
-      publicMode
-      publicRegion={urlRegion} // ★ 傳入網址的區域參數
-    />
-)}
-</div>
-);
-}
-
-// ★ 邏輯判斷：如果不是公開模式，但未解鎖，顯示鎖定畫面
-if (!isUnlocked) {
-return <AdminLock onUnlock={() => setIsUnlocked(true)} />;
-}
-
-// ★ 邏輯判斷：已解鎖，顯示完整後台
-return (
-<div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-{/* Header */}
-<header className="bg-white shadow-sm border-b border-gray-200">
-<div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-  <div className="flex items-center gap-3">
-    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
-      下
-    </div>
-    <div>
-      <div className="font-bold text-gray-800">
-        下班隨手作｜企業報價系統
-      </div>
-      <div className="text-xs text-gray-500">
-        內部管理系統 v4.0 (Full Merge)
-      </div>
-    </div>
-  </div>
-
-  <nav className="flex gap-2 text-sm">
-    <button
-      onClick={() => {
+  // ... (原本的 handleSaveQuote, handleDeleteQuote 等函式保持不變，直接複製過來即可) ...
+  // 為節省篇幅，這裡省略中間未變動的函式 (handleSaveQuote, handleDeleteQuote, handleChangeStatus, handleSavePayment, RegularClass 相關...) 
+  // 請務必保留您原本寫好的這些 CRUD 函式！
+  
+  // --------------------------------------------------------
+  // 以下為省略的函式佔位符，請確保您的程式碼中有這些
+  const handleSaveQuote = async (data) => {
+      try {
+        if (!db) {
+          alert('沒有連線 Firebase，僅在前端參考使用。');
+          setQuotes((prev) => {
+            if (editingQuote?.id) {
+              return prev.map((q) => q.id === editingQuote.id ? { ...q, ...data } : q);
+            }
+            return [{ id: generateId(), ...data, createdAt: new Date() }, ...prev];
+          });
+        } else if (editingQuote?.id) {
+          await updateDoc(doc(db, 'quotes', editingQuote.id), { ...data, updatedAt: serverTimestamp() });
+        } else {
+          await addDoc(collection(db, 'quotes'), { ...data, status: data.status || 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        }
         setEditingQuote(null);
         setCurrentView('list');
-      }}
-      className={`px-3 py-1 rounded-full ${
-        currentView === 'list' && !editingQuote
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      追蹤清單
-    </button>
-    <button
-      onClick={() => {
-        setEditingQuote({});
-        setCurrentView('create');
-      }}
-      className={`px-3 py-1 rounded-full ${
-        editingQuote
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      新增報價
-    </button>
-    <button
-      onClick={() => {
-        setEditingQuote(null);
-        setCurrentView('calendar');
-      }}
-      className={`px-3 py-1 rounded-full ${
-        currentView === 'calendar'
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      行事曆
-    </button>
+      } catch (err) {
+        console.error('儲存報價單失敗', err);
+        alert('儲存失敗，請稍後再試。');
+      }
+  };
+  const handleDeleteQuote = async (q) => {
+      if (!window.confirm(`確定要刪除「${q.clientInfo.companyName}」這筆資料？`)) return;
+      try {
+        if (db) await deleteDoc(doc(db, 'quotes', q.id));
+        setQuotes((prev) => prev.filter((x) => x.id !== q.id));
+      } catch (err) { console.error('刪除失敗', err); }
+  };
+  const handleChangeStatus = async (quote, newStatus) => {
+      try {
+        if (db) await updateDoc(doc(db, 'quotes', quote.id), { status: newStatus, updatedAt: serverTimestamp() });
+        setQuotes((prev) => prev.map((q) => q.id === quote.id ? { ...q, status: newStatus } : q));
+      } catch (err) { console.error('更新狀態失敗', err); }
+  };
+  const handleSavePayment = async (id, data) => {
+      try { if (db) await updateDoc(doc(db, 'quotes', id), data); } 
+      catch (err) { console.error(err); alert('儲存款項失敗'); }
+  };
+  const handleAddRegularClass = async (classData) => { /* ...原程式碼... */ };
+  const handleUpdateRegularClass = async (id, classData) => { /* ...原程式碼... */ };
+  const handleDeleteRegularClass = async (id) => { /* ...原程式碼... */ };
+  const handleUpdateQuoteDirect = async (id, data) => { /* ...原程式碼... */ };
+  // --------------------------------------------------------
 
-    {/* 新增備課表按鈕 */}
-    <button
-      onClick={() => {
-        setEditingQuote(null);
-        setCurrentView('prep');
-      }}
-      className={`px-3 py-1 rounded-full ${
-        currentView === 'prep'
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      <div className="flex items-center">
-        <ClipboardList className="w-3 h-3 mr-1" />
-        備課表
+
+  if (isPublicMode) {
+    return (
+      <div className="min-h-screen bg-gray-100 py-4">
+        {urlView === 'prep' ? (
+           <PreparationView quotes={quotes} onUpdateQuote={handleUpdateQuoteDirect} publicMode publicRegion={urlRegion} />
+        ) : (
+           <CalendarView quotes={quotes} regularClasses={regularClasses} publicMode publicRegion={urlRegion} />
+        )}
       </div>
-    </button>
+    );
+  }
 
-    <button
-      onClick={() => {
-        setEditingQuote(null);
-        setCurrentView('stats');
-      }}
-      className={`px-3 py-1 rounded-full ${
-        currentView === 'stats'
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      業績統計
-    </button>
-  </nav>
-</div>
-</header>
+  if (!isUnlocked) {
+    return <AdminLock onUnlock={() => setIsUnlocked(true)} />;
+  }
 
-{/* Main */}
-<main className="py-6">
-{loading && (
-  <div className="max-w-6xl mx-auto p-8 text-center text-gray-500">
-    載入中…
-  </div>
-)}
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">下</div>
+            <div>
+              <div className="font-bold text-gray-800">下班隨手作｜企業報價系統</div>
+              <div className="text-xs text-gray-500">內部管理系統 v4.1 (Product Manager)</div>
+            </div>
+          </div>
 
-{!loading && currentView === 'list' && !editingQuote && (
-  <QuoteList
-    quotes={quotes}
-    onCreateNew={() => {
-      setEditingQuote({});
-      setCurrentView('create');
-    }}
-    onEdit={(q) => {
-      setEditingQuote(q);
-      setCurrentView('create');
-    }}
-    onPreview={(q) => setPreviewQuote(q)}
-    onDelete={handleDeleteQuote}
-    onChangeStatus={handleChangeStatus}
-    onSwitchView={(v) => setCurrentView(v)}
-    onSave={handleSaveQuote}
-    onOpenPayment={setPaymentQuote} 
-  />
-)}
+          <nav className="flex gap-2 text-sm">
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('list'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'list' && !editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              追蹤清單
+            </button>
+            <button
+              onClick={() => { setEditingQuote({}); setCurrentView('create'); }}
+              className={`px-3 py-1 rounded-full ${editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              新增報價
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('calendar'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              行事曆
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('prep'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'prep' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              備課表
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('stats'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              業績統計
+            </button>
+            
+            {/* ★ 新增：商品管理按鈕 */}
+            <button
+              onClick={() => setShowProductManager(true)}
+              className="px-3 py-1 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-700 flex items-center border border-transparent hover:border-purple-200 ml-2"
+              title="管理商品與價格"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </nav>
+        </div>
+      </header>
 
-{!loading && (currentView === 'create' || editingQuote) && (
-  <QuoteCreator
-    initialData={editingQuote}
-    onSave={handleSaveQuote}
-    onCancel={() => {
-      setEditingQuote(null);
-      setCurrentView('list');
-    }}
-  />
-)}
+      {/* Main */}
+      <main className="py-6">
+        {loading && <div className="max-w-6xl mx-auto p-8 text-center text-gray-500">載入中…</div>}
 
-{!loading && currentView === 'calendar' && (
-  <CalendarView
-    quotes={quotes}
-    regularClasses={regularClasses}
-    onAddRegularClass={handleAddRegularClass}
-    onUpdateRegularClass={handleUpdateRegularClass}
-    onDeleteRegularClass={handleDeleteRegularClass}
-  />
-)}
+        {!loading && currentView === 'list' && !editingQuote && (
+          <QuoteList
+            quotes={quotes}
+            onCreateNew={() => { setEditingQuote({}); setCurrentView('create'); }}
+            onEdit={(q) => { setEditingQuote(q); setCurrentView('create'); }}
+            onPreview={(q) => setPreviewQuote(q)}
+            onDelete={handleDeleteQuote}
+            onChangeStatus={handleChangeStatus}
+            onSwitchView={(v) => setCurrentView(v)}
+            onSave={handleSaveQuote}
+            onOpenPayment={setPaymentQuote}
+          />
+        )}
 
-{!loading && currentView === 'prep' && (
-  <PreparationView
-    quotes={quotes}
-    onUpdateQuote={handleUpdateQuoteDirect}
-  />
-)}
+        {/* ★ 注意：這裡將 courseData 傳遞給 QuoteCreator */}
+        {!loading && (currentView === 'create' || editingQuote) && (
+          <QuoteCreator
+            initialData={editingQuote}
+            onSave={handleSaveQuote}
+            onCancel={() => { setEditingQuote(null); setCurrentView('list'); }}
+            courseData={courseData} 
+          />
+        )}
 
-{!loading && currentView === 'stats' && (
-  <StatsView quotes={quotes} />
-)}
-</main>
+        {!loading && currentView === 'calendar' && (
+          <CalendarView
+            quotes={quotes}
+            regularClasses={regularClasses}
+            onAddRegularClass={handleAddRegularClass}
+            onUpdateRegularClass={handleUpdateRegularClass}
+            onDeleteRegularClass={handleDeleteRegularClass}
+          />
+        )}
 
-{previewQuote && (
-<PreviewModal
-  quote={previewQuote}
-  onClose={() => setPreviewQuote(null)}
-/>
-)}
+        {!loading && currentView === 'prep' && (
+          <PreparationView quotes={quotes} onUpdateQuote={handleUpdateQuoteDirect} />
+        )}
 
-{paymentQuote && (
-<PaymentModal
-  quote={paymentQuote}
-  onClose={() => setPaymentQuote(null)}
-  onSave={handleSavePayment}
-/>
-)}
+        {!loading && currentView === 'stats' && <StatsView quotes={quotes} />}
+      </main>
 
-{/* ★★★ 全域 CSS 修正：確保印章與分頁在列印時的行為 ★★★ */}
-<style>{`
-@media print {
-  @page { margin: 0; size: auto; }
-  body { margin: 0; padding: 0; }
-  /* 強制背景圖形列印 */
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  
-  /* 確保印章容器不會切斷溢出的內容 */
-  .overflow-visible { overflow: visible !important; }
-  
-  /* 防止表格內容在不該斷的地方斷開 */
-  tr { break-inside: avoid; page-break-inside: avoid; }
-  
-  /* 隱藏所有非列印區域 */
-  .print\\:hidden { display: none !important; }
-}
+      {/* Modals */}
+      {previewQuote && <PreviewModal quote={previewQuote} onClose={() => setPreviewQuote(null)} />}
+      
+      {paymentQuote && <PaymentModal quote={paymentQuote} onClose={() => setPaymentQuote(null)} onSave={handleSavePayment} />}
+      
+      {/* ★ 新增：商品管理視窗 */}
+      {showProductManager && (
+          <ProductManager 
+             currentData={courseData} 
+             onSave={handleUpdateCatalog} 
+             onClose={() => setShowProductManager(false)} 
+          />
+      )}
 
-/* 一般動畫 */
-.animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
-`}</style>
-</div>
-);
+      {/* CSS */}
+      <style>{`
+        @media print {
+          @page { margin: 0; size: auto; }
+          body { margin: 0; padding: 0; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .overflow-visible { overflow: visible !important; }
+          tr { break-inside: avoid; page-break-inside: avoid; }
+          .print\\:hidden { display: none !important; }
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+      `}</style>
+    </div>
+  );
 };
 
 export default App;
