@@ -1675,10 +1675,6 @@ const PreviewModal = ({ quote, onClose }) => {
 };
 
 
-//第四部份 ========== QuoteCreator ==========
-
-// ========== QuoteCreator ==========
-
 // ========== QuoteCreator ==========
 
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
@@ -1705,7 +1701,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         // 確保屬性存在
         if (item.applyTransportFee === undefined) item.applyTransportFee = true;
         if (item.isCustom === undefined) item.isCustom = false;
-        if (item.isProductMode === undefined) item.isProductMode = false; // ★ 新增
+        if (item.isProductMode === undefined) item.isProductMode = false;
         if (item.enableDiscount85 === undefined) item.enableDiscount85 = false;
 
         if (item.extraFee > 0 && item.extraFees.length === 0) {
@@ -1759,7 +1755,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         itemNote: '',
         applyTransportFee: true,
         isCustom: false,
-        isProductMode: false, // ★ 新增預設
+        isProductMode: false,
       },
     ];
   });
@@ -1832,7 +1828,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
       setItems(newItems);
   };
 
-  // ★ 新增：切換商品模式
+  // 切換商品模式
   const toggleProductMode = (index) => {
       const newItems = [...items];
       const current = newItems[index];
@@ -1842,17 +1838,24 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           current.isProductMode = true;
           current.isCustom = false; // 互斥
           current.courseSeries = '材料包系列';
-          current.locationMode = 'outing'; // 強制為外派(運送)邏輯以計算運費
+          current.locationMode = 'outing'; // 強制為外派(運送)邏輯
+          
+          // 清空縣市區域，避免誤算車馬費 (商品模式運費由邏輯自動判斷)
+          current.city = '';
+          current.area = '';
+          
           const series = COURSE_DATA['材料包系列'];
           if(series) {
               current.courseName = series[0].name;
               current.price = series[0].price;
           }
       } else {
-          // 離開商品模式，回到一般選單
+          // 離開商品模式，回到一般課程
           current.isProductMode = false;
           current.courseSeries = '水晶系列';
           current.locationMode = 'store'; // 預設回店內
+          current.city = '台北市'; // 重置預設值
+          
           const series = COURSE_DATA['水晶系列'];
           if(series) {
               current.courseName = series[0].name;
@@ -2160,37 +2163,14 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
                 </div>
               </div>
 
-              {/* 地點設定：商品模式時僅顯示地址欄位，隱藏外派/店內選項 */}
+              {/* 地點設定：商品模式時僅顯示地址欄位，隱藏縣市區域 */}
               {item.isProductMode ? (
                   <div className="bg-purple-50 p-4 rounded border border-purple-200 mb-4">
                       <div className="mb-2 font-bold text-purple-800 flex items-center">
                           <Store className="w-4 h-4 mr-2"/> 商品寄送資訊
-                          {calcItem.calc.transportFee === 0 ? 
-                             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">符合免運資格</span> : 
-                             <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">未滿免運門檻</span>
-                          }
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className={LABEL_CLASS}>縣市 (計算運費用)</label>
-                          <select className={INPUT_CLASS} value={item.city} onChange={(e) => updateItem(idx, 'city', e.target.value)}>
-                            {getAvailableCities('North').map((c) => (
-                              <option key={c} value={c}>{c.replace('(北部出發)', '')}</option>
-                            ))}
-                          </select>
-                        </div>
-                        {TRANSPORT_FEES[item.city]?.zones && Object.keys(TRANSPORT_FEES[item.city].zones).length > 0 && (
-                            <div>
-                              <label className={LABEL_CLASS}>區域 {calcItem.calc.transportFee > 0 && (<span className="text-blue-600 ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded">+${calcItem.calc.transportFee.toLocaleString()}</span>)}</label>
-                              <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
-                                <option value="">選擇區域...</option>
-                                {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
-                                  <option key={zone} value={zone}>{zone} (+${fee})</option>
-                                ))}
-                              </select>
-                            </div>
-                        )}
-                        <div className="md:col-span-3">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="w-full">
                           <label className={LABEL_CLASS}>詳細寄送地址</label>
                           <input className={INPUT_CLASS} placeholder="請輸入收件地址" value={item.address || ''} onChange={(e) => updateItem(idx, 'address', e.target.value)} />
                         </div>
