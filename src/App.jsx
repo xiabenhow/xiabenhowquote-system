@@ -1677,6 +1677,8 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // ========== QuoteCreator ==========
 
+// ========== QuoteCreator ==========
+
 const QuoteCreator = ({ initialData, onSave, onCancel }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
@@ -1843,6 +1845,9 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
           // 清空縣市區域，避免誤算車馬費 (商品模式運費由邏輯自動判斷)
           current.city = '';
           current.area = '';
+          // 清空日期時間
+          current.eventDate = '';
+          current.timeRange = '';
           
           const series = COURSE_DATA['材料包系列'];
           if(series) {
@@ -1876,10 +1881,15 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
         enableDiscount85: false,
         extraFees: [],
         extraFee: 0,
-        timeRange: '',
+        extraFeeDesc: '',
+        address: '',
+        itemNote: '',
+        applyTransportFee: true,
         isCustom: false,
         isProductMode: false,
-        applyTransportFee: true,
+        // 重置日期時間，避免複製到不需要的資料
+        timeRange: '',
+        eventDate: '',
       },
     ]);
 
@@ -2111,21 +2121,34 @@ const QuoteCreator = ({ initialData, onSave, onCancel }) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div><label className={LABEL_CLASS}>{item.isProductMode ? '數量(份)' : '人數'}</label><input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} /></div>
-                
+                {/* 數量/人數 (所有模式皆顯示) */}
                 <div>
-                    <label className={LABEL_CLASS}>
-                        日期 {item.isCustom || item.isProductMode ? '(選填)' : ''}
-                    </label>
-                    <input 
-                        type="date" 
-                        className={INPUT_CLASS} 
-                        value={item.eventDate} 
-                        onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} 
-                    />
+                    <label className={LABEL_CLASS}>{item.isProductMode ? '數量(份)' : '人數'}</label>
+                    <input type="number" className={INPUT_CLASS} value={item.peopleCount} onChange={(e) => updateItem(idx, 'peopleCount', e.target.value)} />
                 </div>
                 
-                <div><label className={LABEL_CLASS}>時間（手動輸入）</label><input type="text" className={INPUT_CLASS} placeholder="例如：12:00-14:00" value={item.timeRange || ''} onChange={(e) => updateItem(idx, 'timeRange', e.target.value)} /></div>
+                {/* 日期 (商品模式隱藏) */}
+                {!item.isProductMode && (
+                    <div>
+                        <label className={LABEL_CLASS}>
+                            日期 {item.isCustom ? '(選填)' : ''}
+                        </label>
+                        <input 
+                            type="date" 
+                            className={INPUT_CLASS} 
+                            value={item.eventDate} 
+                            onChange={(e) => updateItem(idx, 'eventDate', e.target.value)} 
+                        />
+                    </div>
+                )}
+                
+                {/* 時間 (商品模式隱藏) */}
+                {!item.isProductMode && (
+                    <div>
+                        <label className={LABEL_CLASS}>時間（手動輸入）</label>
+                        <input type="text" className={INPUT_CLASS} placeholder="例如：12:00-14:00" value={item.timeRange || ''} onChange={(e) => updateItem(idx, 'timeRange', e.target.value)} />
+                    </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-2 mb-4">
