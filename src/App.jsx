@@ -586,7 +586,7 @@ const getAvailableCities = (region) => {
 
 // ========== 價格計算邏輯 (修正版：含材料包運費規則與85折修復) ==========
 
-// ========== 價格計算邏輯 (修正版：含商品模式與85折修復) ==========
+// ========== 價格計算邏輯 (修正版：全手動折扣 + 商品免運規則) ==========
 
 const calculateItem = (item) => {
   const {
@@ -604,7 +604,7 @@ const calculateItem = (item) => {
     enableDiscount85, // ★ 確保解構出 85 折選項
     applyTransportFee = true,
     isCustom = false,
-    isProductMode = false, // ★ 新增：商品模式
+    isProductMode = false,
     courseSeries, 
   } = item;
 
@@ -665,37 +665,17 @@ const calculateItem = (item) => {
       }
   }
 
-  // --- 折扣邏輯 (含手動勾選修復) ---
+  // --- 折扣邏輯 (完全依賴手動按鈕) ---
+  // ★ 修改說明：移除了自動根據數量判斷折扣的邏輯，現在只看按鈕狀態
   if (enableDiscount85) {
-    // ★ 手動勾選 85 折 (優先權高)
     discountRate = 0.85;
     isDiscountApplied = true;
   } else if (enableDiscount90) {
-    // ★ 手動勾選 9 折
     discountRate = 0.9;
     isDiscountApplied = true;
   }
 
-  // --- 材料包/商品模式 專屬折扣規則 ---
-  // 規則：200份可享9折，300份可享85折 (自動套用，除非手動已選更優折扣)
-  if (isProductMode || courseSeries === '材料包系列') {
-      if (count >= 300) {
-          // 如果手動沒勾或勾9折，自動升級為85折
-          if (discountRate > 0.85) {
-             discountRate = 0.85;
-             isDiscountApplied = true;
-          }
-      } else if (count >= 200) {
-          // 如果手動沒勾，自動給9折
-          if (discountRate > 0.9) {
-             discountRate = 0.9;
-             isDiscountApplied = true;
-          }
-      }
-  }
-
   // --- 車馬費/運費計算 ---
-  // 商品模式下，locationMode 會被強制設為 outing (為了顯示地址)，我們照樣計算運費
   if (locationMode === 'outing' && city && applyTransportFee) {
     const cityData = TRANSPORT_FEES[city];
     if (cityData) {
@@ -710,7 +690,7 @@ const calculateItem = (item) => {
   }
 
   // --- 材料包/商品模式 專屬免運規則 ---
-  // 規則：滿 $2000 免運，或滿 200 份以上免運
+  // 規則：滿 $2000 免運，或滿 200 份以上免運 (保留免運自動計算，方便作業)
   if (isProductMode || courseSeries === '材料包系列') {
       const originalTotal = unitPrice * count;
       if (originalTotal >= 2000 || count >= 200) {
@@ -738,7 +718,6 @@ const calculateItem = (item) => {
     error,
   };
 };
-
 // ★★★ 車馬費去重：同日 + 縣市 + 區域 + 地址，只收一次車馬費 ★★★
 const applyTransportDedup = (itemsWithCalc) => {
   const seenKeys = new Set();
