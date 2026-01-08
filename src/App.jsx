@@ -1289,11 +1289,12 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
 // ========== PreviewModal (修正：修復紅字錯誤、包含 PDF 修復與 Excel 功能) ==========
 
+// ========== PreviewModal (還原為您提供的正確版本) ==========
+
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
 
-  // ★ PDF 下載功能 (修正版：移除邊距，解決跑版問題)
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
     if (!element) return;
@@ -1312,19 +1313,11 @@ const PreviewModal = ({ quote, onClose }) => {
       }
     }
 
-    // ★★★ 關鍵修正：將 margin 設為 0，避免與 CSS 的寬度衝突 ★★★
     const opt = {
-      margin: 0, // 改為 0，因為您的 CSS 已經設定好版面寬度了
+      margin: 5,
       filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2, // 保持清晰度
-        useCORS: true,
-        scrollY: 0,
-        scrollX: 0,
-        // 設定虛擬視窗寬度為 A4 像素寬度 (約 794px)，確保排版一致
-        windowWidth: 794 
-      },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
     };
@@ -1338,7 +1331,7 @@ const PreviewModal = ({ quote, onClose }) => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定欄寬
+      // 1. 設定欄寬 (C欄維持 10 配合總金額)
       sheet.columns = [
         { header: '', key: 'item', width: 50 },
         { header: '', key: 'price', width: 12 },
@@ -1350,8 +1343,8 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.pageSetup = {
         paperSize: 9, // A4
         orientation: 'portrait',
-        fitToPage: false,
-        scale: 100,
+        fitToPage: false, // 不強制一頁
+        scale: 100, // ★ 改用標準 100% 比例
         margins: {
           left: 0.5, right: 0.5, top: 0.5, bottom: 0.5,
           header: 0.3, footer: 0.3
@@ -1524,6 +1517,7 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
       noteTitleRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
       
+      // 條款內容
       const notes = [
         '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
         '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
@@ -1539,6 +1533,7 @@ const PreviewModal = ({ quote, onClose }) => {
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         r.font = { size: 10, name: 'Microsoft JhengHei' };
         
+        // ★ 自動調整行高邏輯 (增加高度避免文字被切)
         const estimatedLines = Math.ceil(note.length / 45); 
         r.height = Math.max(25, estimatedLines * 22); 
       });
@@ -1550,13 +1545,14 @@ const PreviewModal = ({ quote, onClose }) => {
       bankRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
       bankRow.height = 30;
       
-      // 增加印章緩衝區
+      // ★★★ 關鍵修正：增加印章緩衝區 (解決壓字問題) ★★★
+      // 插入 5 行空白列，確保印章有足夠空間，不會蓋到銀行資訊
       for(let i=0; i<5; i++) {
           const emptyRow = sheet.addRow([]);
-          emptyRow.height = 30;
+          emptyRow.height = 30; // 每行給 30 高度
       }
 
-      // 10. 簽名欄
+      // 10. 簽名欄 (位置在緩衝區之後)
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
       signRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
       signRow.height = 50; 
@@ -1564,6 +1560,7 @@ const PreviewModal = ({ quote, onClose }) => {
       signRow.getCell(3).alignment = { vertical: 'bottom', horizontal: 'right' };
       sheet.mergeCells(`C${signRow.number}:D${signRow.number}`); 
       
+      // 底部再加一點緩衝
       sheet.addRow([]);
 
       // 12. 處理印章圖片
@@ -1576,6 +1573,7 @@ const PreviewModal = ({ quote, onClose }) => {
             extension: 'png',
           });
 
+          // ★ 印章定位修正：定位在簽名欄往上 4.5 行 (大約在緩衝區的中間)
           sheet.addImage(imageId, {
             tl: { col: 0.1, row: signRow.number - 4.5 }, 
             ext: { width: 160, height: 160 },
@@ -1585,6 +1583,9 @@ const PreviewModal = ({ quote, onClose }) => {
           console.error("無法載入印章圖片", imgErr);
         }
       }
+
+      // ★ 移除 printArea 設定：讓 Excel 自動偵測列印範圍，避免鎖死造成錯誤
+      // sheet.pageSetup.printArea = ... (移除)
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `${quote.clientInfo.companyName || '報價單'}_編輯檔.xlsx`;
