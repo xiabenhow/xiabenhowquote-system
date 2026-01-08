@@ -586,7 +586,7 @@ const getAvailableCities = (region) => {
 
 // ========== 價格計算邏輯 (修正版：含材料包運費規則與85折修復) ==========
 
-// ========== 價格計算邏輯 (修正版：全手動折扣 + 商品免運規則) ==========
+// ========== 價格計算邏輯 (修正版：桃園改為20人門檻 + 商品模式 + 手動折扣) ==========
 
 const calculateItem = (item) => {
   const {
@@ -601,7 +601,7 @@ const calculateItem = (item) => {
     extraFees,
     extraFee,
     enableDiscount90,
-    enableDiscount85, // ★ 確保解構出 85 折選項
+    enableDiscount85,
     applyTransportFee = true,
     isCustom = false,
     isProductMode = false,
@@ -629,19 +629,31 @@ const calculateItem = (item) => {
   if (!isCustom && !isProductMode && courseSeries !== '材料包系列') {
       if (locationMode === 'outing') {
         if (outingRegion === 'North') {
-          const isRemote =
-            ['桃園市', '新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) ||
-            city.includes('(北部出發)');
-          if (isRemote) {
-            if (count < 25) {
-              error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
-            }
+          // ★★★ 修改重點開始：將桃園市獨立判斷，門檻改為 20 人 ★★★
+          if (city === '桃園市') {
+             if (count < 20) {
+                 error = '北部遠程外派(桃園市)最低出課人數為 20 人';
+             }
           } else {
-            if (['台北市', '新北市'].includes(city)) {
-              // 正常模式下，自動計算師資費
-              if (count >= 10 && count <= 14) teacherFee = 2000;
-            }
+              // 其他遠程地區 (移除桃園，保留其他)
+              const isOtherRemote =
+                ['新竹縣市', '苗栗縣', '宜蘭縣'].includes(city) ||
+                city.includes('(北部出發)');
+              
+              if (isOtherRemote) {
+                if (count < 25) {
+                  error = `北部遠程外派(${city.replace(/\(.*\)/, '')})最低出課人數為 25 人`;
+                }
+              } else {
+                // 雙北地區 (台北/新北)
+                if (['台北市', '新北市'].includes(city)) {
+                  // 正常模式下，自動計算師資費
+                  if (count >= 10 && count <= 14) teacherFee = 2000;
+                }
+              }
           }
+          // ★★★ 修改重點結束 ★★★
+
         } else if (outingRegion === 'Central') {
           if (city === '台中市') {
             if (count < 10) error = '中部市區外派最低出課人數為 10 人';
@@ -666,7 +678,6 @@ const calculateItem = (item) => {
   }
 
   // --- 折扣邏輯 (完全依賴手動按鈕) ---
-  // ★ 修改說明：移除了自動根據數量判斷折扣的邏輯，現在只看按鈕狀態
   if (enableDiscount85) {
     discountRate = 0.85;
     isDiscountApplied = true;
@@ -690,7 +701,6 @@ const calculateItem = (item) => {
   }
 
   // --- 材料包/商品模式 專屬免運規則 ---
-  // 規則：滿 $2000 免運，或滿 200 份以上免運 (保留免運自動計算，方便作業)
   if (isProductMode || courseSeries === '材料包系列') {
       const originalTotal = unitPrice * count;
       if (originalTotal >= 2000 || count >= 200) {
