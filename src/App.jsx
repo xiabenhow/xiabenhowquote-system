@@ -1293,7 +1293,7 @@ const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
 
-  // ★ PDF 下載功能 (已包含防跑版修正)
+  // ★ PDF 下載功能 (修正版：移除邊距，解決跑版問題)
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
     if (!element) return;
@@ -1312,17 +1312,18 @@ const PreviewModal = ({ quote, onClose }) => {
       }
     }
 
-    // ★★★ 修改：優化 PDF 輸出參數，防止跑版 ★★★
+    // ★★★ 關鍵修正：將 margin 設為 0，避免與 CSS 的寬度衝突 ★★★
     const opt = {
-      margin: [10, 10, 10, 10], // 設定上下左右邊距為 10mm
+      margin: 0, // 改為 0，因為您的 CSS 已經設定好版面寬度了
       filename,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
-        scale: 2, // 保持高解析度
+        scale: 2, // 保持清晰度
         useCORS: true,
         scrollY: 0,
-        // ★ 關鍵修正：強制設定截圖寬度為 850px (A4標準)，避免受螢幕或 Modal 捲軸影響導致變形
-        windowWidth: 850
+        scrollX: 0,
+        // 設定虛擬視窗寬度為 A4 像素寬度 (約 794px)，確保排版一致
+        windowWidth: 794 
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
