@@ -615,14 +615,14 @@ const calculateItem = (item) => {
   let isDiscountApplied = false;
 
   const count = parseInt(peopleCount) || 0;
-  const unitPrice = parseFloat(price) || 0;
-  const manualDiscount = parseFloat(customDiscount) || 0;
+  const unitPrice = parseInt(price) || 0;
+  const manualDiscount = parseInt(customDiscount) || 0;
 
-  let totalExtraFee = parseFloat(extraFee) || 0;
+  let totalExtraFee = parseInt(extraFee) || 0;
   if (extraFees && Array.isArray(extraFees)) {
     totalExtraFee += extraFees
       .filter((f) => f.isEnabled)
-      .reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0);
+      .reduce((sum, f) => sum + (parseInt(f.amount) || 0), 0);
   }
 
   // --- 一般課程最低人數與師資費規則 (僅非自訂且非商品模式時檢查) ---
@@ -990,7 +990,7 @@ const QuotePreview = ({
                       -$
                       {(
                         (item.calc.discountAmount || 0) +
-                        (parseFloat(item.customDiscount || 0) || 0)
+                        (parseInt(item.customDiscount || 0) || 0)
                       ).toLocaleString()}
                     </td>
                   </tr>
@@ -1031,7 +1031,7 @@ const QuotePreview = ({
                           額外加價 ({fee.description || '未說明'})
                         </td>
                         <td className="p-1 text-right font-bold">
-                          +${parseFloat(fee.amount || 0).toLocaleString()}
+                          +${parseInt(fee.amount || 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -1078,30 +1078,7 @@ const QuotePreview = ({
       <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
-          {(items && items.some(i => i.courseSeries === '材料包系列') ? [
-            {
-              text: '本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單。',
-            },
-            {
-              text: '數量以報價單協議數量為主，可再臨時新增但不能臨時減少。',
-            },
-            {
-              text: '客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
-            },
-            {
-              text: '材料包寄送至指定地址，如需更改地址請提前告知。',
-            },
-            {
-              text: '材料包不接受個人因素退貨，如有瑕疵請於收到後3天內聯繫，將協助更換。',
-            },
-            {
-              text: '退換貨須於收到後5天內提出，寄送方式以隨機出貨為主，如需指定請提前告知。',
-            },
-            {
-              text: '付款方式：確認數量金額，回傳報價單，並蓋章付50%訂金，合約即生效。課程結束後7天內匯款付清尾款。',
-              highlight: true,
-            },
-          ] : [
+          {[
             {
               text: '本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
             },
@@ -1121,7 +1098,7 @@ const QuotePreview = ({
             {
               text: '已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
             },
-          ]).map((item, index) => (
+          ].map((item, index) => (
             <div key={index} className="flex items-start">
               <div className="w-4 pr-1 text-right">{index + 1}.</div>
               <div
@@ -1190,8 +1167,8 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   });
 
   const total = quote.totalAmount || 0;
-  const deposit = parseFloat(data.depositAmount || 0);
-  const adjustment = parseFloat(data.adjustmentAmount || 0);
+  const deposit = parseInt(data.depositAmount || 0);
+  const adjustment = parseInt(data.adjustmentAmount || 0);
   const remaining = total - deposit + adjustment;
 
   const handleSubmit = () => {
@@ -1453,7 +1430,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
         // 折扣
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
-            const discountAmount = (item.calc.discountAmount || 0) + (parseFloat(item.customDiscount || 0) || 0);
+            const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
             const discRow = sheet.addRow([
                 `折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, 
                 '', 
@@ -1487,7 +1464,7 @@ const PreviewModal = ({ quote, onClose }) => {
         if (item.extraFees) {
             item.extraFees.filter(f => f.isEnabled).forEach(fee => {
                  const feeRow = sheet.addRow([
-                    `額外加價 (${fee.description})`, '', '', parseFloat(fee.amount)
+                    `額外加價 (${fee.description})`, '', '', parseInt(fee.amount)
                  ]);
                  feeRow.eachCell(c => {
                     c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}};
@@ -1540,17 +1517,8 @@ const PreviewModal = ({ quote, onClose }) => {
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
       noteTitleRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
       
-      // 條款內容 (根據是否為材料包模式切換)
-      const isMaterialPackQuote = quote.items && quote.items.some(i => i.courseSeries === '材料包系列');
-      const notes = isMaterialPackQuote ? [
-        '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單。',
-        '2. 數量以報價單協議數量為主，可再臨時新增但不能臨時減少。',
-        '3. 客戶確認訂單簽章後，回傳 Mail：xiabenhow@gmail.com。或官方 Line：@xiabenhow 下班隨手作。',
-        '4. 材料包寄送至指定地址，如需更改地址請提前告知。',
-        '5. 材料包不接受個人因素退貨，如有瑕疵請於收到後3天內聯繫，將協助更換。',
-        '6. 退換貨須於收到後5天內提出，寄送方式以隨機出貨為主，如需指定請提前告知。',
-        '7. 付款方式：確認數量金額，回傳報價單，並蓋章付50%訂金，合約即生效。課程結束後7天內匯款付清尾款。',
-      ] : [
+      // 條款內容
+      const notes = [
         '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
         '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
         '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
@@ -1559,17 +1527,15 @@ const PreviewModal = ({ quote, onClose }) => {
         '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。'
       ];
 
-      notes.forEach((note, idx) => {
+      notes.forEach(note => {
         const r = sheet.addRow([note]);
         sheet.mergeCells(`A${r.number}:D${r.number}`);
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        // 材料包模式第7條 或 一般模式第5條 標紅色粗體
-        const isHighlight = isMaterialPackQuote ? (idx === 6) : (idx === 4);
-        r.font = { size: 10, name: 'Microsoft JhengHei', bold: isHighlight, color: isHighlight ? { argb: 'FFDC2626' } : undefined };
-
+        r.font = { size: 10, name: 'Microsoft JhengHei' };
+        
         // ★ 自動調整行高邏輯 (增加高度避免文字被切)
-        const estimatedLines = Math.ceil(note.length / 45);
-        r.height = Math.max(25, estimatedLines * 22);
+        const estimatedLines = Math.ceil(note.length / 45); 
+        r.height = Math.max(25, estimatedLines * 22); 
       });
 
       // 銀行資訊
@@ -2680,7 +2646,7 @@ const ProductManager = ({ currentData, onSave, onClose }) => {
   // 新增商品
   const handleAddItem = (category) => {
     const name = newItem.name.trim();
-    const price = parseFloat(newItem.price);
+    const price = parseInt(newItem.price);
     if (!name || isNaN(price)) {
       alert('請輸入正確的名稱與價格');
       return;
