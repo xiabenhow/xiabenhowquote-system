@@ -1325,199 +1325,234 @@ const PreviewModal = ({ quote, onClose }) => {
     window.html2pdf().from(element).set(opt).save();
   };
 
-  // ★ Excel 下載功能
+  // ★ Excel 下載功能（嚴格對齊 PDF 排版）
   const handleDownloadExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定欄寬 (C欄維持 10 配合總金額)
+      // 1. 設定欄寬（對齊 PDF 比例：項目寬、單價/人數/小計窄）
       sheet.columns = [
-        { header: '', key: 'item', width: 50 },
-        { header: '', key: 'price', width: 12 },
-        { header: '', key: 'count', width: 10 },
-        { header: '', key: 'total', width: 20 },
+        { header: '', key: 'col1', width: 38 },
+        { header: '', key: 'col2', width: 14 },
+        { header: '', key: 'col3', width: 12 },
+        { header: '', key: 'col4', width: 20 },
       ];
 
-      // 2. 設定列印屬性
+      // 2. 列印屬性 (A4)
       sheet.pageSetup = {
-        paperSize: 9, // A4
+        paperSize: 9,
         orientation: 'portrait',
-        fitToPage: false, // 不強制一頁
-        scale: 100, // ★ 改用標準 100% 比例
+        fitToPage: false,
+        scale: 100,
         margins: {
           left: 0.5, right: 0.5, top: 0.5, bottom: 0.5,
           header: 0.3, footer: 0.3
         }
       };
 
-      // 3. 標題
-      sheet.mergeCells('A1:D1');
+      const msjh = 'Microsoft JhengHei';
+      const grayText = { argb: 'FF6B7280' };
+      const darkBorderBottom = { bottom: { style: 'medium', color: { argb: 'FF374151' } } };
+
+      // 3. 標題列（左：標題，右：日期）— 對齊 PDF 的 flex justify-between
+      sheet.mergeCells('A1:C1');
       const titleCell = sheet.getCell('A1');
       titleCell.value = '下班隨手作活動報價單';
-      titleCell.font = { size: 20, bold: true, name: 'Microsoft JhengHei' };
-      titleCell.alignment = { horizontal: 'center' };
+      titleCell.font = { size: 20, bold: true, name: msjh };
+      titleCell.alignment = { horizontal: 'left', vertical: 'bottom' };
+      titleCell.border = darkBorderBottom;
 
-      // 4. 日期
-      sheet.mergeCells('A2:D2');
-      const dateCell = sheet.getCell('A2');
-      dateCell.value = `報價日期: ${displayDateStr} (有效期限：3天)`;
-      dateCell.alignment = { horizontal: 'right' };
-      dateCell.font = { size: 10, name: 'Microsoft JhengHei' };
+      const dateCellD1 = sheet.getCell('D1');
+      dateCellD1.value = `報價日期: ${displayDateStr}`;
+      dateCellD1.font = { size: 10, name: msjh, color: grayText };
+      dateCellD1.alignment = { horizontal: 'right', vertical: 'bottom' };
+      dateCellD1.border = darkBorderBottom;
+      sheet.getRow(1).height = 32;
 
+      // 4. 有效期限（右側第二行）
+      const dateCellD2 = sheet.getCell('D2');
+      dateCellD2.value = '有效期限：3天';
+      dateCellD2.font = { size: 10, bold: true, name: msjh, color: grayText };
+      dateCellD2.alignment = { horizontal: 'right' };
+      sheet.getRow(2).height = 18;
+
+      // 空白間隔列
       sheet.addRow([]);
 
-      // 5. 品牌與客戶資料
+      // 5. 品牌與客戶資料標頭
       const brandRow = sheet.addRow(['品牌單位', '', '客戶資料', '']);
       sheet.mergeCells(`A${brandRow.number}:B${brandRow.number}`);
       sheet.mergeCells(`C${brandRow.number}:D${brandRow.number}`);
-      
       ['A', 'C'].forEach(col => {
         const cell = sheet.getCell(`${col}${brandRow.number}`);
-        cell.font = { bold: true, name: 'Microsoft JhengHei' };
+        cell.font = { bold: true, size: 10, name: msjh };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
         cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
       });
 
+      // 品牌/客戶 資訊列（標籤對齊 PDF 格式）
+      const infoFont = { size: 10, name: msjh };
+      const infoAlign = { wrapText: true, vertical: 'top' };
       const addInfoRow = (label1, val1, label2, val2) => {
-        const r = sheet.addRow([`${label1} ${val1}`, '', `${label2} ${val2}`, '']);
+        const r = sheet.addRow([`${label1}  ${val1}`, '', `${label2}  ${val2}`, '']);
         sheet.mergeCells(`A${r.number}:B${r.number}`);
         sheet.mergeCells(`C${r.number}:D${r.number}`);
-        r.font = { size: 10, name: 'Microsoft JhengHei' };
-        r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        r.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+        r.font = infoFont;
+        r.getCell(1).alignment = infoAlign;
+        r.getCell(3).alignment = infoAlign;
       };
 
-      addInfoRow('公司:', '下班文化國際有限公司', '名稱:', quote.clientInfo.companyName || '-');
-      addInfoRow('統編:', '83475827', '統編:', quote.clientInfo.taxId || '-');
-      addInfoRow('電話:', '02-2371-4171', '電話:', quote.clientInfo.phone || '-');
-      addInfoRow('聯絡人:', '下班隨手作', '聯絡人:', quote.clientInfo.contactPerson || '-');
-      
-      sheet.addRow([]); 
+      addInfoRow('公司行號:', '下班文化國際有限公司', '名稱:', quote.clientInfo.companyName || '-');
+      addInfoRow('統一編號:', '83475827', '統編:', quote.clientInfo.taxId || '-');
+      addInfoRow('聯絡電話:', '02-2371-4171', '聯絡人:', quote.clientInfo.contactPerson || '-');
+      addInfoRow('聯絡人:', '下班隨手作', '電話:', quote.clientInfo.phone || '-');
 
-      // 6. 表格標頭
+      sheet.addRow([]);
+
+      // 6. 表格標頭（深灰底白字）
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
       headerRow.height = 25;
-      headerRow.eachCell((cell) => {
+      headerRow.eachCell((cell, colNumber) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
-        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Microsoft JhengHei', size: 11 };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, name: msjh, size: 11 };
+        cell.alignment = { horizontal: colNumber === 1 ? 'left' : 'center', vertical: 'middle' };
       });
 
+      // ★ 費用行輔助函式（合併 A:C 右對齊標籤 + D 金額，對齊 PDF 的 colSpan=3 text-right）
+      const addFeeRow = (label, amount, bgArgb, textArgb, numFmt) => {
+        const r = sheet.addRow(['', '', '', amount]);
+        sheet.mergeCells(`A${r.number}:C${r.number}`);
+        const lbl = r.getCell(1);
+        lbl.value = label;
+        lbl.alignment = { horizontal: 'right', vertical: 'middle' };
+        lbl.font = { name: msjh, size: 10, color: { argb: textArgb } };
+        lbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } };
+        const val = r.getCell(4);
+        val.numFmt = numFmt;
+        val.alignment = { horizontal: 'right', vertical: 'middle' };
+        val.font = { name: msjh, bold: true, color: { argb: textArgb } };
+        val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } };
+      };
+
       // 7. 課程項目
+      const dayMap = ['日', '一', '二', '三', '四', '五', '六'];
+
       quote.items.forEach((item) => {
         const timeText = item.timeRange || (item.startTime && item.endTime ? `${item.startTime}-${item.endTime}` : item.startTime || '');
-        const dateText = (item.eventDate || timeText) ? `時間：${item.eventDate} ${timeText}` : '';
+
+        // ★ 日期加星期（對齊 PDF 的 formatDateWithDay）
+        let dateWithDay = item.eventDate || '';
+        if (dateWithDay && typeof dateWithDay === 'string' && dateWithDay.includes('-')) {
+          try {
+            const parts = dateWithDay.split('-');
+            if (parts.length === 3) {
+              const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+              dateWithDay = `${dateWithDay} (${dayMap[d.getDay()]})`;
+            }
+          } catch (e) { /* ignore */ }
+        }
+
+        const dateText = (dateWithDay || timeText) ? `時間：${dateWithDay}${timeText ? ` ${timeText}` : ''}` : '';
         const addressText = item.address ? `地點：${item.address}` : '';
-        
         const itemName = item.courseName + (item.itemNote ? ` (備註: ${item.itemNote})` : '');
         const itemDesc = [itemName, dateText, addressText].filter(Boolean).join('\n');
 
-        const mainRow = sheet.addRow([
-          itemDesc, 
-          item.price, 
-          item.peopleCount, 
-          item.calc.subTotal
-        ]);
-        
-        mainRow.font = { name: 'Microsoft JhengHei', size: 11 };
+        // 主項目列
+        const mainRow = sheet.addRow([itemDesc, item.price, item.peopleCount, item.calc.subTotal]);
+        mainRow.font = { name: msjh, size: 11 };
         mainRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         mainRow.getCell(2).numFmt = '"$"#,##0';
         mainRow.getCell(2).alignment = { vertical: 'top', horizontal: 'right' };
         mainRow.getCell(3).alignment = { vertical: 'top', horizontal: 'right' };
         mainRow.getCell(4).numFmt = '"$"#,##0';
         mainRow.getCell(4).alignment = { vertical: 'top', horizontal: 'right' };
+        mainRow.getCell(4).font = { name: msjh, size: 11, bold: true };
 
-        // 折扣
+        // 折扣（紅底）
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
-            const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
-            const discRow = sheet.addRow([
-                `折扣優惠 ${item.customDiscountDesc ? `(${item.customDiscountDesc})` : ''}`, 
-                '', 
-                '', 
-                -discountAmount
-            ]);
-            discRow.eachCell((cell) => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
-                cell.font = { color: { argb: 'FFDC2626' }, name: 'Microsoft JhengHei', size: 10 };
-            });
-            discRow.getCell(4).font = { color: { argb: 'FFDC2626' }, bold: true, name: 'Microsoft JhengHei' };
-            discRow.getCell(4).numFmt = '-"$"#,##0';
-            discRow.getCell(4).alignment = { horizontal: 'right' };
+          const discountAmount = (item.calc.discountAmount || 0) + (parseInt(item.customDiscount || 0) || 0);
+          const discLabel = `折扣優惠${item.customDiscountDesc ? ` (${item.customDiscountDesc})` : ''}`;
+          addFeeRow(discLabel, -discountAmount, 'FFFFF1F2', 'FFDC2626', '-"$"#,##0');
         }
 
-        // 車馬費
+        // 車馬費（綠底）
         if (item.calc.transportFee > 0) {
-            const transRow = sheet.addRow([
-                `車馬費 (${item.city} ${item.area})`, '', '', item.calc.transportFee
-            ]);
-            transRow.eachCell(c => {
-                c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}};
-                c.font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei', size: 10 };
-            });
-            transRow.getCell(4).numFmt = '+"$"#,##0';
-            transRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true, name: 'Microsoft JhengHei' };
-            transRow.getCell(4).alignment = { horizontal: 'right' };
-        }
-        
-        // 額外費用
-        if (item.extraFees) {
-            item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-                 const feeRow = sheet.addRow([
-                    `額外加價 (${fee.description})`, '', '', parseInt(fee.amount)
-                 ]);
-                 feeRow.eachCell(c => {
-                    c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}};
-                    c.font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei', size: 10 };
-                 });
-                 feeRow.getCell(4).numFmt = '+"$"#,##0';
-                 feeRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true, name: 'Microsoft JhengHei' };
-                 feeRow.getCell(4).alignment = { horizontal: 'right' };
-            });
+          addFeeRow(`車馬費 (${item.city}${item.area})`, item.calc.transportFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
         }
 
-        // 營業稅
-        if (item.hasInvoice) {
-             const taxRow = sheet.addRow(['營業稅 (5%)', '', '', item.calc.tax]);
-             taxRow.eachCell(c => {
-                c.fill = {type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4'}};
-                c.font = { color: { argb: 'FF166534' }, name: 'Microsoft JhengHei', size: 10 };
-             });
-             taxRow.getCell(4).numFmt = '+"$"#,##0';
-             taxRow.getCell(4).font = { color: { argb: 'FF166534' }, bold: true, name: 'Microsoft JhengHei' };
-             taxRow.getCell(4).alignment = { horizontal: 'right' };
+        // 師資費（綠底）— ★ 補齊 PDF 有但舊版 Excel 遺漏的欄位
+        if (item.calc.teacherFee > 0) {
+          addFeeRow('師資費', item.calc.teacherFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
         }
-        
-        // 項目總計
-        const subTotalRow = sheet.addRow(['項目總計', '', '', item.calc.finalTotal]);
-        subTotalRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
-        subTotalRow.getCell(4).numFmt = '"$"#,##0';
-        subTotalRow.getCell(4).alignment = { horizontal: 'right' };
-        subTotalRow.border = { bottom: { style: 'medium' } };
-    });
+
+        // 額外費用（綠底）
+        if (item.extraFees) {
+          item.extraFees.filter(f => f.isEnabled).forEach(fee => {
+            addFeeRow(`額外加價 (${fee.description || '未說明'})`, parseInt(fee.amount || 0), 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+          });
+        }
+
+        // 營業稅（綠底）
+        if (item.hasInvoice) {
+          addFeeRow('營業稅 (5%)', item.calc.tax, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+        }
+
+        // 項目總計（合併 A:C 右對齊，底線）— 對齊 PDF 的 bg-gray-100 font-bold border-b-2
+        const subTotalRow = sheet.addRow(['', '', '', item.calc.finalTotal]);
+        sheet.mergeCells(`A${subTotalRow.number}:C${subTotalRow.number}`);
+        const stLabel = subTotalRow.getCell(1);
+        stLabel.value = '項目總計';
+        stLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+        stLabel.font = { bold: true, name: msjh, size: 11 };
+        stLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+        stLabel.border = { bottom: { style: 'medium', color: { argb: 'FFD1D5DB' } } };
+        const stVal = subTotalRow.getCell(4);
+        stVal.numFmt = '"$"#,##0';
+        stVal.alignment = { horizontal: 'right', vertical: 'middle' };
+        stVal.font = { bold: true, name: msjh, size: 11 };
+        stVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+        stVal.border = { bottom: { style: 'medium', color: { argb: 'FFD1D5DB' } } };
+      });
 
       sheet.addRow([]);
 
-      // 8. 總金額
+      // 8. 總金額（對齊 PDF 的右側方框樣式）
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
       totalRow.height = 35;
-      const labelCell = totalRow.getCell(3);
-      labelCell.font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Microsoft JhengHei' };
-      labelCell.alignment = { vertical: 'middle', horizontal: 'right' };
-      
-      const valueCell = totalRow.getCell(4);
-      valueCell.font = { size: 18, bold: true, color: { argb: 'FF1E3A8A' }, name: 'Microsoft JhengHei' };
-      valueCell.numFmt = '"$"#,##0';
-      valueCell.alignment = { vertical: 'middle', horizontal: 'right' };
+      const totalLabelCell = totalRow.getCell(3);
+      totalLabelCell.font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
+      totalLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
+      totalLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+      totalLabelCell.border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      };
+      const totalValueCell = totalRow.getCell(4);
+      totalValueCell.font = { size: 18, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
+      totalValueCell.numFmt = '"$"#,##0';
+      totalValueCell.alignment = { vertical: 'middle', horizontal: 'right' };
+      totalValueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+      totalValueCell.border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      };
+
+      // 總金額副標（對齊 PDF 的小字 "總金額"）
+      const totalSubRow = sheet.addRow(['', '', '', '總金額']);
+      totalSubRow.getCell(4).font = { size: 8, color: { argb: 'FF9CA3AF' }, name: msjh };
+      totalSubRow.getCell(4).alignment = { horizontal: 'right' };
 
       sheet.addRow([]);
-      
-      // 9. 注意事項 / 條款
+
+      // 9. 注意事項 / 條款（上方加粗分隔線對齊 PDF 的 border-t-2）
       const noteTitleRow = sheet.addRow(['注意事項 / 條款：']);
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
-      noteTitleRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
-      
-      // 條款內容
+      noteTitleRow.font = { bold: true, name: msjh, size: 11 };
+      noteTitleRow.getCell(1).border = { top: { style: 'medium', color: { argb: 'FF374151' } } };
+
       const notes = [
         '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
         '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
@@ -1531,61 +1566,58 @@ const PreviewModal = ({ quote, onClose }) => {
         const r = sheet.addRow([note]);
         sheet.mergeCells(`A${r.number}:D${r.number}`);
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        r.font = { size: 10, name: 'Microsoft JhengHei' };
-        
-        // ★ 自動調整行高邏輯 (增加高度避免文字被切)
-        const estimatedLines = Math.ceil(note.length / 45); 
-        r.height = Math.max(25, estimatedLines * 22); 
+        r.font = { size: 10, name: msjh };
+        const estimatedLines = Math.ceil(note.length / 50);
+        r.height = Math.max(25, estimatedLines * 22);
       });
 
-      // 銀行資訊
+      // 銀行資訊（灰底方框對齊 PDF 的 bg-gray-100 rounded border）
       const bankRow = sheet.addRow(['銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201']);
       sheet.mergeCells(`A${bankRow.number}:D${bankRow.number}`);
-      bankRow.font = { bold: true, name: 'Microsoft JhengHei', size: 10 };
+      bankRow.font = { bold: true, name: msjh, size: 10 };
       bankRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+      bankRow.getCell(1).border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      };
       bankRow.height = 30;
-      
-      // ★★★ 關鍵修正：增加印章緩衝區 (解決壓字問題) ★★★
-      // 插入 5 行空白列，確保印章有足夠空間，不會蓋到銀行資訊
-      for(let i=0; i<5; i++) {
-          const emptyRow = sheet.addRow([]);
-          emptyRow.height = 30; // 每行給 30 高度
+
+      // 印章緩衝區（避免印章蓋到銀行資訊）
+      for (let i = 0; i < 5; i++) {
+        const emptyRow = sheet.addRow([]);
+        emptyRow.height = 30;
       }
 
-      // 10. 簽名欄 (位置在緩衝區之後)
+      // 10. 簽名欄
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
-      signRow.font = { bold: true, name: 'Microsoft JhengHei', size: 11 };
-      signRow.height = 50; 
+      signRow.font = { bold: true, name: msjh, size: 11 };
+      signRow.height = 50;
       signRow.getCell(1).alignment = { vertical: 'bottom' };
       signRow.getCell(3).alignment = { vertical: 'bottom', horizontal: 'right' };
-      sheet.mergeCells(`C${signRow.number}:D${signRow.number}`); 
-      
-      // 底部再加一點緩衝
+      sheet.mergeCells(`C${signRow.number}:D${signRow.number}`);
+
       sheet.addRow([]);
 
-      // 12. 處理印章圖片
+      // 11. 印章圖片
       if (isSigned) {
         try {
           const response = await fetch(STAMP_URL);
-          const buffer = await response.arrayBuffer();
+          const imgBuffer = await response.arrayBuffer();
           const imageId = workbook.addImage({
-            buffer: buffer,
+            buffer: imgBuffer,
             extension: 'png',
           });
-
-          // ★ 印章定位修正：定位在簽名欄往上 4.5 行 (大約在緩衝區的中間)
           sheet.addImage(imageId, {
-            tl: { col: 0.1, row: signRow.number - 4.5 }, 
+            tl: { col: 0.1, row: signRow.number - 4.5 },
             ext: { width: 160, height: 160 },
-            editAs: 'oneCell' 
+            editAs: 'oneCell'
           });
         } catch (imgErr) {
           console.error("無法載入印章圖片", imgErr);
         }
       }
-
-      // ★ 移除 printArea 設定：讓 Excel 自動偵測列印範圍，避免鎖死造成錯誤
-      // sheet.pageSetup.printArea = ... (移除)
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `${quote.clientInfo.companyName || '報價單'}_編輯檔.xlsx`;
