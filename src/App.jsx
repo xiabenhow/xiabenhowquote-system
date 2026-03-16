@@ -1078,7 +1078,7 @@ const QuotePreview = ({
       <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
-          {(quote.items.some(it => it.isProductMode) ? [
+          {(items.some(it => it.isProductMode) ? [
             {
               text: '本報價單有效時間以接到合作案3日內為主，經買家簽章後則視為訂單確認單，並於開始販售前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
             },
