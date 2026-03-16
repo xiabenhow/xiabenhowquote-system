@@ -1331,23 +1331,24 @@ const PreviewModal = ({ quote, onClose }) => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('報價單');
 
-      // 1. 設定欄寬（對齊 PDF 比例：項目寬、單價/人數/小計窄）
+      // 1. 設定欄寬（加寬項目欄避免地址換行，壓縮其餘欄位）
       sheet.columns = [
-        { header: '', key: 'col1', width: 38 },
-        { header: '', key: 'col2', width: 14 },
-        { header: '', key: 'col3', width: 12 },
-        { header: '', key: 'col4', width: 20 },
+        { header: '', key: 'col1', width: 44 },
+        { header: '', key: 'col2', width: 12 },
+        { header: '', key: 'col3', width: 10 },
+        { header: '', key: 'col4', width: 18 },
       ];
 
-      // 2. 列印屬性 (A4)
+      // 2. 列印屬性 (A4，強制一頁)
       sheet.pageSetup = {
         paperSize: 9,
         orientation: 'portrait',
-        fitToPage: false,
-        scale: 100,
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
         margins: {
-          left: 0.5, right: 0.5, top: 0.5, bottom: 0.5,
-          header: 0.3, footer: 0.3
+          left: 0.3, right: 0.3, top: 0.25, bottom: 0.25,
+          header: 0.1, footer: 0.1
         }
       };
 
@@ -1368,20 +1369,22 @@ const PreviewModal = ({ quote, onClose }) => {
       dateCellD1.font = { size: 10, name: msjh, color: grayText };
       dateCellD1.alignment = { horizontal: 'right', vertical: 'bottom' };
       dateCellD1.border = darkBorderBottom;
-      sheet.getRow(1).height = 32;
+      sheet.getRow(1).height = 28;
 
       // 4. 有效期限（右側第二行）
       const dateCellD2 = sheet.getCell('D2');
       dateCellD2.value = '有效期限：3天';
       dateCellD2.font = { size: 10, bold: true, name: msjh, color: grayText };
       dateCellD2.alignment = { horizontal: 'right' };
-      sheet.getRow(2).height = 18;
+      sheet.getRow(2).height = 15;
 
       // 空白間隔列
-      sheet.addRow([]);
+      const spacer1 = sheet.addRow([]);
+      spacer1.height = 4;
 
       // 5. 品牌與客戶資料標頭
       const brandRow = sheet.addRow(['品牌單位', '', '客戶資料', '']);
+      brandRow.height = 18;
       sheet.mergeCells(`A${brandRow.number}:B${brandRow.number}`);
       sheet.mergeCells(`C${brandRow.number}:D${brandRow.number}`);
       ['A', 'C'].forEach(col => {
@@ -1396,6 +1399,7 @@ const PreviewModal = ({ quote, onClose }) => {
       const infoAlign = { wrapText: true, vertical: 'top' };
       const addInfoRow = (label1, val1, label2, val2) => {
         const r = sheet.addRow([`${label1}  ${val1}`, '', `${label2}  ${val2}`, '']);
+        r.height = 16;
         sheet.mergeCells(`A${r.number}:B${r.number}`);
         sheet.mergeCells(`C${r.number}:D${r.number}`);
         r.font = infoFont;
@@ -1408,11 +1412,12 @@ const PreviewModal = ({ quote, onClose }) => {
       addInfoRow('聯絡電話:', '02-2371-4171', '聯絡人:', quote.clientInfo.contactPerson || '-');
       addInfoRow('聯絡人:', '下班隨手作', '電話:', quote.clientInfo.phone || '-');
 
-      sheet.addRow([]);
+      const spacer2 = sheet.addRow([]);
+      spacer2.height = 4;
 
       // 6. 表格標頭（深灰底白字）
       const headerRow = sheet.addRow(['項目', '單價', '人數', '小計']);
-      headerRow.height = 25;
+      headerRow.height = 20;
       headerRow.eachCell((cell, colNumber) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
         cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, name: msjh, size: 11 };
@@ -1422,6 +1427,7 @@ const PreviewModal = ({ quote, onClose }) => {
       // ★ 費用行輔助函式（合併 A:C 右對齊標籤 + D 金額，對齊 PDF 的 colSpan=3 text-right）
       const addFeeRow = (label, amount, bgArgb, textArgb, numFmt) => {
         const r = sheet.addRow(['', '', '', amount]);
+        r.height = 18;
         sheet.mergeCells(`A${r.number}:C${r.number}`);
         const lbl = r.getCell(1);
         lbl.value = label;
@@ -1460,14 +1466,17 @@ const PreviewModal = ({ quote, onClose }) => {
 
         // 主項目列
         const mainRow = sheet.addRow([itemDesc, item.price, item.peopleCount, item.calc.subTotal]);
-        mainRow.font = { name: msjh, size: 11 };
+        const descLines = itemDesc.split('\n').length;
+        mainRow.height = Math.max(20, descLines * 15);
+        mainRow.font = { name: msjh, size: 10 };
         mainRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        mainRow.getCell(1).font = { name: msjh, size: 10 };
         mainRow.getCell(2).numFmt = '"$"#,##0';
         mainRow.getCell(2).alignment = { vertical: 'top', horizontal: 'right' };
         mainRow.getCell(3).alignment = { vertical: 'top', horizontal: 'right' };
         mainRow.getCell(4).numFmt = '"$"#,##0';
         mainRow.getCell(4).alignment = { vertical: 'top', horizontal: 'right' };
-        mainRow.getCell(4).font = { name: msjh, size: 11, bold: true };
+        mainRow.getCell(4).font = { name: msjh, size: 10, bold: true };
 
         // 折扣（紅底）
         if (item.calc.isDiscountApplied || item.customDiscount > 0) {
@@ -1500,28 +1509,30 @@ const PreviewModal = ({ quote, onClose }) => {
 
         // 項目總計（合併 A:C 右對齊，底線）— 對齊 PDF 的 bg-gray-100 font-bold border-b-2
         const subTotalRow = sheet.addRow(['', '', '', item.calc.finalTotal]);
+        subTotalRow.height = 20;
         sheet.mergeCells(`A${subTotalRow.number}:C${subTotalRow.number}`);
         const stLabel = subTotalRow.getCell(1);
         stLabel.value = '項目總計';
         stLabel.alignment = { horizontal: 'right', vertical: 'middle' };
-        stLabel.font = { bold: true, name: msjh, size: 11 };
+        stLabel.font = { bold: true, name: msjh, size: 10 };
         stLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
         stLabel.border = { bottom: { style: 'medium', color: { argb: 'FFD1D5DB' } } };
         const stVal = subTotalRow.getCell(4);
         stVal.numFmt = '"$"#,##0';
         stVal.alignment = { horizontal: 'right', vertical: 'middle' };
-        stVal.font = { bold: true, name: msjh, size: 11 };
+        stVal.font = { bold: true, name: msjh, size: 10 };
         stVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
         stVal.border = { bottom: { style: 'medium', color: { argb: 'FFD1D5DB' } } };
       });
 
-      sheet.addRow([]);
+      const spacer3 = sheet.addRow([]);
+      spacer3.height = 4;
 
       // 8. 總金額（對齊 PDF 的右側方框樣式）
       const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
-      totalRow.height = 35;
+      totalRow.height = 30;
       const totalLabelCell = totalRow.getCell(3);
-      totalLabelCell.font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
+      totalLabelCell.font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
       totalLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
       totalLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
       totalLabelCell.border = {
@@ -1530,7 +1541,7 @@ const PreviewModal = ({ quote, onClose }) => {
         left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
       };
       const totalValueCell = totalRow.getCell(4);
-      totalValueCell.font = { size: 18, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
+      totalValueCell.font = { size: 16, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
       totalValueCell.numFmt = '"$"#,##0';
       totalValueCell.alignment = { vertical: 'middle', horizontal: 'right' };
       totalValueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
@@ -1542,15 +1553,18 @@ const PreviewModal = ({ quote, onClose }) => {
 
       // 總金額副標（對齊 PDF 的小字 "總金額"）
       const totalSubRow = sheet.addRow(['', '', '', '總金額']);
+      totalSubRow.height = 14;
       totalSubRow.getCell(4).font = { size: 8, color: { argb: 'FF9CA3AF' }, name: msjh };
       totalSubRow.getCell(4).alignment = { horizontal: 'right' };
 
-      sheet.addRow([]);
+      const spacer4 = sheet.addRow([]);
+      spacer4.height = 6;
 
       // 9. 注意事項 / 條款（上方加粗分隔線對齊 PDF 的 border-t-2）
       const noteTitleRow = sheet.addRow(['注意事項 / 條款：']);
+      noteTitleRow.height = 18;
       sheet.mergeCells(`A${noteTitleRow.number}:D${noteTitleRow.number}`);
-      noteTitleRow.font = { bold: true, name: msjh, size: 11 };
+      noteTitleRow.font = { bold: true, name: msjh, size: 10 };
       noteTitleRow.getCell(1).border = { top: { style: 'medium', color: { argb: 'FF374151' } } };
 
       const notes = [
@@ -1566,15 +1580,18 @@ const PreviewModal = ({ quote, onClose }) => {
         const r = sheet.addRow([note]);
         sheet.mergeCells(`A${r.number}:D${r.number}`);
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-        r.font = { size: 10, name: msjh };
-        const estimatedLines = Math.ceil(note.length / 50);
-        r.height = Math.max(25, estimatedLines * 22);
+        r.font = { size: 9, name: msjh };
+        // 以合併後約90字元/行估算，壓緊行高
+        const estimatedLines = Math.ceil(note.length / 85);
+        r.height = Math.max(14, estimatedLines * 13);
       });
 
       // 銀行資訊（灰底方框對齊 PDF 的 bg-gray-100 rounded border）
+      const spacer5 = sheet.addRow([]);
+      spacer5.height = 4;
       const bankRow = sheet.addRow(['銀行：玉山銀行 永安分行 808　戶名：下班文化國際有限公司　帳號：1115-940-021201']);
       sheet.mergeCells(`A${bankRow.number}:D${bankRow.number}`);
-      bankRow.font = { bold: true, name: msjh, size: 10 };
+      bankRow.font = { bold: true, name: msjh, size: 9 };
       bankRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
       bankRow.getCell(1).border = {
         top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
@@ -1582,23 +1599,21 @@ const PreviewModal = ({ quote, onClose }) => {
         left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
         right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
       };
-      bankRow.height = 30;
+      bankRow.height = 22;
 
       // 印章緩衝區（避免印章蓋到銀行資訊）
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 3; i++) {
         const emptyRow = sheet.addRow([]);
-        emptyRow.height = 30;
+        emptyRow.height = 18;
       }
 
       // 10. 簽名欄
       const signRow = sheet.addRow(['下班隨手作代表：_________________', '', '客戶確認簽章：_________________']);
-      signRow.font = { bold: true, name: msjh, size: 11 };
-      signRow.height = 50;
+      signRow.font = { bold: true, name: msjh, size: 10 };
+      signRow.height = 35;
       signRow.getCell(1).alignment = { vertical: 'bottom' };
       signRow.getCell(3).alignment = { vertical: 'bottom', horizontal: 'right' };
       sheet.mergeCells(`C${signRow.number}:D${signRow.number}`);
-
-      sheet.addRow([]);
 
       // 11. 印章圖片
       if (isSigned) {
@@ -1610,8 +1625,8 @@ const PreviewModal = ({ quote, onClose }) => {
             extension: 'png',
           });
           sheet.addImage(imageId, {
-            tl: { col: 0.1, row: signRow.number - 4.5 },
-            ext: { width: 160, height: 160 },
+            tl: { col: 0.1, row: signRow.number - 3.5 },
+            ext: { width: 140, height: 140 },
             editAs: 'oneCell'
           });
         } catch (imgErr) {
