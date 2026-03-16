@@ -1078,7 +1078,30 @@ const QuotePreview = ({
       <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
         <h4 className="font-bold text-xs mb-1">注意事項 / 條款：</h4>
         <div className="space-y-0.5">
-          {[
+          {(quote.items.some(it => it.isProductMode) ? [
+            {
+              text: '本報價單有效時間以接到合作案3日內為主，經買家簽章後則視為訂單確認單，並於開始販售前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+            },
+            {
+              text: '數量以報價單協議數量為主，因老師已著手準備，可再臨時新增但不能臨時減少。',
+            },
+            {
+              text: '客戶確認訂單簽章後，掃描回傳Mail: xiabenhow@gmail.com，或LINE官方帳號@xiabenhow即可。',
+            },
+            {
+              text: '下班隨手作統一將材料包寄送至指定的地址。',
+            },
+            {
+              text: '退換貨不以個人喜好做退換貨：A. 如配色不喜歡 B. 反悔不買。商品毀損下班隨手作會提供換貨服務：A. 材料運送損壞。',
+            },
+            {
+              text: '退換貨申請須在收到商品後5天內提出，如不在換貨條件或是申請換貨時間內，下班隨手作有權拒絕退換貨。如未備註特殊需求，皆隨機出貨！',
+            },
+            {
+              text: '付款方式：確認最低數量交付日期，數量與金額後，需事先用印回傳報價單並付訂金50%，方可協議準備製作備料，已視合約生效，並在課程結束後一週內付清全額。',
+              highlight: true,
+            },
+          ] : [
             {
               text: '本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
             },
@@ -1098,7 +1121,7 @@ const QuotePreview = ({
             {
               text: '已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。',
             },
-          ].map((item, index) => (
+          ]).map((item, index) => (
             <div key={index} className="flex items-start">
               <div className="w-4 pr-1 text-right">{index + 1}.</div>
               <div
@@ -1567,7 +1590,10 @@ const PreviewModal = ({ quote, onClose }) => {
       noteTitleRow.font = { bold: true, name: msjh, size: 10 };
       noteTitleRow.getCell(1).border = { top: { style: 'medium', color: { argb: 'FF374151' } } };
 
-      const notes = [
+      // 判斷是否有商品模式項目
+      const hasProductModeItem = quote.items.some(it => it.isProductMode);
+
+      const normalNotes = [
         '1. 本報價單有效時間以接到合作案3天為主，經買家簽章後則視為訂單確認單，並於活動前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
         '2. 人數以報價單協議人數為主，可再臨時新增但不能臨時減少，如當天未達人數老師會製作成品補齊給客戶。',
         '3. 教學老師依報價單數量人數進行分配，為鞏固教學品質，實際報價人數以報價單【數量】等同【現場課程參與人數】，超過報價數量人數則依現場實際增加人數加收陪同費，並於尾款一併收費。',
@@ -1576,14 +1602,26 @@ const PreviewModal = ({ quote, onClose }) => {
         '6. 已預定的課程，由於此時間老師已經推掉其他手作課程，恕無法無故延期，造成老師損失。'
       ];
 
+      const productNotes = [
+        '1. 本報價單有效時間以接到合作案3日內為主，經買家簽章後則視為訂單確認單，並於開始販售前彼此簽訂總人數之報價單視同正式合作簽署，下班隨手作可依此作為收款依據。',
+        '2. 數量以報價單協議數量為主，因老師已著手準備，可再臨時新增但不能臨時減少。',
+        '3. 客戶確認訂單簽章後，掃描回傳Mail: xiabenhow@gmail.com，或LINE官方帳號@xiabenhow即可。',
+        '4. 下班隨手作統一將材料包寄送至指定的地址。',
+        '5. 退換貨不以個人喜好做退換貨：A. 如配色不喜歡 B. 反悔不買。商品毀損下班隨手作會提供換貨服務：A. 材料運送損壞。',
+        '6. 退換貨申請須在收到商品後5天內提出，如不在換貨條件或是申請換貨時間內，下班隨手作有權拒絕退換貨。如未備註特殊需求，皆隨機出貨！',
+        '7. 付款方式：確認最低數量交付日期，數量與金額後，需事先用印回傳報價單並付訂金50%，方可協議準備製作備料，已視合約生效，並在課程結束後一週內付清全額。'
+      ];
+
+      const notes = hasProductModeItem ? productNotes : normalNotes;
+
       notes.forEach(note => {
         const r = sheet.addRow([note]);
         sheet.mergeCells(`A${r.number}:D${r.number}`);
         r.getCell(1).alignment = { wrapText: true, vertical: 'top' };
         r.font = { size: 9, name: msjh };
-        // 以合併後約90字元/行估算，壓緊行高
-        const estimatedLines = Math.ceil(note.length / 85);
-        r.height = Math.max(14, estimatedLines * 13);
+        // 以合併後實際可容納約 55 中文字/行估算（A4 扣邊距後欄寬）
+        const estimatedLines = Math.ceil(note.length / 55);
+        r.height = Math.max(15, estimatedLines * 15);
       });
 
       // 銀行資訊（灰底方框對齊 PDF 的 bg-gray-100 rounded border）
