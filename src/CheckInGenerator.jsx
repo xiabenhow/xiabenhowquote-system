@@ -1,6 +1,7 @@
 // ========== 簽到表產生器 ==========
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Printer, Calendar, Users, Download, ChevronLeft, ChevronRight, FileText, Check } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const loadScript = (src) =>
   new Promise((resolve, reject) => {
@@ -32,13 +33,57 @@ const formatDateWithDay = (dateStr) => {
   } catch { return dateStr; }
 };
 
-const CheckInGenerator = ({ quotes, regularClasses }) => {
+const CheckInGenerator = ({ quotes, regularClasses, db }) => {
   const [selectedDate, setSelectedDate] = useState(
     new Date(Date.now() + 86400000).toISOString().slice(0, 10) // 預設明天
   );
   const [extraRows, setExtraRows] = useState(5); // 額外空白行數
   const [selectedEvents, setSelectedEvents] = useState(new Set());
+  const [registrationStudents, setRegistrationStudents] = useState({}); // { eventId: [{ name, course, time }] }
   const printRef = useRef(null);
+
+  // 從登記表抓學員名單
+  useEffect(() => {
+    if (!db || !selectedDate) return;
+    const fetchStudents = async () => {
+      const students = {};
+      
+      // 隨手作登記表 - 按時段分組
+      try {
+        const wsQ = query(collection(db, 'registrations_workshop'), where('date', '==', selectedDate));
+        const wsSnap = await getDocs(wsQ);
+        const workshopByTime = {};
+        wsSnap.forEach(doc => {
+          const d = doc.data();
+          const timeKey = d.time || '未指定時段';
+          if (!workshopByTime[timeKey]) workshopByTime[timeKey] = [];
+          workshopByTime[timeKey].push({ name: d.studentName || '', course: d.courseName || '', peopleCount: parseInt(d.peopleCount) || 1 });
+        });
+        Object.entries(workshopByTime).forEach(([time, list]) => {
+          students[`ws_${time}`] = list;
+        });
+      } catch (e) { console.error('fetch workshop err', e); }
+
+      // 課程登記表 - 按課程分組
+      try {
+        const csQ = query(collection(db, 'registrations_course'), where('date', '==', selectedDate));
+        const csSnap = await getDocs(csQ);
+        const courseByName = {};
+        csSnap.forEach(doc => {
+          const d = doc.data();
+          const courseKey = d.courseName || '未指定課程';
+          if (!courseByName[courseKey]) courseByName[courseKey] = [];
+          courseByName[courseKey].push({ name: d.studentName || '', location: d.location || '', peopleCount: parseInt(d.peopleCount) || 1 });
+        });
+        Object.entries(courseByName).forEach(([course, list]) => {
+          students[`cs_${course}`] = list;
+        });
+      } catch (e) { console.error('fetch course err', e); }
+
+      setRegistrationStudents(students);
+    };
+    fetchStudents();
+  }, [db, selectedDate]);
 
   // 找出該日期的所有課程
   const dayEvents = useMemo(() => {
@@ -82,8 +127,43 @@ const CheckInGenerator = ({ quotes, regularClasses }) => {
       }
     });
 
+    // 從登記表加入（隨手作 - 按時段）
+    Object.entries(registrationStudents).forEach(([key, list]) => {
+      if (key.startsWith('ws_')) {
+        const time = key.replace('ws_', '');
+        const studentNames = list.map(s => s.name).filter(Boolean);
+        const courses = [...new Set(list.map(s => s.course).filter(Boolean))];
+        events.push({
+          id: `reg_ws_${time}`,
+          type: 'workshop',
+          title: `隨手作 ${time} 場次`,
+          courseName: courses.join(' / ') || '隨手作體驗',
+          time: time !== '未指定時段' ? time : '',
+          peopleCount: list.reduce((sum, s) => sum + s.peopleCount, 0),
+          address: '',
+          studentList: studentNames,
+          note: '',
+        });
+      }
+      if (key.startsWith('cs_')) {
+        const course = key.replace('cs_', '');
+        const studentNames = list.map(s => s.name).filter(Boolean);
+        events.push({
+          id: `reg_cs_${course}`,
+          type: 'course_reg',
+          title: course,
+          courseName: course,
+          time: '',
+          peopleCount: list.reduce((sum, s) => sum + s.peopleCount, 0),
+          address: list[0]?.location || '',
+          studentList: studentNames,
+          note: '',
+        });
+      }
+    });
+
     return events.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  }, [quotes, regularClasses, selectedDate]);
+  }, [quotes, regularClasses, selectedDate, registrationStudents]);
 
   // 日期導航
   const goDay = (delta) => {
@@ -296,14 +376,18 @@ const CheckInGenerator = ({ quotes, regularClasses }) => {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: (event.peopleCount || 10) + extraRows }, (_, i) => (
-                  <tr key={i}>
-                    <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', color: '#999' }}>{i + 1}</td>
-                    <td style={{ border: '1px solid #333', padding: '8px', minWidth: '150px' }}>&nbsp;</td>
-                    <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center' }}>☐</td>
-                    <td style={{ border: '1px solid #333', padding: '8px', minWidth: '150px' }}>&nbsp;</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const names = event.studentList || [];
+                  const totalRows = Math.max(names.length, event.peopleCount || 10) + extraRows;
+                  return Array.from({ length: totalRows }, (_, i) => (
+                    <tr key={i}>
+                      <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center', color: '#999' }}>{i + 1}</td>
+                      <td style={{ border: '1px solid #333', padding: '8px', minWidth: '150px' }}>{names[i] || ''}&nbsp;</td>
+                      <td style={{ border: '1px solid #333', padding: '8px', textAlign: 'center' }}>☐</td>
+                      <td style={{ border: '1px solid #333', padding: '8px', minWidth: '150px' }}>&nbsp;</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
 

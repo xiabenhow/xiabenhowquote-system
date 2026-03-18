@@ -5199,7 +5199,7 @@ const App = () => {
 
         {/* ★ 簽到表 */}
         {!loading && currentView === 'checkin' && (
-          <CheckInGenerator quotes={quotes} regularClasses={regularClasses} />
+          <CheckInGenerator quotes={quotes} regularClasses={regularClasses} db={db} />
         )}
 
         {/* ★ 統一登記表 */}
