@@ -1,3 +1,7 @@
+import AccountingView from './AccountingView';
+import CheckInGenerator from './CheckInGenerator';
+import RegistrationView from './RegistrationView';
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -38,7 +42,17 @@ import {
   CheckSquare,
   MessageSquare, 
   FileSpreadsheet, // Excel 圖示
-  Settings // 確保設定圖示存在
+  Settings, // 確保設定圖示存在
+  Building2,
+  Phone,
+  Mail,
+  Tag,
+  Bell,
+  ArrowLeft,
+  UserPlus,
+  Activity,
+  RefreshCw,
+  Hash,
 } from 'lucide-react';
 
 // ★★★ Excel 功能 ★★★
@@ -59,6 +73,9 @@ import {
   orderBy,
   serverTimestamp,
   setDoc,
+  where,
+  getDocs,
+  writeBatch,
 } from 'firebase/firestore';
 
 // ★★★ 印章圖片路徑 ★★★
@@ -1753,7 +1770,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // ========== QuoteCreator ==========
 
-const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
+const QuoteCreator = ({ initialData, onSave, onCancel, courseData, clients = [] }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
       companyName: '',
@@ -1763,8 +1780,26 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
       address: '',
     },
   );
+  const [clientId, setClientId] = useState(initialData?.clientId || '');
   const [status] = useState(initialData?.status || 'draft');
   const [internalNote, setInternalNote] = useState(initialData?.internalNote || '');
+
+  // 當選擇客戶時，帶入客戶資料
+  const handleSelectClient = (id) => {
+    setClientId(id);
+    if (id) {
+      const c = clients.find((cl) => cl.id === id);
+      if (c) {
+        setClientInfo({
+          companyName: c.companyName || '',
+          taxId: c.taxId || '',
+          contactPerson: c.contactPerson || '',
+          phone: c.phone || '',
+          address: c.address || '',
+        });
+      }
+    }
+  };
   const [isSigned, setIsSigned] = useState(false);
 
   // 初始化 items
@@ -2018,6 +2053,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
 
     onSave({
       clientInfo,
+      clientId: clientId || '',
       items: calculatedItems,
       totalAmount,
       status,
@@ -2034,6 +2070,11 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
             <div className="w-1 h-6 bg-slate-800 mr-2 rounded" />
             客戶基本資料 (報價單抬頭)
           </h3>
+          {clients.length > 0 && (
+            <div className="mb-4">
+              <ClientSelector clients={clients} selectedClientId={clientId} onSelect={handleSelectClient} />
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={LABEL_CLASS}>公司/客戶名稱</label>
@@ -4085,6 +4126,572 @@ return (
 );
 };
 
+// ========== CRM 客戶管理模組 ==========
+
+const REGION_OPTIONS = [
+  { value: '', label: '全部區域' },
+  { value: 'North', label: '北部' },
+  { value: 'Central', label: '中部' },
+  { value: 'South', label: '南部' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: '全部狀態' },
+  { value: 'active', label: '活躍' },
+  { value: 'cold', label: '冷淡' },
+  { value: 'lost', label: '流失' },
+];
+
+const SOURCE_OPTIONS = ['LINE', '電話', 'Email', '官網', '轉介紹', 'Facebook', 'Instagram', '其他'];
+
+const statusLabel = (s) => {
+  if (s === 'active') return { text: '活躍', color: 'bg-green-100 text-green-700' };
+  if (s === 'cold') return { text: '冷淡', color: 'bg-yellow-100 text-yellow-700' };
+  if (s === 'lost') return { text: '流失', color: 'bg-red-100 text-red-700' };
+  return { text: s || '活躍', color: 'bg-gray-100 text-gray-600' };
+};
+
+const regionLabel = (r) => {
+  if (r === 'North') return '北部';
+  if (r === 'Central') return '中部';
+  if (r === 'South') return '南部';
+  return r || '';
+};
+
+// ---------- 客戶列表頁 ----------
+const ClientListView = ({ clients, onSelect, onEdit, onDelete, onCreate }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRegion, setFilterRegion] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const followUpClients = useMemo(() =>
+    clients.filter((c) => c.followUpDate && c.followUpDate <= today && c.status !== 'lost'),
+    [clients, today]
+  );
+
+  const filtered = useMemo(() => {
+    return clients.filter((c) => {
+      const term = searchTerm.toLowerCase();
+      const matchSearch = !term || (c.companyName || '').toLowerCase().includes(term) || (c.contactPerson || '').toLowerCase().includes(term);
+      const matchRegion = !filterRegion || c.region === filterRegion;
+      const matchStatus = !filterStatus || c.status === filterStatus;
+      return matchSearch && matchRegion && matchStatus;
+    });
+  }, [clients, searchTerm, filterRegion, filterStatus]);
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      {/* 標題列 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center">
+          <Building2 className="w-6 h-6 mr-2 text-blue-600" />
+          客戶管理
+          <span className="ml-2 text-sm font-normal text-gray-500">共 {clients.length} 筆</span>
+        </h2>
+        <button
+          onClick={onCreate}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 flex items-center text-sm"
+        >
+          <UserPlus className="w-4 h-4 mr-1" /> 新增客戶
+        </button>
+      </div>
+
+      {/* 需要跟進提醒 */}
+      {followUpClients.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 className="font-bold text-amber-800 flex items-center mb-2">
+            <Bell className="w-4 h-4 mr-1" /> 需要跟進 ({followUpClients.length})
+          </h3>
+          <div className="space-y-1">
+            {followUpClients.map((c) => {
+              const isOverdue = c.followUpDate < today;
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center justify-between text-sm px-3 py-2 rounded cursor-pointer hover:bg-amber-100 ${isOverdue ? 'text-red-700 font-bold' : 'text-amber-900'}`}
+                  onClick={() => onSelect(c)}
+                >
+                  <span>{c.companyName} - {c.contactPerson || '未填'}</span>
+                  <span className="text-xs">{c.followUpDate} {isOverdue ? '(已逾期)' : ''} {c.followUpNote ? `| ${c.followUpNote}` : ''}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 搜尋與篩選 */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+            placeholder="搜尋公司名稱或聯絡人..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}>
+          {REGION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* 客戶表格 */}
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="text-left p-3 font-bold text-gray-600">公司名稱</th>
+              <th className="text-left p-3 font-bold text-gray-600">聯絡人</th>
+              <th className="text-right p-3 font-bold text-gray-600">累計營收</th>
+              <th className="text-left p-3 font-bold text-gray-600">上次合作</th>
+              <th className="text-center p-3 font-bold text-gray-600">狀態</th>
+              <th className="text-center p-3 font-bold text-gray-600">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">尚無客戶資料</td></tr>
+            )}
+            {filtered.map((c) => {
+              const st = statusLabel(c.status);
+              return (
+                <tr key={c.id} className="border-b hover:bg-blue-50 cursor-pointer" onClick={() => onSelect(c)}>
+                  <td className="p-3 font-medium text-gray-800">
+                    {c.companyName || '-'}
+                    {c.tags && c.tags.length > 0 && (
+                      <span className="ml-2">
+                        {c.tags.map((t) => (
+                          <span key={t} className="inline-block bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded mr-1">{t}</span>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-gray-600">{c.contactPerson || '-'}</td>
+                  <td className="p-3 text-right font-medium text-gray-800">{(c.totalRevenue || 0).toLocaleString()}</td>
+                  <td className="p-3 text-gray-500 text-xs">{c.lastOrderDate || '-'}</td>
+                  <td className="p-3 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${st.color}`}>{st.text}</span>
+                  </td>
+                  <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-center gap-1">
+                      <button onClick={() => onSelect(c)} className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 flex items-center"><Eye className="w-3 h-3 mr-1" />查看</button>
+                      <button onClick={() => onEdit(c)} className="px-2 py-1 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 flex items-center"><Edit className="w-3 h-3 mr-1" />編輯</button>
+                      <button onClick={() => onDelete(c)} className="px-2 py-1 text-xs bg-white border border-red-300 text-red-700 rounded hover:bg-red-50 flex items-center"><Trash2 className="w-3 h-3 mr-1" />刪除</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ---------- 客戶編輯彈窗 ----------
+const ClientEditModal = ({ client, onClose, onSave }) => {
+  const isNew = !client?.id;
+  const [form, setForm] = useState({
+    companyName: client?.companyName || '',
+    taxId: client?.taxId || '',
+    contactPerson: client?.contactPerson || '',
+    phone: client?.phone || '',
+    email: client?.email || '',
+    address: client?.address || '',
+    source: client?.source || 'LINE',
+    region: client?.region || 'North',
+    notes: client?.notes || '',
+    status: client?.status || 'active',
+  });
+
+  const handleSubmit = () => {
+    if (!form.companyName.trim()) { alert('請輸入公司名稱'); return; }
+    onSave(form);
+  };
+
+  const update = (field, val) => setForm((prev) => ({ ...prev, [field]: val }));
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in">
+        <div className="bg-blue-600 p-4 flex justify-between items-center text-white rounded-t-xl">
+          <h3 className="font-bold text-lg flex items-center">
+            <Building2 className="w-5 h-5 mr-2" />
+            {isNew ? '新增客戶' : '編輯客戶'}
+          </h3>
+          <button onClick={onClose} className="text-white hover:text-blue-200"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label className={LABEL_CLASS}>公司名稱 *</label><input className={INPUT_CLASS} value={form.companyName} onChange={(e) => update('companyName', e.target.value)} /></div>
+            <div><label className={LABEL_CLASS}>統一編號</label><input className={INPUT_CLASS} value={form.taxId} onChange={(e) => update('taxId', e.target.value)} /></div>
+            <div><label className={LABEL_CLASS}>聯絡人</label><input className={INPUT_CLASS} value={form.contactPerson} onChange={(e) => update('contactPerson', e.target.value)} /></div>
+            <div><label className={LABEL_CLASS}>電話</label><input className={INPUT_CLASS} value={form.phone} onChange={(e) => update('phone', e.target.value)} /></div>
+            <div><label className={LABEL_CLASS}>Email</label><input className={INPUT_CLASS} type="email" value={form.email} onChange={(e) => update('email', e.target.value)} /></div>
+            <div><label className={LABEL_CLASS}>來源</label>
+              <select className={INPUT_CLASS} value={form.source} onChange={(e) => update('source', e.target.value)}>
+                {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className={LABEL_CLASS}>區域</label>
+              <select className={INPUT_CLASS} value={form.region} onChange={(e) => update('region', e.target.value)}>
+                <option value="North">北部</option>
+                <option value="Central">中部</option>
+                <option value="South">南部</option>
+              </select>
+            </div>
+            <div><label className={LABEL_CLASS}>狀態</label>
+              <select className={INPUT_CLASS} value={form.status} onChange={(e) => update('status', e.target.value)}>
+                <option value="active">活躍</option>
+                <option value="cold">冷淡</option>
+                <option value="lost">流失</option>
+              </select>
+            </div>
+          </div>
+          <div><label className={LABEL_CLASS}>地址</label><input className={INPUT_CLASS} value={form.address} onChange={(e) => update('address', e.target.value)} /></div>
+          <div><label className={LABEL_CLASS}>備註</label><textarea className={INPUT_CLASS} rows="2" value={form.notes} onChange={(e) => update('notes', e.target.value)} /></div>
+        </div>
+        <div className="p-4 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50">取消</button>
+          <button onClick={handleSubmit} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">{isNew ? '建立' : '儲存'}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- 客戶詳情頁 ----------
+const ClientDetailView = ({ client, quotes, activities, onBack, onSave, onAddActivity, onUpdateFollowUp, onNewQuote }) => {
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm] = useState({ ...client });
+  const [newTag, setNewTag] = useState('');
+  const [noteText, setNoteText] = useState('');
+  const [followDate, setFollowDate] = useState(client.followUpDate || '');
+  const [followNote, setFollowNote] = useState(client.followUpNote || '');
+
+  const clientQuotes = useMemo(() =>
+    quotes.filter((q) => q.clientId === client.id || (q.clientInfo?.companyName && q.clientInfo.companyName === client.companyName)),
+    [quotes, client]
+  );
+
+  const update = (field, val) => setForm((prev) => ({ ...prev, [field]: val }));
+
+  const handleSaveInfo = () => {
+    onSave(client.id, form);
+    setEditMode(false);
+  };
+
+  const handleAddTag = () => {
+    if (!newTag.trim()) return;
+    const tags = [...(form.tags || [])];
+    if (!tags.includes(newTag.trim())) tags.push(newTag.trim());
+    setForm((prev) => ({ ...prev, tags }));
+    onSave(client.id, { tags });
+    setNewTag('');
+  };
+
+  const handleRemoveTag = (tag) => {
+    const tags = (form.tags || []).filter((t) => t !== tag);
+    setForm((prev) => ({ ...prev, tags }));
+    onSave(client.id, { tags });
+  };
+
+  const handleSaveFollowUp = () => {
+    onUpdateFollowUp(client.id, followDate, followNote);
+  };
+
+  const handleAddNote = () => {
+    if (!noteText.trim()) return;
+    onAddActivity({
+      clientId: client.id,
+      type: 'note',
+      title: '新增備註',
+      detail: noteText,
+      amount: 0,
+      createdBy: '管理員',
+    });
+    setNoteText('');
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = client.followUpDate && client.followUpDate < today;
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      {/* 返回 + 標題 */}
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200"><ArrowLeft className="w-5 h-5" /></button>
+        <h2 className="text-xl font-bold text-gray-800">{client.companyName}</h2>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusLabel(client.status).color}`}>{statusLabel(client.status).text}</span>
+        {client.region && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{regionLabel(client.region)}</span>}
+      </div>
+
+      {/* 統計卡片 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">${(client.totalRevenue || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500 mt-1">累計營收</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{client.totalOrders || 0}</div>
+          <div className="text-xs text-gray-500 mt-1">合作次數</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <div className="text-lg font-bold text-gray-700">{client.firstOrderDate || '-'}</div>
+          <div className="text-xs text-gray-500 mt-1">首次合作</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <div className="text-lg font-bold text-gray-700">{client.lastOrderDate || '-'}</div>
+          <div className="text-xs text-gray-500 mt-1">最近合作</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 左欄：基本資料 + 跟進 + 標籤 */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* 基本資料 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-gray-700 flex items-center"><User className="w-4 h-4 mr-1" /> 基本資料</h3>
+              {!editMode ? (
+                <button onClick={() => setEditMode(true)} className="text-xs text-blue-600 hover:underline">編輯</button>
+              ) : (
+                <button onClick={handleSaveInfo} className="text-xs text-green-600 font-bold hover:underline">儲存</button>
+              )}
+            </div>
+            {editMode ? (
+              <div className="space-y-2 text-sm">
+                <input className={INPUT_CLASS} value={form.companyName} onChange={(e) => update('companyName', e.target.value)} placeholder="公司名稱" />
+                <input className={INPUT_CLASS} value={form.taxId || ''} onChange={(e) => update('taxId', e.target.value)} placeholder="統編" />
+                <input className={INPUT_CLASS} value={form.contactPerson || ''} onChange={(e) => update('contactPerson', e.target.value)} placeholder="聯絡人" />
+                <input className={INPUT_CLASS} value={form.phone || ''} onChange={(e) => update('phone', e.target.value)} placeholder="電話" />
+                <input className={INPUT_CLASS} value={form.email || ''} onChange={(e) => update('email', e.target.value)} placeholder="Email" />
+                <input className={INPUT_CLASS} value={form.address || ''} onChange={(e) => update('address', e.target.value)} placeholder="地址" />
+                <select className={INPUT_CLASS} value={form.source || 'LINE'} onChange={(e) => update('source', e.target.value)}>
+                  {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select className={INPUT_CLASS} value={form.region || 'North'} onChange={(e) => update('region', e.target.value)}>
+                  <option value="North">北部</option><option value="Central">中部</option><option value="South">南部</option>
+                </select>
+                <select className={INPUT_CLASS} value={form.status || 'active'} onChange={(e) => update('status', e.target.value)}>
+                  <option value="active">活躍</option><option value="cold">冷淡</option><option value="lost">流失</option>
+                </select>
+                <textarea className={INPUT_CLASS} rows="2" value={form.notes || ''} onChange={(e) => update('notes', e.target.value)} placeholder="備註" />
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm text-gray-600">
+                {client.taxId && <div className="flex items-center"><Hash className="w-3 h-3 mr-2 text-gray-400" />{client.taxId}</div>}
+                {client.contactPerson && <div className="flex items-center"><User className="w-3 h-3 mr-2 text-gray-400" />{client.contactPerson}</div>}
+                {client.phone && <div className="flex items-center"><Phone className="w-3 h-3 mr-2 text-gray-400" />{client.phone}</div>}
+                {client.email && <div className="flex items-center"><Mail className="w-3 h-3 mr-2 text-gray-400" />{client.email}</div>}
+                {client.address && <div className="flex items-center"><MapPin className="w-3 h-3 mr-2 text-gray-400" />{client.address}</div>}
+                {client.source && <div className="text-xs text-gray-400">來源: {client.source}</div>}
+                {client.notes && <div className="mt-2 text-xs bg-gray-50 p-2 rounded">{client.notes}</div>}
+              </div>
+            )}
+          </div>
+
+          {/* 跟進提醒 */}
+          <div className={`bg-white rounded-lg shadow p-4 ${isOverdue ? 'border-2 border-red-300' : ''}`}>
+            <h3 className="font-bold text-gray-700 flex items-center mb-3"><Bell className="w-4 h-4 mr-1" /> 跟進提醒</h3>
+            <div className="space-y-2">
+              <input type="date" className={INPUT_CLASS} value={followDate} onChange={(e) => setFollowDate(e.target.value)} />
+              <input className={INPUT_CLASS} placeholder="跟進備註" value={followNote} onChange={(e) => setFollowNote(e.target.value)} />
+              <button onClick={handleSaveFollowUp} className="w-full py-2 bg-amber-500 text-white rounded font-bold text-sm hover:bg-amber-600">設定跟進</button>
+            </div>
+            {isOverdue && <div className="mt-2 text-xs text-red-600 font-bold">已逾期！原定 {client.followUpDate}</div>}
+          </div>
+
+          {/* 標籤管理 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="font-bold text-gray-700 flex items-center mb-3"><Tag className="w-4 h-4 mr-1" /> 標籤</h3>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {(form.tags || []).map((t) => (
+                <span key={t} className="inline-flex items-center bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">
+                  {t}
+                  <button onClick={() => handleRemoveTag(t)} className="ml-1 text-blue-400 hover:text-red-500"><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              <input className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" placeholder="新標籤" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTag()} />
+              <button onClick={handleAddTag} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">加</button>
+            </div>
+          </div>
+
+          {/* 開新報價單 */}
+          <button
+            onClick={() => onNewQuote(client)}
+            className="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 flex items-center justify-center"
+          >
+            <Plus className="w-4 h-4 mr-1" /> 開新報價單（帶入此客戶）
+          </button>
+        </div>
+
+        {/* 右欄：歷史報價 + 動態 */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* 歷史報價 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="font-bold text-gray-700 flex items-center mb-3"><FileText className="w-4 h-4 mr-1" /> 歷史報價單 ({clientQuotes.length})</h3>
+            {clientQuotes.length === 0 ? (
+              <div className="text-sm text-gray-400 py-4 text-center">尚無報價紀錄</div>
+            ) : (
+              <div className="space-y-2">
+                {clientQuotes.map((q) => (
+                  <div key={q.id} className="flex justify-between items-center p-3 bg-gray-50 rounded text-sm hover:bg-blue-50">
+                    <div>
+                      <div className="font-medium text-gray-700">{q.clientInfo?.companyName} - {formatDate(q.createdAt)}</div>
+                      <div className="text-xs text-gray-500">{q.items?.length || 0} 項課程</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-gray-800">${(q.totalAmount || 0).toLocaleString()}</div>
+                      <div className="text-xs text-gray-400">{q.status === 'confirmed' ? '已確認' : q.status === 'pending' ? '待確認' : q.status}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 動態時間軸 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="font-bold text-gray-700 flex items-center mb-3"><Activity className="w-4 h-4 mr-1" /> 動態紀錄</h3>
+            {/* 新增備註 */}
+            <div className="flex gap-2 mb-4">
+              <input className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm" placeholder="新增一筆備註..." value={noteText} onChange={(e) => setNoteText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNote()} />
+              <button onClick={handleAddNote} className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700">新增</button>
+            </div>
+            {activities.length === 0 ? (
+              <div className="text-sm text-gray-400 py-4 text-center">尚無動態紀錄</div>
+            ) : (
+              <div className="space-y-3">
+                {activities.map((a) => {
+                  const typeIcon = a.type === 'quote' ? <FileText className="w-4 h-4 text-blue-500" /> :
+                    a.type === 'payment' ? <DollarSign className="w-4 h-4 text-green-500" /> :
+                    a.type === 'follow-up' ? <Bell className="w-4 h-4 text-amber-500" /> :
+                    <MessageSquare className="w-4 h-4 text-gray-500" />;
+                  return (
+                    <div key={a.id} className="flex gap-3 p-3 border-l-2 border-blue-200 bg-gray-50 rounded-r">
+                      <div className="mt-0.5">{typeIcon}</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-700">{a.title}</div>
+                        {a.detail && <div className="text-xs text-gray-500 mt-1">{a.detail}</div>}
+                        {a.amount > 0 && <div className="text-xs text-green-600 mt-1">${a.amount.toLocaleString()}</div>}
+                        <div className="text-xs text-gray-400 mt-1">{formatDate(a.createdAt)} {a.createdBy ? `| ${a.createdBy}` : ''}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------- 客戶選擇器（報價單用）----------
+const ClientSelector = ({ clients, selectedClientId, onSelect }) => {
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!search) return clients.slice(0, 20);
+    const term = search.toLowerCase();
+    return clients.filter((c) => (c.companyName || '').toLowerCase().includes(term) || (c.contactPerson || '').toLowerCase().includes(term)).slice(0, 20);
+  }, [clients, search]);
+
+  const selected = clients.find((c) => c.id === selectedClientId);
+
+  return (
+    <div className="relative">
+      <label className={LABEL_CLASS}>關聯客戶（CRM）</label>
+      <div
+        className={`${INPUT_CLASS} cursor-pointer flex items-center justify-between`}
+        onClick={() => setOpen(!open)}
+      >
+        <span className={selected ? 'text-gray-800' : 'text-gray-400'}>
+          {selected ? `${selected.companyName}${selected.contactPerson ? ` - ${selected.contactPerson}` : ''}` : '點擊選擇客戶（選填）'}
+        </span>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div className="p-2 border-b sticky top-0 bg-white">
+            <input className="w-full border border-gray-200 rounded px-2 py-1 text-sm" placeholder="搜尋客戶..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+          </div>
+          <div
+            className="px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 cursor-pointer"
+            onClick={() => { onSelect(''); setOpen(false); setSearch(''); }}
+          >
+            不關聯客戶
+          </div>
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className={`px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer ${c.id === selectedClientId ? 'bg-blue-100 font-bold' : ''}`}
+              onClick={() => { onSelect(c.id); setOpen(false); setSearch(''); }}
+            >
+              {c.companyName} {c.contactPerson ? `- ${c.contactPerson}` : ''} <span className="text-xs text-gray-400">({regionLabel(c.region)})</span>
+            </div>
+          ))}
+          {filtered.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">無符合結果</div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------- 舊資料匯入 ----------
+const ImportLegacyClients = ({ quotes, onImport }) => {
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleImport = async () => {
+    if (!window.confirm('確定要掃描所有報價單並匯入客戶資料？\n已存在的公司名稱將被跳過。')) return;
+    setImporting(true);
+    try {
+      const res = await onImport();
+      setResult(res);
+    } catch (err) {
+      alert('匯入失敗：' + err.message);
+    }
+    setImporting(false);
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mt-4 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-gray-700 flex items-center"><Upload className="w-4 h-4 mr-2" /> 匯入舊資料</h3>
+          <p className="text-xs text-gray-500 mt-1">掃描所有報價單，依公司名去重後自動建立客戶資料</p>
+        </div>
+        <button
+          onClick={handleImport}
+          disabled={importing}
+          className="px-4 py-2 bg-purple-600 text-white rounded font-bold text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1 ${importing ? 'animate-spin' : ''}`} />
+          {importing ? '匯入中...' : '開始匯入'}
+        </button>
+      </div>
+      {result && (
+        <div className="mt-3 text-sm bg-green-50 border border-green-200 rounded p-3">
+          匯入完成！新增 {result.created} 筆客戶，跳過 {result.skipped} 筆（已存在），回填 {result.linked} 筆 clientId。
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ========== App 主程式 (★ 修正：路由與安全鎖定邏輯) ==========
 // ========== App 主程式 ==========
 
@@ -4108,6 +4715,12 @@ const App = () => {
   const [previewQuote, setPreviewQuote] = useState(null);
   const [paymentQuote, setPaymentQuote] = useState(null);
   const [showProductManager, setShowProductManager] = useState(false); // ★ 控制商品管理視窗
+
+  // ★ CRM 狀態
+  const [clients, setClients] = useState([]);
+  const [clientActivities, setClientActivities] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [editingClient, setEditingClient] = useState(null); // null=不顯示, {}=新增, {id,...}=編輯
 
   const [isUnlocked, setIsUnlocked] = useState(false);
   const isPublicMode = urlMode === 'public';
@@ -4143,10 +4756,24 @@ const App = () => {
         }
     });
 
+    // 4. ★ CRM：監聽客戶
+    const qClients = query(collection(db, 'clients'), orderBy('createdAt', 'desc'));
+    const unsubClients = onSnapshot(qClients, (snapshot) => {
+      setClients(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
+    // 5. ★ CRM：監聽客戶動態
+    const qActivities = query(collection(db, 'activities'), orderBy('createdAt', 'desc'));
+    const unsubActivities = onSnapshot(qActivities, (snapshot) => {
+      setClientActivities(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubQuotes();
       unsubRegular();
       unsubCatalog();
+      unsubClients();
+      unsubActivities();
     };
   }, []);
 
@@ -4211,6 +4838,189 @@ const App = () => {
   const handleUpdateRegularClass = async (id, classData) => { /* ...原程式碼... */ };
   const handleDeleteRegularClass = async (id) => { /* ...原程式碼... */ };
   const handleUpdateQuoteDirect = async (id, data) => { /* ...原程式碼... */ };
+
+  // ★ CRM CRUD 函式
+  const handleSaveClient = async (formData) => {
+    if (!db) return;
+    try {
+      if (editingClient?.id) {
+        await updateDoc(doc(db, 'clients', editingClient.id), { ...formData, updatedAt: serverTimestamp() });
+      } else {
+        await addDoc(collection(db, 'clients'), {
+          ...formData,
+          tags: [],
+          totalOrders: 0,
+          totalRevenue: 0,
+          lastOrderDate: '',
+          firstOrderDate: '',
+          followUpDate: '',
+          followUpNote: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+      setEditingClient(null);
+    } catch (err) {
+      console.error('儲存客戶失敗', err);
+      alert('儲存失敗');
+    }
+  };
+
+  const handleUpdateClientFields = async (clientId, fields) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'clients', clientId), { ...fields, updatedAt: serverTimestamp() });
+    } catch (err) {
+      console.error('更新客戶失敗', err);
+    }
+  };
+
+  const handleDeleteClient = async (client) => {
+    if (!window.confirm(`確定要刪除客戶「${client.companyName}」？`)) return;
+    try {
+      if (db) await deleteDoc(doc(db, 'clients', client.id));
+    } catch (err) { console.error('刪除客戶失敗', err); }
+  };
+
+  const handleAddActivity = async (activityData) => {
+    if (!db) return;
+    try {
+      await addDoc(collection(db, 'activities'), { ...activityData, createdAt: serverTimestamp() });
+    } catch (err) {
+      console.error('新增動態失敗', err);
+    }
+  };
+
+  const handleUpdateFollowUp = async (clientId, date, note) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        followUpDate: date,
+        followUpNote: note,
+        updatedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, 'activities'), {
+        clientId,
+        type: 'follow-up',
+        title: '設定跟進提醒',
+        detail: `${date} ${note}`,
+        amount: 0,
+        createdBy: '管理員',
+        createdAt: serverTimestamp(),
+      });
+      // 更新 selectedClient 本地狀態
+      setSelectedClient((prev) => prev ? { ...prev, followUpDate: date, followUpNote: note } : prev);
+    } catch (err) {
+      console.error('更新跟進失敗', err);
+    }
+  };
+
+  const handleNewQuoteFromClient = (client) => {
+    setEditingQuote({
+      clientInfo: {
+        companyName: client.companyName || '',
+        taxId: client.taxId || '',
+        contactPerson: client.contactPerson || '',
+        phone: client.phone || '',
+        address: client.address || '',
+      },
+      clientId: client.id,
+    });
+    setSelectedClient(null);
+    setCurrentView('create');
+  };
+
+  const handleImportLegacyClients = async () => {
+    if (!db) return { created: 0, skipped: 0, linked: 0 };
+    const existingNames = new Set(clients.map((c) => c.companyName));
+    const nameMap = {};
+    clients.forEach((c) => { nameMap[c.companyName] = c.id; });
+
+    // 從 quotes 收集唯一公司名
+    const companyMap = {};
+    quotes.forEach((q) => {
+      const name = q.clientInfo?.companyName?.trim();
+      if (!name) return;
+      if (!companyMap[name]) {
+        companyMap[name] = {
+          companyName: name,
+          taxId: q.clientInfo?.taxId || '',
+          contactPerson: q.clientInfo?.contactPerson || '',
+          phone: q.clientInfo?.phone || '',
+          address: q.clientInfo?.address || '',
+          totalAmount: 0,
+          count: 0,
+          firstDate: null,
+          lastDate: null,
+          quoteIds: [],
+        };
+      }
+      const entry = companyMap[name];
+      entry.totalAmount += q.totalAmount || 0;
+      entry.count += 1;
+      entry.quoteIds.push(q.id);
+      const d = q.createdAt ? getSafeDate(q.createdAt) : null;
+      if (d) {
+        const ds = d.toISOString().slice(0, 10);
+        if (!entry.firstDate || ds < entry.firstDate) entry.firstDate = ds;
+        if (!entry.lastDate || ds > entry.lastDate) entry.lastDate = ds;
+      }
+    });
+
+    let created = 0, skipped = 0, linked = 0;
+    const batch = writeBatch(db);
+
+    for (const [name, info] of Object.entries(companyMap)) {
+      if (existingNames.has(name)) {
+        // 已存在：只回填 clientId
+        const existingId = nameMap[name];
+        if (existingId) {
+          for (const qid of info.quoteIds) {
+            const qRef = doc(db, 'quotes', qid);
+            batch.update(qRef, { clientId: existingId });
+            linked++;
+          }
+        }
+        skipped++;
+        continue;
+      }
+
+      // 新建客戶
+      const clientRef = doc(collection(db, 'clients'));
+      batch.set(clientRef, {
+        companyName: name,
+        taxId: info.taxId,
+        contactPerson: info.contactPerson,
+        phone: info.phone,
+        email: '',
+        address: info.address,
+        source: '',
+        tags: [],
+        region: '',
+        notes: '',
+        totalOrders: info.count,
+        totalRevenue: info.totalAmount,
+        lastOrderDate: info.lastDate || '',
+        firstOrderDate: info.firstDate || '',
+        followUpDate: '',
+        followUpNote: '',
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      created++;
+
+      // 回填 clientId 到 quotes
+      for (const qid of info.quoteIds) {
+        const qRef = doc(db, 'quotes', qid);
+        batch.update(qRef, { clientId: clientRef.id });
+        linked++;
+      }
+    }
+
+    await batch.commit();
+    return { created, skipped, linked };
+  };
   // --------------------------------------------------------
 
 
@@ -4274,7 +5084,31 @@ const App = () => {
             >
               業績統計
             </button>
-            
+            <button
+              onClick={() => { setEditingQuote(null); setSelectedClient(null); setCurrentView('clients'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'clients' || currentView === 'clientDetail' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              客戶管理
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('accounting'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'accounting' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              帳務對帳
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('checkin'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'checkin' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              簽到表
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('registration'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'registration' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              登記表
+            </button>
+
             {/* ★ 新增：商品管理按鈕 */}
             <button
               onClick={() => setShowProductManager(true)}
@@ -4311,7 +5145,8 @@ const App = () => {
             initialData={editingQuote}
             onSave={handleSaveQuote}
             onCancel={() => { setEditingQuote(null); setCurrentView('list'); }}
-            courseData={courseData} 
+            courseData={courseData}
+            clients={clients}
           />
         )}
 
@@ -4330,13 +5165,63 @@ const App = () => {
         )}
 
         {!loading && currentView === 'stats' && <StatsView quotes={quotes} />}
+
+        {!loading && currentView === 'clients' && !selectedClient && (
+          <>
+            <ClientListView
+              clients={clients}
+              onSelect={(c) => { setSelectedClient(c); setCurrentView('clientDetail'); }}
+              onEdit={(c) => setEditingClient(c)}
+              onDelete={handleDeleteClient}
+              onCreate={() => setEditingClient({})}
+            />
+            <ImportLegacyClients quotes={quotes} onImport={handleImportLegacyClients} />
+          </>
+        )}
+
+        {!loading && currentView === 'clientDetail' && selectedClient && (
+          <ClientDetailView
+            client={clients.find((c) => c.id === selectedClient.id) || selectedClient}
+            quotes={quotes}
+            activities={clientActivities.filter((a) => a.clientId === selectedClient.id)}
+            onBack={() => { setSelectedClient(null); setCurrentView('clients'); }}
+            onSave={handleUpdateClientFields}
+            onAddActivity={handleAddActivity}
+            onUpdateFollowUp={handleUpdateFollowUp}
+            onNewQuote={handleNewQuoteFromClient}
+          />
+        )}
+
+        {/* ★ 帳務對帳 */}
+        {!loading && currentView === 'accounting' && (
+          <AccountingView quotes={quotes} clients={clients} onUpdateQuote={handleUpdateQuoteDirect} />
+        )}
+
+        {/* ★ 簽到表 */}
+        {!loading && currentView === 'checkin' && (
+          <CheckInGenerator quotes={quotes} regularClasses={regularClasses} />
+        )}
+
+        {/* ★ 統一登記表 */}
+        {!loading && currentView === 'registration' && (
+          <RegistrationView db={db} />
+        )}
       </main>
 
       {/* Modals */}
       {previewQuote && <PreviewModal quote={previewQuote} onClose={() => setPreviewQuote(null)} />}
       
       {paymentQuote && <PaymentModal quote={paymentQuote} onClose={() => setPaymentQuote(null)} onSave={handleSavePayment} />}
-      
+
+      {/* ★ CRM：客戶編輯彈窗 */}
+      {editingClient && (
+        <ClientEditModal
+          client={editingClient}
+          onClose={() => setEditingClient(null)}
+          onSave={handleSaveClient}
+        />
+      )}
+
       {/* ★ 新增：商品管理視窗 */}
       {showProductManager && (
           <ProductManager 
