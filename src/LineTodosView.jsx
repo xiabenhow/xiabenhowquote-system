@@ -8,8 +8,12 @@ import {
   collection, query, where, onSnapshot, doc, updateDoc,
 } from 'firebase/firestore';
 import {
-  MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp,
+  MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp, Sparkles, RefreshCw,
 } from 'lucide-react';
+import { fmtDate } from './opsUtils';
+
+const SUMMARY_ENDPOINT = 'https://www.xiabenhow.com/wp-json/xbh-line/v1/daily-summary';
+const SUMMARY_SECRET = 'xbh_sum_9dk2vq';
 
 const TYPE_STYLE = {
   '付款回報':   { color: 'bg-green-100 text-green-800 border-green-300', icon: Wallet },
@@ -86,6 +90,59 @@ const TodoCard = ({ todo, onDone, onReopen, isDone }) => {
   );
 };
 
+// ★ 今日訊息摘要卡（每晚 22:00 自動更新，可手動立即更新）
+const DailySummaryCard = ({ db }) => {
+  const [summary, setSummary] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const todayStr = fmtDate(new Date());
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, 'line_daily_summary', todayStr), (snap) => {
+      setSummary(snap.exists() ? snap.data() : null);
+    });
+    return () => unsub();
+  }, [db, todayStr]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const r = await fetch(SUMMARY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: SUMMARY_SECRET }),
+      });
+      const j = await r.json();
+      if (!j.ok) alert('摘要更新失敗，請稍後再試');
+    } catch (e) { alert('連線失敗，請確認網路'); }
+    setRefreshing(false);
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-200 p-5 mb-5">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-bold text-indigo-900 flex items-center">
+          <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500" /> 今日訊息摘要
+          {summary?.upTo && <span className="ml-2 text-xs font-normal text-indigo-400">統計到 {summary.upTo}</span>}
+        </h3>
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 ${refreshing ? 'bg-gray-200 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+        >
+          <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} /> {refreshing ? '整理中…' : '立即更新'}
+        </button>
+      </div>
+      {summary?.summary ? (
+        <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{summary.summary}</div>
+      ) : (
+        <div className="text-sm text-gray-400">今天還沒有摘要——每晚 10:00 會自動整理，也可以按「立即更新」馬上看。</div>
+      )}
+      <div className="text-[11px] text-indigo-300 mt-2">AI 只摘要企業訂單相關訊息（舉辦/人數/匯款/改期/詢價），閒聊與零售訊息會自動略過</div>
+    </div>
+  );
+};
+
 const LineTodosView = ({ db }) => {
   const [openTodos, setOpenTodos] = useState([]);
   const [doneTodos, setDoneTodos] = useState([]);
@@ -146,6 +203,9 @@ const LineTodosView = ({ db }) => {
           {showDone ? '← 回到待處理' : `已完成 (${doneTodos.length})`}
         </button>
       </div>
+
+      {/* ★ 今日摘要 */}
+      <DailySummaryCard db={db} />
 
       {/* 類型篩選 */}
       <div className="flex gap-2 flex-wrap mb-4">

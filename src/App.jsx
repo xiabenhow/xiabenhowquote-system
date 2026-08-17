@@ -50,7 +50,7 @@ import { saveAs } from 'file-saver';
 import InventoryView from './InventoryView';
 import LineTodosView from './LineTodosView';
 import DashboardView from './DashboardView';
-import { buildMatIndex, matchBom, calcQty, matLabel, linkMat } from './opsUtils';
+import { buildMatIndex, matchBom, calcQty, matLabel, linkMat, fmtDate } from './opsUtils';
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -3112,10 +3112,11 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
   const prepItems = useMemo(() => {
     const list = [];
+    const todayStr = fmtDate(new Date()); // ★ 今天以前的課早就出完了，不顯示（用本地日期避免時區差）
     validQuotes.forEach((q) => {
       if (!q.items) return;
       q.items.forEach((item, idx) => {
-        if (item.eventDate && item.eventDate <= filterDate) {
+        if (item.eventDate && item.eventDate >= todayStr && item.eventDate <= filterDate) {
           
           const itemRegion = item.outingRegion || item.regionType || 'North';
           let effectiveRegion = itemRegion;
