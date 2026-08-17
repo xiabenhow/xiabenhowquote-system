@@ -804,8 +804,11 @@ const AdminLock = ({ onUnlock }) => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passcode === '8888') {
-      onUnlock();
+    // ★ 雙密碼：9999 = 老闆全開；8888 = 員工版（看不到今日看板 / LINE待辦）
+    if (passcode === '9999') {
+      onUnlock('boss');
+    } else if (passcode === '8888') {
+      onUnlock('staff');
     } else {
       setError(true);
     }
@@ -4341,7 +4344,9 @@ const App = () => {
     return () => unsub();
   }, []);
 
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [role, setRole] = useState(null); // ★ 'boss'(9999 全開) | 'staff'(8888 隱藏看板/LINE待辦)
+  const isUnlocked = !!role;
+  const isBoss = role === 'boss';
   const isPublicMode = urlMode === 'public';
 
   useEffect(() => {
@@ -4474,7 +4479,7 @@ const App = () => {
   }
 
   if (!isUnlocked) {
-    return <AdminLock onUnlock={() => setIsUnlocked(true)} />;
+    return <AdminLock onUnlock={(r) => setRole(r)} />;
   }
 
   return (
@@ -4491,23 +4496,27 @@ const App = () => {
           </div>
 
           <nav className="flex gap-2 text-sm flex-wrap">
-            <button
-              onClick={() => { setEditingQuote(null); setCurrentView('dashboard'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              今日看板
-            </button>
-            <button
-              onClick={() => { setEditingQuote(null); setCurrentView('linetodos'); }}
-              className={`px-3 py-1 rounded-full relative ${currentView === 'linetodos' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              LINE待辦
-              {lineTodoCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
-                  {lineTodoCount > 99 ? '99+' : lineTodoCount}
-                </span>
-              )}
-            </button>
+            {isBoss && (
+              <button
+                onClick={() => { setEditingQuote(null); setCurrentView('dashboard'); }}
+                className={`px-3 py-1 rounded-full ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                今日看板
+              </button>
+            )}
+            {isBoss && (
+              <button
+                onClick={() => { setEditingQuote(null); setCurrentView('linetodos'); }}
+                className={`px-3 py-1 rounded-full relative ${currentView === 'linetodos' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                LINE待辦
+                {lineTodoCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                    {lineTodoCount > 99 ? '99+' : lineTodoCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('list'); }}
               className={`px-3 py-1 rounded-full ${currentView === 'list' && !editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -4610,11 +4619,11 @@ const App = () => {
 
         {!loading && currentView === 'inventory' && <InventoryView db={db} />}
 
-        {!loading && currentView === 'dashboard' && (
+        {!loading && isBoss && currentView === 'dashboard' && (
           <DashboardView quotes={quotes} db={db} lineTodoCount={lineTodoCount} onNavigate={(v) => { setEditingQuote(null); setCurrentView(v); }} />
         )}
 
-        {!loading && currentView === 'linetodos' && <LineTodosView db={db} quotes={quotes} />}
+        {!loading && isBoss && currentView === 'linetodos' && <LineTodosView db={db} quotes={quotes} />}
       </main>
 
       {/* Modals */}
