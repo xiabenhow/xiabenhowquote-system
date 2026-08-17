@@ -48,6 +48,9 @@ import { saveAs } from 'file-saver';
 
 // ==========  Firebase 設定  ==========
 import InventoryView from './InventoryView';
+import LineTodosView from './LineTodosView';
+import DashboardView from './DashboardView';
+import { buildMatIndex, matchBom, calcQty, matLabel, linkMat } from './opsUtils';
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -58,9 +61,11 @@ import {
   doc,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
   setDoc,
+  increment,
 } from 'firebase/firestore';
 
 // ★★★ 印章圖片路徑 ★★★
@@ -3026,6 +3031,17 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   const [staffData, setStaffData] = useState({ North: [], Central: [], South: [] });
   const [newStaffName, setNewStaffName] = useState('');
 
+  // ★ 備課引擎：課程配方(bom) + 材料庫存(materials)
+  const [bomList, setBomList] = useState([]);
+  const [materialsList, setMaterialsList] = useState([]);
+  useEffect(() => {
+    if (!db) return;
+    const u1 = onSnapshot(collection(db, 'bom'), (s) => setBomList(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u2 = onSnapshot(collection(db, 'materials'), (s) => setMaterialsList(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return () => { u1(); u2(); };
+  }, []);
+  const matIndex = useMemo(() => buildMatIndex(materialsList.filter((m) => m.active !== false)), [materialsList]);
+
   useEffect(() => {
     if (!db) return;
     const staffRef = doc(db, 'settings', 'staff');
@@ -3110,9 +3126,26 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
           if (effectiveRegion !== currentRegion) return;
 
-          const standardMaterials = COURSE_MATERIALS[item.courseName] || [];
+          // ★ 備課引擎：優先用 bom 配方（自動算量＋庫存燈號），沒有配方才退回舊的固定清單
+          const bom = matchBom(bomList, item.courseName);
+          const bomInfo = {};
+          let standardMaterials;
+          if (bom && Array.isArray(bom.materials) && bom.materials.length > 0) {
+            standardMaterials = bom.materials.map((m) => m.t);
+            bom.materials.forEach((m) => {
+              const qty = calcQty(m, item.peopleCount);
+              const mat = linkMat(matIndex, m.t);
+              bomInfo[m.t] = {
+                qty,
+                mat,
+                enough: mat ? Number(mat.stock || 0) >= qty : null,
+              };
+            });
+          } else {
+            standardMaterials = COURSE_MATERIALS[item.courseName] || [];
+          }
           const savedData = q.prepData?.[idx] || {};
-          const customMaterials = Object.keys(savedData).filter(key => key !== 'note' && !standardMaterials.includes(key));
+          const customMaterials = Object.keys(savedData).filter(key => key !== 'note' && key !== 'packedAt' && key !== 'packedBy' && !standardMaterials.includes(key));
 
           list.push({
             quoteId: q.id,
@@ -3125,12 +3158,14 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             standardMaterials,
             customMaterials,
             prepData: savedData,
+            bom,
+            bomInfo,
           });
         }
       });
     });
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
-  }, [validQuotes, filterDate, currentRegion]); 
+  }, [validQuotes, filterDate, currentRegion, bomList, matIndex]);
 
   const handleMaterialUpdate = (quoteId, itemIdx, matName, field, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
@@ -3176,6 +3211,39 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {}; else newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
     newPrepData[itemIdx].note = value;
     onUpdateQuote(quoteId, { prepData: newPrepData });
+  };
+
+  // ★ 裝箱出庫：把有連到庫存主檔的材料一次扣庫存＋寫出庫紀錄，並標記已裝箱（防重複扣）
+  const handlePackOut = async (item) => {
+    if (item.prepData?.packedAt) { alert('這場已裝箱出庫過了，不會重複扣庫存。'); return; }
+    const linked = item.standardMaterials
+      .map((t) => ({ t, info: item.bomInfo[t] }))
+      .filter((x) => x.info && x.info.mat);
+    const unlinkedCount = item.standardMaterials.length - linked.length;
+    const msg = `確定「${item.courseName}（${item.date}・${item.people}人）」裝箱出庫？\n\n將自動扣庫存 ${linked.length} 項${unlinkedCount > 0 ? `（另有 ${unlinkedCount} 項未連到庫存主檔，不扣量）` : ''}`;
+    if (!window.confirm(msg)) return;
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      for (const { info } of linked) {
+        await updateDoc(doc(db, 'materials', info.mat.id), { stock: increment(-info.qty) });
+        await addDoc(collection(db, 'stock_moves'), {
+          materialId: info.mat.id,
+          name: info.mat.name,
+          delta: -info.qty,
+          type: 'outbound',
+          note: `備課出庫：${item.date} ${item.courseName}（${item.clientName}・${item.people}人）`,
+          at: serverTimestamp(),
+        });
+      }
+      const quote = quotes.find((q) => q.id === item.quoteId);
+      const newPrepData = { ...(quote?.prepData || {}) };
+      newPrepData[item.itemIdx] = { ...(newPrepData[item.itemIdx] || {}), packedAt: today };
+      onUpdateQuote(item.quoteId, { prepData: newPrepData });
+      alert(`✅ 已裝箱出庫，扣庫存 ${linked.length} 項`);
+    } catch (err) {
+      console.error('裝箱出庫失敗', err);
+      alert('出庫失敗，請到「庫存」頁確認數量再試一次');
+    }
   };
 
   const canEditStaff = !publicMode || !!publicRegion;
@@ -3292,19 +3360,40 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                       <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{item.people} 人</span>
                     </div>
                   </div>
-                  <div className="text-right"><div className="text-2xl font-bold text-gray-300">{progress}%</div></div>
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <div className="text-2xl font-bold text-gray-300">{progress}%</div>
+                    {item.bom && (
+                      item.prepData.packedAt ? (
+                        <span className="text-xs bg-green-100 text-green-700 border border-green-300 rounded-full px-2 py-0.5 font-bold">📦 已裝箱 {item.prepData.packedAt.slice(5)}</span>
+                      ) : (
+                        <button
+                          onClick={() => handlePackOut(item)}
+                          className="text-xs bg-gray-800 hover:bg-black text-white rounded-full px-3 py-1 font-bold"
+                          title="全部備好後按此：自動扣庫存並標記已裝箱"
+                        >
+                          📦 裝箱出庫
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-4"><div className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} /></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {item.standardMaterials.map(mat => {
                         const matState = item.prepData[mat] || { done: false, staff: '' };
+                        const info = item.bomInfo[mat]; // ★ BOM：需求量＋庫存燈號
                         return (
                             <div key={mat} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
-                                <label className="flex items-center cursor-pointer select-none">
-                                    <input type="checkbox" className="w-4 h-4 mr-2 text-blue-600 rounded focus:ring-blue-500" checked={matState.done} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)} />
-                                    <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{mat}</span>
+                                <label className="flex items-center cursor-pointer select-none min-w-0">
+                                    <input type="checkbox" className="w-4 h-4 mr-2 shrink-0 text-blue-600 rounded focus:ring-blue-500" checked={matState.done} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'done', e.target.checked)} />
+                                    <span className={`text-sm break-all ${matState.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>
+                                      {info ? matLabel(mat) : mat}
+                                      {info && <span className="ml-1 text-xs font-bold text-blue-600 whitespace-nowrap">×{info.qty}</span>}
+                                      {info && info.enough === true && <span className="ml-1 text-[10px] bg-green-100 text-green-700 rounded px-1 whitespace-nowrap">庫存夠({info.mat.stock})</span>}
+                                      {info && info.enough === false && <span className="ml-1 text-[10px] bg-red-100 text-red-700 rounded px-1 font-bold whitespace-nowrap">缺！剩{info.mat.stock}</span>}
+                                    </span>
                                 </label>
-                                <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
+                                <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500 shrink-0 ml-1" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
                                     <option value="">未指派</option>
                                     {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
                                 </select>
@@ -4209,6 +4298,15 @@ const App = () => {
   const [paymentQuote, setPaymentQuote] = useState(null);
   const [showPayLink, setShowPayLink] = useState(false); // ★ 刷卡連結視窗
   const [showProductManager, setShowProductManager] = useState(false); // ★ 控制商品管理視窗
+  const [lineTodoCount, setLineTodoCount] = useState(0); // ★ LINE 待辦數（紅點）
+
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(query(collection(db, 'line_todos'), where('status', '==', 'open')), (snap) => {
+      setLineTodoCount(snap.size);
+    }, (err) => console.error('line_todos 監聽失敗', err));
+    return () => unsub();
+  }, []);
 
   const [isUnlocked, setIsUnlocked] = useState(false);
   const isPublicMode = urlMode === 'public';
@@ -4308,10 +4406,25 @@ const App = () => {
       try { if (db) await updateDoc(doc(db, 'quotes', id), data); } 
       catch (err) { console.error(err); alert('儲存款項失敗'); }
   };
-  const handleAddRegularClass = async (classData) => { /* ...原程式碼... */ };
-  const handleUpdateRegularClass = async (id, classData) => { /* ...原程式碼... */ };
-  const handleDeleteRegularClass = async (id) => { /* ...原程式碼... */ };
-  const handleUpdateQuoteDirect = async (id, data) => { /* ...原程式碼... */ };
+  const handleAddRegularClass = async (classData) => {
+      try { if (db) await addDoc(collection(db, 'regularClasses'), { ...classData, createdAt: serverTimestamp() }); }
+      catch (err) { console.error('新增常態課失敗', err); alert('新增失敗'); }
+  };
+  const handleUpdateRegularClass = async (id, classData) => {
+      try { if (db) await updateDoc(doc(db, 'regularClasses', id), { ...classData, updatedAt: serverTimestamp() }); }
+      catch (err) { console.error('更新常態課失敗', err); alert('更新失敗'); }
+  };
+  const handleDeleteRegularClass = async (id) => {
+      try { if (db) await deleteDoc(doc(db, 'regularClasses', id)); }
+      catch (err) { console.error('刪除常態課失敗', err); }
+  };
+  // ★ 備課表勾選/備註 直接寫回報價單（先前為空殼，備課進度因此存不住）
+  const handleUpdateQuoteDirect = async (id, data) => {
+      try {
+        if (db) await updateDoc(doc(db, 'quotes', id), { ...data, updatedAt: serverTimestamp() });
+        setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, ...data } : q)));
+      } catch (err) { console.error('更新備課資料失敗', err); alert('儲存失敗，請再試一次'); }
+  };
   // --------------------------------------------------------
 
 
@@ -4344,7 +4457,24 @@ const App = () => {
             </div>
           </div>
 
-          <nav className="flex gap-2 text-sm">
+          <nav className="flex gap-2 text-sm flex-wrap">
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('dashboard'); }}
+              className={`px-3 py-1 rounded-full ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              今日看板
+            </button>
+            <button
+              onClick={() => { setEditingQuote(null); setCurrentView('linetodos'); }}
+              className={`px-3 py-1 rounded-full relative ${currentView === 'linetodos' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              LINE待辦
+              {lineTodoCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                  {lineTodoCount > 99 ? '99+' : lineTodoCount}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('list'); }}
               className={`px-3 py-1 rounded-full ${currentView === 'list' && !editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -4446,6 +4576,12 @@ const App = () => {
         {!loading && currentView === 'stats' && <StatsView quotes={quotes} />}
 
         {!loading && currentView === 'inventory' && <InventoryView db={db} />}
+
+        {!loading && currentView === 'dashboard' && (
+          <DashboardView quotes={quotes} db={db} lineTodoCount={lineTodoCount} onNavigate={(v) => { setEditingQuote(null); setCurrentView(v); }} />
+        )}
+
+        {!loading && currentView === 'linetodos' && <LineTodosView db={db} />}
       </main>
 
       {/* Modals */}
