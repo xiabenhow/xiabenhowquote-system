@@ -191,7 +191,6 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
   const [expanded, setExpanded] = useState(false);
   const style = TYPE_STYLE[todo.type] || { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: MessageSquare };
   const Icon = style.icon;
-  const conf = Math.round((todo.confidence || 0) * 100);
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border p-4 ${isDone ? 'opacity-60' : ''}`}>
@@ -201,11 +200,6 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${style.color}`}>
               <Icon className="w-3 h-3" />{todo.type}
             </span>
-            {conf > 0 && (
-              <span className={`text-xs ${conf >= 80 ? 'text-gray-400' : 'text-orange-500 font-bold'}`}>
-                {conf >= 80 ? `信心 ${conf}%` : `⚠ 信心僅 ${conf}%，請人工確認`}
-              </span>
-            )}
             <span className="text-xs text-gray-400">{fmtTime(todo.at)}</span>
           </div>
           <div className="text-sm font-medium text-gray-800">{todo.summary || todo.text}</div>
