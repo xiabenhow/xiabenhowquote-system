@@ -26,6 +26,7 @@ import {
   Link as LinkIcon,
   Lock,
   Wallet,
+  CreditCard,
   User,
   Clock,
   Store,
@@ -1200,6 +1201,32 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
     onClose();
   };
 
+  // ★ 刷卡連結
+  const [payAmount, setPayAmount] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
+  const [payUrl, setPayUrl] = useState('');
+  const [payTest, setPayTest] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const genPayLink = async (kind) => {
+    const amt = parseInt(payAmount || (kind === 'deposit' ? Math.round(total * 0.5) : remaining) || 0);
+    if (!amt || amt < 1) { alert('請先填入刷卡金額'); return; }
+    setPayLoading(true); setPayUrl(''); setCopied(false);
+    try {
+      const r = await fetch('https://www.xiabenhow.com/wp-json/xbh-quote/v1/paylink', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt, quoteId: quote.id, company: quote.clientInfo?.companyName || '', kind }),
+      });
+      const j = await r.json();
+      if (j.ok && j.pay_url) { setPayUrl(j.pay_url); setPayTest(!!j.test); }
+      else alert('產生連結失敗：' + (j.message || '請稍後再試'));
+    } catch (e) { alert('連線失敗，請確認網路'); }
+    setPayLoading(false);
+  };
+  const copyPayUrl = () => {
+    navigator.clipboard.writeText(payUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => prompt('請手動複製連結：', payUrl));
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
@@ -1289,6 +1316,46 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
             <span className="text-2xl font-bold text-orange-600">
               ${remaining.toLocaleString()}
             </span>
+          </div>
+
+          {/* ★ 刷卡收款 */}
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <label className="block text-sm font-bold text-blue-800 mb-2 flex items-center gap-1">
+              <CreditCard className="w-4 h-4" /> 開刷卡單（產生連結給客戶）
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">$</span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-300 outline-none"
+                placeholder={`金額（訂金約 ${Math.round(total * 0.5).toLocaleString()}、尾款 ${remaining.toLocaleString()}）`}
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => genPayLink('deposit')} disabled={payLoading}
+                className="flex-1 bg-blue-600 text-white rounded py-2 text-sm font-bold hover:bg-blue-700 disabled:opacity-50">
+                {payLoading ? '產生中…' : '產生訂金刷卡連結'}
+              </button>
+              <button onClick={() => genPayLink('final')} disabled={payLoading}
+                className="flex-1 bg-white border border-blue-600 text-blue-700 rounded py-2 text-sm font-bold hover:bg-blue-50 disabled:opacity-50">
+                產生尾款刷卡連結
+              </button>
+            </div>
+            {payUrl && (
+              <div className="mt-3 bg-white border border-blue-200 rounded p-3">
+                {payTest ? <div className="text-xs text-amber-600 mb-1 font-bold">⚠ 測試模式（不會真的扣款）</div> : null}
+                <div className="text-xs text-gray-500 mb-1">複製這條連結貼到 LINE 給客戶：</div>
+                <div className="flex gap-2 items-center">
+                  <input readOnly value={payUrl} className="w-full border rounded p-2 text-xs bg-gray-50" onFocus={(e) => e.target.select()} />
+                  <button onClick={copyPayUrl} className={`whitespace-nowrap px-3 py-2 rounded text-sm font-bold ${copied ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                    {copied ? '已複製' : '複製'}
+                  </button>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">客戶刷卡完成後，系統會自動記錄付款。</div>
+              </div>
+            )}
           </div>
         </div>
 
