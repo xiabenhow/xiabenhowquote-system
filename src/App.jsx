@@ -1226,6 +1226,8 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
     depositNote: quote.depositNote || '',
     adjustmentAmount: quote.adjustmentAmount || '',
     adjustmentNote: quote.adjustmentNote || '',
+    finalPaidAmount: quote.finalPaidAmount || '',
+    finalPaidNote: quote.finalPaidNote || '',
   });
 
   const total = quote.totalAmount || 0;
@@ -1353,6 +1355,36 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
             <span className="text-2xl font-bold text-orange-600">
               ${remaining.toLocaleString()}
             </span>
+          </div>
+
+          {/* ★ 尾款已收 */}
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <label className="block text-sm font-bold text-green-800 mb-2">
+              已收尾款
+            </label>
+            <div className="flex gap-2 mb-2">
+              <span className="flex items-center text-gray-500 font-bold px-2">
+                $
+              </span>
+              <input
+                type="number"
+                className="w-full border rounded p-2 focus:ring-2 focus:ring-green-300 outline-none"
+                placeholder="0"
+                value={data.finalPaidAmount}
+                onChange={(e) =>
+                  setData({ ...data, finalPaidAmount: e.target.value })
+                }
+              />
+            </div>
+            <input
+              type="text"
+              className="w-full border rounded p-2 text-sm"
+              placeholder="尾款備註 (如: 匯款後五碼、日期)"
+              value={data.finalPaidNote}
+              onChange={(e) =>
+                setData({ ...data, finalPaidNote: e.target.value })
+              }
+            />
           </div>
 
           {/* ★ 刷卡收款 */}
@@ -4582,7 +4614,7 @@ const App = () => {
           <DashboardView quotes={quotes} db={db} lineTodoCount={lineTodoCount} onNavigate={(v) => { setEditingQuote(null); setCurrentView(v); }} />
         )}
 
-        {!loading && currentView === 'linetodos' && <LineTodosView db={db} />}
+        {!loading && currentView === 'linetodos' && <LineTodosView db={db} quotes={quotes} />}
       </main>
 
       {/* Modals */}

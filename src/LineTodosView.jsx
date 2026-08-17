@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  collection, query, where, onSnapshot, doc, updateDoc,
+  collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp,
 } from 'firebase/firestore';
 import {
   MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp, Sparkles, RefreshCw,
@@ -37,7 +37,157 @@ const fmtTime = (at) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const TodoCard = ({ todo, onDone, onReopen, isDone }) => {
+const STATUS_LABEL = { draft: '草稿', confirmed: '已回簽', paid: '已付訂', closed: '已結案' };
+const STATUS_COLOR = {
+  draft: 'bg-gray-100 text-gray-600',
+  confirmed: 'bg-purple-100 text-purple-700',
+  paid: 'bg-orange-100 text-orange-700',
+  closed: 'bg-green-100 text-green-700',
+};
+
+// ★ 套用到報價單：確定舉辦→改「已回簽」；付款回報→記訂金(改已付訂)或尾款(改已結案)
+const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
+  const [open, setOpen] = useState(false);
+  const [kw, setKw] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [amount, setAmount] = useState(todo.amount ? String(todo.amount) : '');
+  const [busy, setBusy] = useState(false);
+
+  const isPay = todo.type === '付款回報';
+  const candidates = useMemo(() => {
+    let list = quotes.filter((q) => q.status !== 'closed');
+    const k = kw.trim();
+    if (k) {
+      list = list.filter((q) =>
+        (q.clientInfo?.companyName || '').includes(k) ||
+        (q.clientInfo?.contactPerson || '').includes(k));
+    }
+    return list.slice(0, 8);
+  }, [quotes, kw]);
+
+  const dateTag = () => {
+    const d = new Date();
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  const apply = async (kind) => {
+    if (!selected) { alert('請先選一張報價單'); return; }
+    const company = selected.clientInfo?.companyName || '';
+    const noteTag = `${dateTag()} LINE回報${todo.last5 && todo.last5 !== 'null' ? ' 末五碼' + todo.last5 : ''}`;
+    let update = {};
+    let desc = '';
+    if (kind === 'confirm') {
+      update = { status: 'confirmed' };
+      desc = `「${company}」狀態 → 已回簽`;
+    } else if (kind === 'deposit') {
+      const amt = parseInt(amount || 0);
+      if (!amt) { alert('請填訂金金額'); return; }
+      update = {
+        status: 'paid',
+        depositAmount: String(amt),
+        depositNote: ((selected.depositNote ? selected.depositNote + ' / ' : '') + noteTag).slice(0, 200),
+      };
+      desc = `「${company}」狀態 → 已付訂，記訂金 $${amt.toLocaleString()}`;
+    } else if (kind === 'final') {
+      const amt = parseInt(amount || 0);
+      if (!amt) { alert('請填尾款金額'); return; }
+      update = {
+        status: 'closed',
+        finalPaidAmount: String(amt),
+        finalPaidNote: ((selected.finalPaidNote ? selected.finalPaidNote + ' / ' : '') + noteTag).slice(0, 200),
+      };
+      desc = `「${company}」狀態 → 已結案，記尾款 $${amt.toLocaleString()}`;
+    }
+    if (!window.confirm(`確定套用？\n\n${desc}\n\n（套用後這張待辦會自動標記完成）`)) return;
+    setBusy(true);
+    try {
+      await updateDoc(doc(db, 'quotes', selected.id), { ...update, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, 'line_todos', todo.id), {
+        status: 'done',
+        doneAt: new Date().toISOString(),
+        applied: { quoteId: selected.id, company, action: desc },
+      });
+      onApplied && onApplied();
+    } catch (e) { console.error(e); alert('套用失敗，請再試一次'); }
+    setBusy(false);
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-2 text-xs font-bold text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-full px-3 py-1 flex items-center gap-1">
+        <FileText className="w-3 h-3" /> 套用到報價單{isPay ? '（記訂金/尾款）' : '（改已回簽）'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 border border-blue-200 bg-blue-50/50 rounded-lg p-3">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-xs font-bold text-blue-800">選擇對應的報價單</span>
+        <button onClick={() => setOpen(false)} className="text-gray-400 text-xs">收合</button>
+      </div>
+      <input
+        type="text"
+        className="w-full border rounded p-1.5 text-sm mb-2 focus:outline-none focus:border-blue-400"
+        placeholder="搜尋公司名 / 聯絡人…"
+        value={kw}
+        onChange={(e) => { setKw(e.target.value); setSelected(null); }}
+      />
+      <div className="space-y-1 mb-2 max-h-44 overflow-y-auto">
+        {candidates.length === 0 ? (
+          <div className="text-xs text-gray-400 py-2 text-center">找不到符合的報價單</div>
+        ) : candidates.map((q) => (
+          <button
+            key={q.id}
+            onClick={() => setSelected(q)}
+            className={`w-full text-left rounded border p-2 text-xs flex justify-between items-center ${selected?.id === q.id ? 'border-blue-500 bg-white ring-1 ring-blue-300' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+          >
+            <div className="min-w-0">
+              <div className="font-bold text-gray-800 truncate">{q.clientInfo?.companyName || '未命名'}</div>
+              <div className="text-gray-400 truncate">
+                {(q.items?.[0]?.eventDate || '')} {(q.items?.[0]?.courseName || '').slice(0, 12)}・${Number(q.totalAmount || 0).toLocaleString()}
+              </div>
+            </div>
+            <span className={`shrink-0 ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[q.status] || 'bg-gray-100 text-gray-500'}`}>
+              {STATUS_LABEL[q.status] || q.status}
+            </span>
+          </button>
+        ))}
+      </div>
+      {isPay && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500 font-bold">金額 $</span>
+          <input
+            type="number"
+            className="w-28 border rounded p-1.5 text-sm focus:outline-none focus:border-blue-400"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="金額"
+          />
+          {todo.amount ? <span className="text-[10px] text-gray-400">（AI 從訊息抓到 ${Number(todo.amount).toLocaleString()}）</span> : null}
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        {isPay ? (
+          <>
+            <button disabled={busy || !selected} onClick={() => apply('deposit')} className={`text-xs font-bold rounded px-3 py-1.5 ${!selected || busy ? 'bg-gray-200 text-gray-400' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}>
+              記訂金 → 已付訂
+            </button>
+            <button disabled={busy || !selected} onClick={() => apply('final')} className={`text-xs font-bold rounded px-3 py-1.5 ${!selected || busy ? 'bg-gray-200 text-gray-400' : 'bg-green-600 hover:bg-green-700 text-white'}`}>
+              記尾款 → 已結案
+            </button>
+          </>
+        ) : (
+          <button disabled={busy || !selected} onClick={() => apply('confirm')} className={`text-xs font-bold rounded px-3 py-1.5 ${!selected || busy ? 'bg-gray-200 text-gray-400' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}>
+            狀態改「已回簽」
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
   const [expanded, setExpanded] = useState(false);
   const style = TYPE_STYLE[todo.type] || { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: MessageSquare };
   const Icon = style.icon;
@@ -72,6 +222,16 @@ const TodoCard = ({ todo, onDone, onReopen, isDone }) => {
           )}
           {expanded && (
             <div className="mt-1 text-xs text-gray-500 bg-gray-50 rounded p-2 whitespace-pre-wrap break-all">{todo.text}</div>
+          )}
+          {/* ★ 已套用資訊 */}
+          {todo.applied?.action && (
+            <div className="mt-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1 inline-block">
+              ✅ 已套用：{todo.applied.action}
+            </div>
+          )}
+          {/* ★ 套用到報價單（確定舉辦 / 付款回報） */}
+          {!isDone && (todo.type === '確定舉辦' || todo.type === '付款回報') && (
+            <ApplyToQuote todo={todo} quotes={quotes} db={db} />
           )}
         </div>
         <div className="shrink-0">
@@ -143,7 +303,7 @@ const DailySummaryCard = ({ db }) => {
   );
 };
 
-const LineTodosView = ({ db }) => {
+const LineTodosView = ({ db, quotes = [] }) => {
   const [openTodos, setOpenTodos] = useState([]);
   const [doneTodos, setDoneTodos] = useState([]);
   const [showDone, setShowDone] = useState(false);
@@ -197,7 +357,7 @@ const LineTodosView = ({ db }) => {
             <MessageSquare className="mr-2 text-green-600" /> LINE 待辦
             {openTodos.length > 0 && <span className="ml-2 bg-red-500 text-white text-sm rounded-full px-2.5 py-0.5">{openTodos.length}</span>}
           </h2>
-          <p className="text-gray-500 text-sm mt-1">客服訊息由 AI 自動判讀，處理完請按「處理完成」。回覆客人仍照舊在 LINE 上人工回。</p>
+          <p className="text-gray-500 text-sm mt-1">這不是未回覆清單——回客人照舊在 LINE 上。這裡是「回完之後要回頭改系統」的重點整理：確定舉辦→改已回簽、收到款→記訂金/尾款，直接在卡片上按「套用到報價單」。</p>
         </div>
         <button onClick={() => setShowDone(!showDone)} className={`text-sm px-3 py-1.5 rounded-full border ${showDone ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300'}`}>
           {showDone ? '← 回到待處理' : `已完成 (${doneTodos.length})`}
@@ -226,7 +386,7 @@ const LineTodosView = ({ db }) => {
           </div>
         ) : (
           list.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} />
+            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} quotes={quotes} db={db} />
           ))
         )}
       </div>
