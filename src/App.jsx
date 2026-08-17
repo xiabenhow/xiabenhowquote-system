@@ -1181,6 +1181,38 @@ const QuotePreview = ({
   );
 };
 
+// ========== PayLinkModal（客戶自填金額刷卡連結）==========
+const XBH_OPEN_PAY_URL = 'https://www.xiabenhow.com/?xbh_pay_open=kq8f3vzh';
+const PayLinkModal = ({ onClose }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(XBH_OPEN_PAY_URL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => prompt('請手動複製：', XBH_OPEN_PAY_URL));
+  };
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
+          <h3 className="font-bold text-lg flex items-center"><CreditCard className="w-5 h-5 mr-2" /> 刷卡連結（客戶自填金額）</h3>
+          <button onClick={onClose} className="hover:bg-blue-700 p-1 rounded"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-6">
+          <p className="text-sm text-gray-600 mb-3">把這條連結貼給客戶，客戶自己填「公司名＋金額」就能刷卡。付款成功會自動記錄。</p>
+          <div className="flex gap-2 items-center mb-3">
+            <input readOnly value={XBH_OPEN_PAY_URL} onFocus={(e) => e.target.select()} className="w-full border rounded p-2 text-xs bg-gray-50" />
+            <button onClick={copy} className={`whitespace-nowrap px-4 py-2 rounded font-bold text-sm ${copied ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{copied ? '已複製' : '複製'}</button>
+          </div>
+          <div className="text-xs text-gray-400 leading-relaxed">
+            ・金額限制 $100～$150,000<br/>
+            ・請只透過 LINE 私訊給客戶，不要公開張貼<br/>
+            ・指定金額的刷卡單請用各報價單的「款項管理」開
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ========== PaymentModal ==========
 
 const PaymentModal = ({ quote, onClose, onSave }) => {
@@ -4175,6 +4207,7 @@ const App = () => {
   const [editingQuote, setEditingQuote] = useState(null);
   const [previewQuote, setPreviewQuote] = useState(null);
   const [paymentQuote, setPaymentQuote] = useState(null);
+  const [showPayLink, setShowPayLink] = useState(false); // ★ 刷卡連結視窗
   const [showProductManager, setShowProductManager] = useState(false); // ★ 控制商品管理視窗
 
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -4348,6 +4381,13 @@ const App = () => {
             >
               庫存
             </button>
+            <button
+              onClick={() => setShowPayLink(true)}
+              className="px-3 py-1 rounded-full text-gray-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-1"
+              title="客戶自填金額的刷卡連結"
+            >
+              <CreditCard className="w-4 h-4" /> 刷卡連結
+            </button>
             
             {/* ★ 新增：商品管理按鈕 */}
             <button
@@ -4412,6 +4452,8 @@ const App = () => {
       {previewQuote && <PreviewModal quote={previewQuote} onClose={() => setPreviewQuote(null)} />}
       
       {paymentQuote && <PaymentModal quote={paymentQuote} onClose={() => setPaymentQuote(null)} onSave={handleSavePayment} />}
+
+      {showPayLink && <PayLinkModal onClose={() => setShowPayLink(false)} />}
       
       {/* ★ 新增：商品管理視窗 */}
       {showProductManager && (
