@@ -200,6 +200,9 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${style.color}`}>
               <Icon className="w-3 h-3" />{todo.type}
             </span>
+            {todo.userName && (
+              <span className="text-sm font-bold text-gray-800">👤 {todo.userName}</span>
+            )}
             <span className="text-xs text-gray-400">{fmtTime(todo.at)}</span>
           </div>
           <div className="text-sm font-medium text-gray-800">{todo.summary || todo.text}</div>
