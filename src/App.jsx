@@ -815,10 +815,10 @@ const AdminLock = ({ onUnlock }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#2b1f14] px-4">
       <div className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
-        <div className="mx-auto bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-          <Lock className="w-8 h-8 text-blue-600" />
+        <div className="mx-auto bg-[#fdeedc] w-16 h-16 rounded-full flex items-center justify-center mb-6">
+          <Lock className="w-8 h-8 text-[#fb8e28]" />
         </div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">後台管理鎖定</h2>
         <p className="text-gray-500 mb-6 text-sm">請輸入通行碼以存取內部資料</p>
@@ -826,7 +826,7 @@ const AdminLock = ({ onUnlock }) => {
         <form onSubmit={handleLogin} className="space-y-4">
           <input
             type="password"
-            className={`w-full text-center text-2xl tracking-widest border-2 rounded-lg p-3 outline-none transition-colors ${error ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-blue-500'}`}
+            className={`w-full text-center text-2xl tracking-widest border-2 rounded-lg p-3 outline-none transition-colors ${error ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#fb8e28]'}`}
             placeholder="••••"
             maxLength={4}
             value={passcode}
@@ -4483,15 +4483,15 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-[#fffaf3] to-[#faf3ec]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white/90 backdrop-blur shadow-sm border-b border-[#f0e2d3]">
         <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">下</div>
+            <div className="w-9 h-9 rounded-full bg-[#fb8e28] text-white flex items-center justify-center font-bold text-lg shadow-sm">下</div>
             <div>
-              <div className="font-bold text-gray-800">下班隨手作｜企業報價系統</div>
-              <div className="text-xs text-gray-500">內部管理系統 v4.1 (Product Manager)</div>
+              <div className="font-bold text-[#4a3421]">下班隨手作｜企業管理系統</div>
+              <div className="text-xs text-[#b09378]">quote · prep · stock · line</div>
             </div>
           </div>
 
@@ -4499,7 +4499,7 @@ const App = () => {
             {isBoss && (
               <button
                 onClick={() => { setEditingQuote(null); setCurrentView('dashboard'); }}
-                className={`px-3 py-1 rounded-full ${currentView === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`px-3 py-1 rounded-full ${currentView === 'dashboard' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
               >
                 今日看板
               </button>
@@ -4507,7 +4507,7 @@ const App = () => {
             {isBoss && (
               <button
                 onClick={() => { setEditingQuote(null); setCurrentView('linetodos'); }}
-                className={`px-3 py-1 rounded-full relative ${currentView === 'linetodos' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`px-3 py-1 rounded-full relative ${currentView === 'linetodos' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
               >
                 LINE待辦
                 {lineTodoCount > 0 && (
@@ -4519,43 +4519,43 @@ const App = () => {
             )}
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('list'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'list' && !editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${currentView === 'list' && !editingQuote ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               追蹤清單
             </button>
             <button
               onClick={() => { setEditingQuote({}); setCurrentView('create'); }}
-              className={`px-3 py-1 rounded-full ${editingQuote ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${editingQuote ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               新增報價
             </button>
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('calendar'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'calendar' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${currentView === 'calendar' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               行事曆
             </button>
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('prep'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'prep' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${currentView === 'prep' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               備課表
             </button>
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('stats'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'stats' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${currentView === 'stats' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               業績統計
             </button>
             <button
               onClick={() => { setEditingQuote(null); setCurrentView('inventory'); }}
-              className={`px-3 py-1 rounded-full ${currentView === 'inventory' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`px-3 py-1 rounded-full ${currentView === 'inventory' ? 'bg-[#fb8e28] text-white shadow-sm' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}
             >
               庫存
             </button>
             <button
               onClick={() => setShowPayLink(true)}
-              className="px-3 py-1 rounded-full text-gray-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-1"
+              className="px-3 py-1 rounded-full text-[#8a6d55] hover:bg-[#faf0e4] hover:text-[#c47d24] flex items-center gap-1"
               title="客戶自填金額的刷卡連結"
             >
               <CreditCard className="w-4 h-4" /> 刷卡連結
@@ -4564,7 +4564,7 @@ const App = () => {
             {/* ★ 新增：商品管理按鈕 */}
             <button
               onClick={() => setShowProductManager(true)}
-              className="px-3 py-1 rounded-full text-gray-600 hover:bg-purple-100 hover:text-purple-700 flex items-center border border-transparent hover:border-purple-200 ml-2"
+              className="px-3 py-1 rounded-full text-[#8a6d55] hover:bg-[#faf0e4] hover:text-[#c47d24] flex items-center border border-transparent hover:border-[#f0e2d3] ml-2"
               title="管理商品與價格"
             >
               <Settings className="w-4 h-4" />

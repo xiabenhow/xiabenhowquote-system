@@ -309,7 +309,7 @@ export default function InventoryView({ db }) {
       {/* 在途清單（舊：手動叫貨） */}
       <div className="bg-white rounded-xl border border-gray-200 mb-4">
         <button onClick={() => setShowIntransit((v) => !v)} className="w-full flex items-center justify-between px-4 py-3">
-          <span className="font-bold text-gray-800 flex items-center gap-2"><Truck className="w-4 h-4 text-blue-600" /> 在途清單（手動叫貨）<span className="text-xs bg-blue-100 text-blue-700 rounded-full px-2 py-0.5">{orderedList.length}</span></span>
+          <span className="font-bold text-gray-800 flex items-center gap-2"><Truck className="w-4 h-4 text-[#fb8e28]" /> 在途清單（手動叫貨）<span className="text-xs bg-[#fdeedc] text-[#c47d24] rounded-full px-2 py-0.5">{orderedList.length}</span></span>
           <span className="text-gray-400 text-sm">{showIntransit ? '收合' : '展開'}</span>
         </button>
         {showIntransit && (
@@ -347,7 +347,7 @@ export default function InventoryView({ db }) {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜尋品名 / 規格 / 分類"
-            className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 outline-none" />
+            className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-[#f5c68c] outline-none" />
         </div>
         <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
           {categories.map((c) => <option key={c} value={c}>{c === 'all' ? '全部分類' : c}</option>)}
@@ -355,7 +355,7 @@ export default function InventoryView({ db }) {
         <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
           <input type="checkbox" checked={shortOnly} onChange={(e) => setShortOnly(e.target.checked)} /> 只看缺料
         </label>
-        <button onClick={() => setAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-full px-4 py-2 flex items-center gap-1">
+        <button onClick={() => setAddModal(true)} className="bg-[#fb8e28] hover:bg-[#e07f1f] text-white text-sm font-bold rounded-full px-4 py-2 flex items-center gap-1">
           <Plus className="w-4 h-4" /> 新增品項
         </button>
       </div>
@@ -382,7 +382,7 @@ export default function InventoryView({ db }) {
               const inT = intransitByMat[m.id] || 0;
               const short = isShort(m);
               return (
-                <tr key={m.id} className="border-b last:border-0 hover:bg-blue-50/40">
+                <tr key={m.id} className="border-b last:border-0 hover:bg-[#fdf5ea]">
                   <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.category}</td>
                   <td className="px-2 font-medium text-gray-800">{m.name}</td>
                   <td className="px-2 text-gray-400 text-xs max-w-[160px] truncate" title={m.spec}>{m.spec}</td>
@@ -394,11 +394,11 @@ export default function InventoryView({ db }) {
                   <td className="px-2 whitespace-nowrap">
                     {short ? <span className="chip bg-red-100 text-red-700 text-xs rounded-full px-2 py-0.5">缺料</span>
                       : <span className="text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-700">足夠</span>}
-                    {inT > 0 && <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-blue-100 text-blue-700">在途 {inT}</span>}
+                    {inT > 0 && <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-[#fdeedc] text-[#c47d24]">在途 {inT}</span>}
                     {!m.stockKnown && <span className="ml-1 text-[10px] text-amber-500">未盤點</span>}
                   </td>
                   <td className="px-3 text-right whitespace-nowrap">
-                    <button onClick={() => setOrderModal(m)} className="inline-flex items-center gap-1 bg-blue-600 text-white text-xs rounded-full px-3 py-1 hover:bg-blue-700"><Plus className="w-3 h-3" /> 叫貨</button>
+                    <button onClick={() => setOrderModal(m)} className="inline-flex items-center gap-1 bg-[#fb8e28] text-white text-xs rounded-full px-3 py-1 hover:bg-[#e07f1f]"><Plus className="w-3 h-3" /> 叫貨</button>
                     <button onClick={() => removeMaterial(m)} title="刪除品項" className="ml-1 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4 inline" /></button>
                   </td>
                 </tr>
@@ -441,7 +441,7 @@ function ShipmentCard({ ship, onToggle, onDelete, history }) {
               <span className="min-w-0">
                 <span className={`text-sm ${it.checked ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>{it.name}</span>
                 {it.inbound && <span className="ml-1 text-[10px] bg-green-100 text-green-700 rounded px-1">已入庫+{it.qty}</span>}
-                {it.matName && !it.inbound && <span className="ml-1 text-[10px] bg-blue-50 text-blue-600 rounded px-1">連結：{it.matName}</span>}
+                {it.matName && !it.inbound && <span className="ml-1 text-[10px] bg-[#fdf5ea] text-[#fb8e28] rounded px-1">連結：{it.matName}</span>}
                 {!it.matId && <span className="ml-1 text-[10px] text-gray-300">僅記錄</span>}
                 <span className="block text-[10px] text-gray-400 break-all">{(it.tracking || []).join('、')}</span>
               </span>
@@ -496,7 +496,7 @@ function PasteShipmentModal({ onClose, onConfirm, matIndex }) {
                     return (
                       <div key={j} className="text-xs text-gray-600 flex justify-between py-0.5">
                         <span>{it.checked ? '✅' : '⬜'} {it.name}{it.qty ? `（數量 ${it.qty}）` : ''}</span>
-                        <span className={mat ? 'text-blue-600' : 'text-gray-300'}>{mat ? `→ ${mat.name}` : '僅記錄'}</span>
+                        <span className={mat ? 'text-[#fb8e28]' : 'text-gray-300'}>{mat ? `→ ${mat.name}` : '僅記錄'}</span>
                       </div>
                     );
                   })}
@@ -551,7 +551,7 @@ function AddMaterialModal({ categories, onClose, onConfirm }) {
           </div>
         </div>
         <button onClick={() => onConfirm(f)} disabled={!f.name.trim()}
-          className="w-full bg-blue-600 text-white rounded-full py-2 font-bold hover:bg-blue-700 disabled:opacity-40 mt-2">
+          className="w-full bg-[#fb8e28] text-white rounded-full py-2 font-bold hover:bg-[#e07f1f] disabled:opacity-40 mt-2">
           新增
         </button>
       </div>
@@ -603,11 +603,11 @@ function OrderModal({ m, onClose, onConfirm }) {
         </div>
         <div className="text-xs text-gray-500 mb-3">來源 {SOURCE_LABEL(m.source)}・貨期約 {m.leadDays || '?'} 天・目前庫存 {m.stock || 0}</div>
         <label className="block text-sm text-gray-600 mb-1">叫貨數量</label>
-        <input autoFocus type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="w-full border rounded-lg px-3 py-2 mb-3 focus:ring-2 focus:ring-blue-300 outline-none" placeholder="0" />
+        <input autoFocus type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="w-full border rounded-lg px-3 py-2 mb-3 focus:ring-2 focus:ring-[#f5c68c] outline-none" placeholder="0" />
         <label className="block text-sm text-gray-600 mb-1">叫貨人（選填）</label>
-        <input value={by} onChange={(e) => setBy(e.target.value)} className="w-full border rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-300 outline-none" placeholder="例：布丁 / 俏俏" />
+        <input value={by} onChange={(e) => setBy(e.target.value)} className="w-full border rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-[#f5c68c] outline-none" placeholder="例：布丁 / 俏俏" />
         <button onClick={() => onConfirm(m, qty, by)} disabled={!qty}
-          className="w-full bg-blue-600 text-white rounded-full py-2 font-bold hover:bg-blue-700 disabled:opacity-40">
+          className="w-full bg-[#fb8e28] text-white rounded-full py-2 font-bold hover:bg-[#e07f1f] disabled:opacity-40">
           加入在途清單
         </button>
       </div>

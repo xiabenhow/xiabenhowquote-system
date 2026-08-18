@@ -18,7 +18,7 @@ const SUMMARY_SECRET = 'xbh_sum_9dk2vq';
 const TYPE_STYLE = {
   '付款回報':   { color: 'bg-green-100 text-green-800 border-green-300', icon: Wallet },
   '付款預告':   { color: 'bg-lime-100 text-lime-800 border-lime-300', icon: Clock },
-  '確定舉辦':   { color: 'bg-blue-100 text-blue-800 border-blue-300', icon: Check },
+  '確定舉辦':   { color: 'bg-[#fdeedc] text-[#a2681e] border-[#eccb9f]', icon: Check },
   '改期請求':   { color: 'bg-orange-100 text-orange-800 border-orange-300', icon: Calendar },
   '人數調整':   { color: 'bg-purple-100 text-purple-800 border-purple-300', icon: Users },
   '課後人數核對': { color: 'bg-teal-100 text-teal-800 border-teal-300', icon: Users },
@@ -114,21 +114,21 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="mt-2 text-xs font-bold text-blue-600 border border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-full px-3 py-1 flex items-center gap-1">
+      <button onClick={() => setOpen(true)} className="mt-2 text-xs font-bold text-[#fb8e28] border border-[#eccb9f] bg-[#fdf5ea] hover:bg-[#fdeedc] rounded-full px-3 py-1 flex items-center gap-1">
         <FileText className="w-3 h-3" /> 套用到報價單{isPay ? '（記訂金/尾款）' : '（改已回簽）'}
       </button>
     );
   }
 
   return (
-    <div className="mt-2 border border-blue-200 bg-blue-50/50 rounded-lg p-3">
+    <div className="mt-2 border border-[#f0d9bd] bg-[#fdf5ea] rounded-lg p-3">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-xs font-bold text-blue-800">選擇對應的報價單</span>
+        <span className="text-xs font-bold text-[#a2681e]">選擇對應的報價單</span>
         <button onClick={() => setOpen(false)} className="text-gray-400 text-xs">收合</button>
       </div>
       <input
         type="text"
-        className="w-full border rounded p-1.5 text-sm mb-2 focus:outline-none focus:border-blue-400"
+        className="w-full border rounded p-1.5 text-sm mb-2 focus:outline-none focus:border-[#fb8e28]"
         placeholder="搜尋公司名 / 聯絡人…"
         value={kw}
         onChange={(e) => { setKw(e.target.value); setSelected(null); }}
@@ -140,7 +140,7 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
           <button
             key={q.id}
             onClick={() => setSelected(q)}
-            className={`w-full text-left rounded border p-2 text-xs flex justify-between items-center ${selected?.id === q.id ? 'border-blue-500 bg-white ring-1 ring-blue-300' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+            className={`w-full text-left rounded border p-2 text-xs flex justify-between items-center ${selected?.id === q.id ? 'border-[#fb8e28] bg-white ring-1 ring-[#f5c68c]' : 'border-gray-200 bg-white hover:border-[#eccb9f]'}`}
           >
             <div className="min-w-0">
               <div className="font-bold text-gray-800 truncate">{q.clientInfo?.companyName || '未命名'}</div>
@@ -159,7 +159,7 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
           <span className="text-xs text-gray-500 font-bold">金額 $</span>
           <input
             type="number"
-            className="w-28 border rounded p-1.5 text-sm focus:outline-none focus:border-blue-400"
+            className="w-28 border rounded p-1.5 text-sm focus:outline-none focus:border-[#fb8e28]"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="金額"
@@ -213,7 +213,7 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
             {todo.people ? <span className="text-purple-700 font-bold">人數 {todo.people}</span> : null}
           </div>
           {todo.text && todo.text !== todo.summary && (
-            <button onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-blue-500 flex items-center gap-0.5">
+            <button onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-[#fb8e28] flex items-center gap-0.5">
               {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />} 原始訊息
             </button>
           )}
@@ -233,7 +233,7 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
         </div>
         <div className="shrink-0">
           {isDone ? (
-            <button onClick={() => onReopen(todo)} className="text-xs text-gray-400 hover:text-blue-600 flex items-center gap-1 border rounded px-2 py-1">
+            <button onClick={() => onReopen(todo)} className="text-xs text-gray-400 hover:text-[#fb8e28] flex items-center gap-1 border rounded px-2 py-1">
               <RotateCcw className="w-3 h-3" /> 還原
             </button>
           ) : (
@@ -276,16 +276,16 @@ const DailySummaryCard = ({ db }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl shadow-sm border border-indigo-200 p-5 mb-5">
+    <div className="bg-gradient-to-br from-[#fdf5ea] to-white rounded-xl shadow-sm border border-[#f0d9bd] p-5 mb-5">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-bold text-indigo-900 flex items-center">
-          <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500" /> 今日訊息摘要
-          {summary?.upTo && <span className="ml-2 text-xs font-normal text-indigo-400">統計到 {summary.upTo}</span>}
+        <h3 className="font-bold text-[#4a3421] flex items-center">
+          <Sparkles className="w-4 h-4 mr-1.5 text-[#fb8e28]" /> 今日訊息摘要
+          {summary?.upTo && <span className="ml-2 text-xs font-normal text-[#c9a377]">統計到 {summary.upTo}</span>}
         </h3>
         <button
           onClick={refresh}
           disabled={refreshing}
-          className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 ${refreshing ? 'bg-gray-200 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+          className={`text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1 ${refreshing ? 'bg-gray-200 text-gray-400' : 'bg-[#fb8e28] text-white hover:bg-[#e07f1f]'}`}
         >
           <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} /> {refreshing ? '整理中…' : '立即更新'}
         </button>
@@ -295,7 +295,7 @@ const DailySummaryCard = ({ db }) => {
       ) : (
         <div className="text-sm text-gray-400">今天還沒有摘要——每晚 10:00 會自動整理，也可以按「立即更新」馬上看。</div>
       )}
-      <div className="text-[11px] text-indigo-300 mt-2">AI 只摘要企業訂單相關訊息（舉辦/人數/匯款/改期/詢價），閒聊與零售訊息會自動略過</div>
+      <div className="text-[11px] text-[#d9b98f] mt-2">AI 只摘要企業訂單相關訊息（舉辦/人數/匯款/改期/詢價），閒聊與零售訊息會自動略過</div>
     </div>
   );
 };
@@ -366,11 +366,11 @@ const LineTodosView = ({ db, quotes = [] }) => {
 
       {/* 類型篩選 */}
       <div className="flex gap-2 flex-wrap mb-4">
-        <button onClick={() => setTypeFilter('all')} className={`text-xs px-3 py-1 rounded-full border ${typeFilter === 'all' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}>
+        <button onClick={() => setTypeFilter('all')} className={`text-xs px-3 py-1 rounded-full border ${typeFilter === 'all' ? 'bg-[#fb8e28] text-white border-[#fb8e28]' : 'bg-white text-gray-600 border-gray-300'}`}>
           全部 {!showDone && openTodos.length > 0 ? `(${openTodos.length})` : ''}
         </button>
         {Object.keys(TYPE_STYLE).map((t) => (
-          <button key={t} onClick={() => setTypeFilter(t)} className={`text-xs px-3 py-1 rounded-full border ${typeFilter === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'}`}>
+          <button key={t} onClick={() => setTypeFilter(t)} className={`text-xs px-3 py-1 rounded-full border ${typeFilter === t ? 'bg-[#fb8e28] text-white border-[#fb8e28]' : 'bg-white text-gray-600 border-gray-300'}`}>
             {t} {!showDone && typeCounts[t] ? `(${typeCounts[t]})` : ''}
           </button>
         ))}

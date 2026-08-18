@@ -108,13 +108,13 @@ const DashboardView = ({ quotes, db, lineTodoCount, onNavigate }) => {
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8">
       <h2 className="text-2xl font-bold text-gray-800 flex items-center mb-1">
-        <LayoutDashboard className="mr-2 text-blue-600" /> 今日看板
+        <LayoutDashboard className="mr-2 text-[#fb8e28]" /> 今日看板
       </h2>
       <p className="text-gray-500 text-sm mb-5">{today}・每天上班先看這頁：今天的課、要備的、要叫的、要回的。</p>
 
       {/* 數字磚 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Tile icon={Calendar} label="今日課程" value={todayClasses.length} color="text-blue-600"
+        <Tile icon={Calendar} label="今日課程" value={todayClasses.length} color="text-[#fb8e28]"
           sub={todayClasses.length ? todayClasses.map((r) => r.courseName).join('、').slice(0, 20) : '今天沒有課'}
           onClick={() => onNavigate('calendar')} />
         <Tile icon={MessageSquare} label="LINE 待辦" value={lineTodoCount} color="text-green-600"
@@ -131,19 +131,19 @@ const DashboardView = ({ quotes, db, lineTodoCount, onNavigate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* 今日 + 近7天課程 */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center"><Calendar className="w-4 h-4 mr-1.5 text-blue-600" /> 今日與近 7 天課程</h3>
+          <h3 className="font-bold text-gray-800 mb-3 flex items-center"><Calendar className="w-4 h-4 mr-1.5 text-[#fb8e28]" /> 今日與近 7 天課程</h3>
           {todayClasses.length === 0 && week.length === 0 ? (
             <div className="text-sm text-gray-400 py-6 text-center">近 7 天沒有已確認的課程</div>
           ) : (
             <div className="space-y-2">
               {[...todayClasses, ...week].map((r) => (
-                <div key={`${r.quoteId}_${r.itemIdx}`} className={`flex items-center justify-between rounded-lg border p-2.5 ${r.date === today ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}>
+                <div key={`${r.quoteId}_${r.itemIdx}`} className={`flex items-center justify-between rounded-lg border p-2.5 ${r.date === today ? 'bg-[#fdf5ea] border-[#f0d9bd]' : 'bg-gray-50 border-gray-100'}`}>
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-gray-800 truncate">{r.courseName}</div>
                     <div className="text-xs text-gray-500 truncate">{r.clientName}・{r.people} 人{r.time ? `・${r.time}` : ''}</div>
                   </div>
                   <div className="text-right shrink-0 ml-2">
-                    <div className={`text-xs font-bold ${r.date === today ? 'text-blue-700' : 'text-gray-600'}`}>{r.date === today ? '今天' : r.date.slice(5)}</div>
+                    <div className={`text-xs font-bold ${r.date === today ? 'text-[#c47d24]' : 'text-gray-600'}`}>{r.date === today ? '今天' : r.date.slice(5)}</div>
                     {r.prepData?.packedAt
                       ? <span className="text-xs text-green-600 flex items-center justify-end"><CheckCircle2 className="w-3 h-3 mr-0.5" />已裝箱</span>
                       : <span className="text-xs text-orange-500">未裝箱</span>}
