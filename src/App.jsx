@@ -1458,34 +1458,72 @@ const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
   const displayDateStr = formatDate(quote.createdAt || new Date());
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+
   const handleDownload = async () => {
     const element = document.getElementById('preview-modal-area');
-    if (!element) return;
+    if (!element || pdfBusy) return;
+    setPdfBusy(true);
 
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `${quote.clientInfo.companyName || '客戶'}_${dateStr}.pdf`;
 
-    if (!window.html2pdf) {
-      try {
-        await loadScript(
-          'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-        );
-      } catch {
-        alert('無法載入 PDF 產生器，請檢查網路連線。');
-        return;
+    // ★ 修復報價單跑版：改用打包在站內的 html2pdf（不再靠 CDN，避免載不到／載一半）
+    let maker = null;
+    try {
+      const mod = await import('html2pdf.js');
+      maker = mod.default || mod;
+    } catch {
+      if (!window.html2pdf) {
+        try {
+          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+        } catch { /* 下面再判斷 */ }
       }
+      maker = window.html2pdf;
+    }
+    if (typeof maker !== 'function') {
+      setPdfBusy(false);
+      alert('PDF 產生器載入失敗，請重新整理頁面再試一次。');
+      return;
     }
 
     const opt = {
       margin: 5,
       filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        scrollY: 0,
+        // ★ 關鍵修復：把樣式整份內嵌進截圖用的複本，
+        //   避免複本還沒載到外部 CSS 就被拍照 → 報價單變成無樣式的直排（跑版）
+        onclone: (clonedDoc) => {
+          try {
+            let css = '';
+            for (const sheet of Array.from(document.styleSheets)) {
+              try {
+                for (const rule of Array.from(sheet.cssRules || [])) css += `${rule.cssText}\n`;
+              } catch { /* 跨網域樣式表跳過 */ }
+            }
+            if (css) {
+              const style = clonedDoc.createElement('style');
+              style.textContent = css;
+              clonedDoc.head.appendChild(style);
+            }
+          } catch (e) { console.error('onclone 失敗', e); }
+        },
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
     };
 
-    window.html2pdf().from(element).set(opt).save();
+    try {
+      await maker().from(element).set(opt).save();
+    } catch (e) {
+      console.error('PDF 產生失敗', e);
+      alert('PDF 產生失敗，請再試一次；若持續失敗請用「列印」另存 PDF。');
+    }
+    setPdfBusy(false);
   };
 
   // ★ Excel 下載功能（嚴格對齊 PDF 排版）
@@ -1854,10 +1892,11 @@ const PreviewModal = ({ quote, onClose }) => {
 
             <button
               onClick={handleDownload}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 flex items-center shadow"
+              disabled={pdfBusy}
+              className={`px-4 py-2 rounded text-sm font-bold flex items-center shadow ${pdfBusy ? 'bg-gray-300 text-gray-500' : 'bg-[#fb8e28] text-white hover:bg-[#e07f1f]'}`}
             >
               <Download className="w-4 h-4 mr-2" />
-              下載 PDF
+              {pdfBusy ? '產生中…' : '下載 PDF'}
             </button>
 
             <button
