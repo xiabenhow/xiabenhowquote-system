@@ -108,11 +108,13 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
         applied: { quoteId: selected.id, company, action: desc },
       });
       // ★ 記住「這個 LINE 帳號 = 這張報價單」→ 之後同窗口的「確定舉辦」自動改狀態
-      if (todo.userId) {
-        await setDoc(doc(db, 'line_links', todo.userId), {
+      const linkKey = todo.chatId || todo.userId;
+      if (linkKey) {
+        await setDoc(doc(db, 'line_links', linkKey), {
           quoteId: selected.id,
           company,
           userName: todo.userName || '',
+          isGroup: !!todo.isGroup,
           updatedAt: serverTimestamp(),
         }, { merge: true }).catch(() => {});
       }
@@ -196,10 +198,13 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
   );
 };
 
-const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
+const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db, links }) => {
   const [expanded, setExpanded] = useState(false);
   const style = TYPE_STYLE[todo.type] || { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: MessageSquare };
   const Icon = style.icon;
+  // 顯示名稱優先序：已連結報價單的公司名 > 群組名/LINE名
+  const linked = links?.[todo.chatId || todo.userId];
+  const displayName = linked?.company || todo.userName || '';
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border p-4 ${isDone ? 'opacity-60' : ''}`}>
@@ -209,8 +214,13 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db }) => {
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${style.color}`}>
               <Icon className="w-3 h-3" />{todo.type}
             </span>
-            {todo.userName && (
-              <span className="text-sm font-bold text-gray-800">👤 {todo.userName}</span>
+            {displayName && (
+              <span className="text-sm font-bold text-gray-800">
+                {todo.isGroup || linked ? '🏢' : '👤'} {displayName}
+                {todo.senderName && todo.senderName !== displayName && (
+                  <span className="ml-1 text-xs font-normal text-gray-400">（{todo.senderName} 發言）</span>
+                )}
+              </span>
             )}
             <span className="text-xs text-gray-400">{fmtTime(todo.at)}</span>
           </div>
@@ -314,6 +324,7 @@ const LineTodosView = ({ db, quotes = [] }) => {
   const [doneTodos, setDoneTodos] = useState([]);
   const [showDone, setShowDone] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [links, setLinks] = useState({}); // chatId → {company,...}
 
   useEffect(() => {
     if (!db) return;
@@ -323,7 +334,12 @@ const LineTodosView = ({ db, quotes = [] }) => {
     const unsub2 = onSnapshot(query(collection(db, 'line_todos'), where('status', '==', 'done')), (snap) => {
       setDoneTodos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsub1(); unsub2(); };
+    const unsub3 = onSnapshot(collection(db, 'line_links'), (snap) => {
+      const m = {};
+      snap.docs.forEach((d) => { m[d.id] = d.data(); });
+      setLinks(m);
+    }, () => {});
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, [db]);
 
   const sortByAt = (arr) => arr.slice().sort((a, b) => {
@@ -392,7 +408,7 @@ const LineTodosView = ({ db, quotes = [] }) => {
           </div>
         ) : (
           list.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} quotes={quotes} db={db} />
+            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} quotes={quotes} db={db} links={links} />
           ))
         )}
       </div>
