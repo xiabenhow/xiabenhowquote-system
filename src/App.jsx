@@ -766,12 +766,12 @@ const applyTransportDedup = (itemsWithCalc) => {
 // ========== UI 小元件 ==========
 
 const StatusSelector = ({ status, onChange }) => {
-  // ★ 修改：只保留四種狀態：草稿、已回簽、已付訂、已結案
+  // ★ 修改：只保留四種狀態：草稿、確定舉辦、已付訂、已結案
   const options = [
     { value: 'draft', label: '草稿', color: 'bg-gray-100 text-gray-800' },
     {
       value: 'confirmed',
-      label: '已回簽',
+      label: '確定舉辦',
       color: 'bg-purple-100 text-purple-800',
     },
     { value: 'paid', label: '已付訂', color: 'bg-orange-100 text-orange-800' },
@@ -2636,7 +2636,7 @@ const StatsView = ({ quotes }) => {
           color: 'bg-gray-100 text-gray-800',
         },
         confirmed: {
-          name: '已回簽 (待付訂)',
+          name: '確定舉辦 (待付訂)',
           count: 0,
           color: 'bg-purple-100 text-purple-800',
         },
@@ -4139,7 +4139,7 @@ return (
     >
       <option value="all">所有狀態</option>
       <option value="draft">草稿</option>
-      <option value="confirmed">已回簽</option>
+      <option value="confirmed">確定舉辦</option>
       <option value="paid">已付訂</option>
       <option value="closed">已結案</option>
     </select>

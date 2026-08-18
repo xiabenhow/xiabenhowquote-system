@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp,
+  collection, query, where, onSnapshot, doc, updateDoc, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import {
   MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp, Sparkles, RefreshCw,
@@ -37,7 +37,7 @@ const fmtTime = (at) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const STATUS_LABEL = { draft: '草稿', confirmed: '已回簽', paid: '已付訂', closed: '已結案' };
+const STATUS_LABEL = { draft: '草稿', confirmed: '確定舉辦', paid: '已付訂', closed: '已結案' };
 const STATUS_COLOR = {
   draft: 'bg-gray-100 text-gray-600',
   confirmed: 'bg-purple-100 text-purple-700',
@@ -45,7 +45,7 @@ const STATUS_COLOR = {
   closed: 'bg-green-100 text-green-700',
 };
 
-// ★ 套用到報價單：確定舉辦→改「已回簽」；付款回報→記訂金(改已付訂)或尾款(改已結案)
+// ★ 套用到報價單：確定舉辦→自動/一鍵改「確定舉辦」；付款回報→記訂金(改已付訂)或尾款(改已結案)
 const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
   const [open, setOpen] = useState(false);
   const [kw, setKw] = useState('');
@@ -78,7 +78,7 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
     let desc = '';
     if (kind === 'confirm') {
       update = { status: 'confirmed' };
-      desc = `「${company}」狀態 → 已回簽`;
+      desc = `「${company}」狀態 → 確定舉辦`;
     } else if (kind === 'deposit') {
       const amt = parseInt(amount || 0);
       if (!amt) { alert('請填訂金金額'); return; }
@@ -107,6 +107,15 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
         doneAt: new Date().toISOString(),
         applied: { quoteId: selected.id, company, action: desc },
       });
+      // ★ 記住「這個 LINE 帳號 = 這張報價單」→ 之後同窗口的「確定舉辦」自動改狀態
+      if (todo.userId) {
+        await setDoc(doc(db, 'line_links', todo.userId), {
+          quoteId: selected.id,
+          company,
+          userName: todo.userName || '',
+          updatedAt: serverTimestamp(),
+        }, { merge: true }).catch(() => {});
+      }
       onApplied && onApplied();
     } catch (e) { console.error(e); alert('套用失敗，請再試一次'); }
     setBusy(false);
@@ -115,7 +124,7 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} className="mt-2 text-xs font-bold text-[#fb8e28] border border-[#eccb9f] bg-[#fdf5ea] hover:bg-[#fdeedc] rounded-full px-3 py-1 flex items-center gap-1">
-        <FileText className="w-3 h-3" /> 套用到報價單{isPay ? '（記訂金/尾款）' : '（改已回簽）'}
+        <FileText className="w-3 h-3" /> 套用到報價單{isPay ? '（記訂金/尾款）' : '（改確定舉辦）'}
       </button>
     );
   }
@@ -179,7 +188,7 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
           </>
         ) : (
           <button disabled={busy || !selected} onClick={() => apply('confirm')} className={`text-xs font-bold rounded px-3 py-1.5 ${!selected || busy ? 'bg-gray-200 text-gray-400' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}>
-            狀態改「已回簽」
+            狀態改「確定舉辦」
           </button>
         )}
       </div>
@@ -354,7 +363,7 @@ const LineTodosView = ({ db, quotes = [] }) => {
             <MessageSquare className="mr-2 text-green-600" /> LINE 待辦
             {openTodos.length > 0 && <span className="ml-2 bg-red-500 text-white text-sm rounded-full px-2.5 py-0.5">{openTodos.length}</span>}
           </h2>
-          <p className="text-gray-500 text-sm mt-1">這不是未回覆清單——回客人照舊在 LINE 上。這裡是「回完之後要回頭改系統」的重點整理：確定舉辦→改已回簽、收到款→記訂金/尾款，直接在卡片上按「套用到報價單」。</p>
+          <p className="text-gray-500 text-sm mt-1">這不是未回覆清單——回客人照舊在 LINE 上。這裡是「回完之後要回頭改系統」的重點整理：確定舉辦→改狀態、收到款→記訂金/尾款。第一次按「套用到報價單」建立連結後，同一位窗口之後的「確定舉辦」會自動改狀態。</p>
         </div>
         <button onClick={() => setShowDone(!showDone)} className={`text-sm px-3 py-1.5 rounded-full border ${showDone ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300'}`}>
           {showDone ? '← 回到待處理' : `已完成 (${doneTodos.length})`}
