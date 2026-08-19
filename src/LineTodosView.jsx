@@ -8,7 +8,7 @@ import {
   collection, query, where, onSnapshot, doc, updateDoc, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import {
-  MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp, Sparkles, RefreshCw,
+  MessageSquare, Check, RotateCcw, Wallet, Calendar, Users, FileText, Clock, ChevronDown, ChevronUp, Sparkles, RefreshCw, Pencil,
 } from 'lucide-react';
 import { fmtDate } from './opsUtils';
 
@@ -198,13 +198,15 @@ const ApplyToQuote = ({ todo, quotes, db, onApplied }) => {
   );
 };
 
-const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db, links }) => {
+const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db, links, profiles, onRename }) => {
   const [expanded, setExpanded] = useState(false);
   const style = TYPE_STYLE[todo.type] || { color: 'bg-gray-100 text-gray-700 border-gray-300', icon: MessageSquare };
   const Icon = style.icon;
-  // 顯示名稱優先序：已連結報價單的公司名 > 群組名/LINE名
-  const linked = links?.[todo.chatId || todo.userId];
-  const displayName = linked?.company || todo.userName || '';
+  // 顯示名稱優先序：手動改的名字 > 已連結報價單的公司名 > 群組名/LINE名
+  const chatKey = todo.chatId || todo.userId;
+  const linked = links?.[chatKey];
+  const override = profiles?.[chatKey]?.override;
+  const displayName = override || linked?.company || todo.userName || '';
 
   return (
     <div className={`bg-white rounded-lg shadow-sm border p-4 ${isDone ? 'opacity-60' : ''}`}>
@@ -215,10 +217,19 @@ const TodoCard = ({ todo, onDone, onReopen, isDone, quotes, db, links }) => {
               <Icon className="w-3 h-3" />{todo.type}
             </span>
             {displayName && (
-              <span className="text-sm font-bold text-gray-800">
-                {todo.isGroup || linked ? '🏢' : '👤'} {displayName}
+              <span className="text-sm font-bold text-gray-800 group/name">
+                {todo.isGroup || linked || override ? '🏢' : '👤'} {displayName}
                 {todo.senderName && todo.senderName !== displayName && (
                   <span className="ml-1 text-xs font-normal text-gray-400">（{todo.senderName} 發言）</span>
+                )}
+                {!isDone && chatKey && (
+                  <button
+                    onClick={() => onRename(chatKey, displayName)}
+                    title="改成你們慣用的客戶名稱（改一次，這個客戶以後都會用這個名字）"
+                    className="ml-1 text-gray-300 hover:text-[#fb8e28] align-middle"
+                  >
+                    <Pencil className="w-3 h-3 inline" />
+                  </button>
                 )}
               </span>
             )}
@@ -325,6 +336,7 @@ const LineTodosView = ({ db, quotes = [] }) => {
   const [showDone, setShowDone] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [links, setLinks] = useState({}); // chatId → {company,...}
+  const [profiles, setProfiles] = useState({}); // chatId → {name, override}
 
   useEffect(() => {
     if (!db) return;
@@ -339,7 +351,12 @@ const LineTodosView = ({ db, quotes = [] }) => {
       snap.docs.forEach((d) => { m[d.id] = d.data(); });
       setLinks(m);
     }, () => {});
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub4 = onSnapshot(collection(db, 'line_profiles'), (snap) => {
+      const m = {};
+      snap.docs.forEach((d) => { m[d.id] = d.data(); });
+      setProfiles(m);
+    }, () => {});
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
   }, [db]);
 
   const sortByAt = (arr) => arr.slice().sort((a, b) => {
@@ -359,6 +376,15 @@ const LineTodosView = ({ db, quotes = [] }) => {
     openTodos.forEach((t) => { c[t.type] = (c[t.type] || 0) + 1; });
     return c;
   }, [openTodos]);
+
+  // ★ 改名：寫進 line_profiles/{chatId}.override，判讀橋之後也會直接用這個名字
+  const renameChat = async (chatKey, current) => {
+    const name = window.prompt('客戶名稱（例如：美世保險 吳泓逸Zack）\n改一次之後，這個客戶的訊息都會顯示這個名字。', current || '');
+    if (name === null) return;
+    try {
+      await setDoc(doc(db, 'line_profiles', chatKey), { override: name.trim() }, { merge: true });
+    } catch (e) { console.error(e); alert('改名失敗，請再試一次'); }
+  };
 
   const markDone = async (todo) => {
     try {
@@ -408,7 +434,7 @@ const LineTodosView = ({ db, quotes = [] }) => {
           </div>
         ) : (
           list.map((todo) => (
-            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} quotes={quotes} db={db} links={links} />
+            <TodoCard key={todo.id} todo={todo} onDone={markDone} onReopen={reopen} isDone={showDone} quotes={quotes} db={db} links={links} profiles={profiles} onRename={renameChat} />
           ))
         )}
       </div>
