@@ -3105,6 +3105,16 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   const [staffData, setStaffData] = useState({ North: [], Central: [], South: [] });
   const [newStaffName, setNewStaffName] = useState('');
 
+  // ★ 備課卡片收合：預設全部收起來，點標題才展開（避免整頁很長）
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set());
+  const toggleExpand = (key) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   // ★ 備課引擎：課程配方(bom) + 材料庫存(materials)
   const [bomList, setBomList] = useState([]);
   const [materialsList, setMaterialsList] = useState([]);
@@ -3230,6 +3240,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             date: item.eventDate,
             time: item.timeRange || item.startTime || '',
             people: item.peopleCount,
+            // ★ 地點：報價單上的縣市＋地址（外送才有；店內課通常空白）
+            city: item.city || '',
+            address: item.address || '',
             standardMaterials,
             customMaterials,
             prepData: savedData,
@@ -3368,6 +3381,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                 </div>
             )}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setExpandedKeys(prev => prev.size > 0 ? new Set() : new Set(prepItems.map(i => `${i.quoteId}_${i.itemIdx}`)))}
+              className="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-2 rounded hover:bg-gray-50 font-bold whitespace-nowrap"
+            >
+              {expandedKeys.size > 0 ? '全部收合' : '全部展開'}
+            </button>
             <label className="text-sm font-bold text-gray-700">截止日期：</label>
             <input type="date" className={INPUT_CLASS} value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
           </div>
@@ -3423,26 +3443,54 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             item.customMaterials.forEach(mat => { if (item.prepData[mat]?.done) doneMat++; });
             const progress = totalMat > 0 ? Math.round((doneMat / totalMat) * 100) : 0;
             const isAllDone = totalMat > 0 && doneMat === totalMat;
+            const isOpen = expandedKeys.has(uniqueKey);
+            // ★ 收合時的重點摘要：缺料數、未指派數
+            const shortCount = item.standardMaterials.filter(m => item.bomInfo[m]?.enough === false).length;
+            const unassignedCount = [...item.standardMaterials, ...item.customMaterials]
+              .filter(m => !(item.prepData[m]?.staff)).length;
 
             return (
-              <div key={uniqueKey} className={`bg-white rounded-lg shadow border-l-4 p-6 transition-colors ${isAllDone ? 'border-l-green-500 border-green-200 bg-green-50' : 'border-l-blue-500 border-gray-200'}`}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800">{item.courseName}</h3>
-                    <div className="text-sm text-gray-600 mt-1 flex items-center gap-4">
-                      <span className="flex items-center"><User className="w-4 h-4 mr-1" />{item.clientName}</span>
-                      <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" />{item.date} {item.time}</span>
-                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{item.people} 人</span>
+              <div key={uniqueKey} className={`bg-white rounded-lg shadow border-l-4 transition-colors ${isAllDone ? 'border-l-green-500 border-green-200 bg-green-50' : 'border-l-blue-500 border-gray-200'} ${isOpen ? 'p-6' : 'p-4'}`}>
+                <div
+                  className="flex justify-between items-start cursor-pointer select-none"
+                  onClick={() => toggleExpand(uniqueKey)}
+                  title={isOpen ? '點擊收合' : '點擊展開材料清單'}
+                >
+                  <div className="flex items-start min-w-0">
+                    <ChevronRight className={`w-5 h-5 mt-1 mr-1 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-bold text-gray-800">{item.courseName}</h3>
+                      <div className="text-sm text-gray-600 mt-1 flex items-center gap-4 flex-wrap">
+                        <span className="flex items-center"><User className="w-4 h-4 mr-1" />{item.clientName}</span>
+                        <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" />{item.date} {item.time}</span>
+                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{item.people} 人</span>
+                      </div>
+                      {(item.city || item.address) && (
+                        <div className="text-sm text-gray-600 mt-1 flex items-start">
+                          <MapPin className="w-4 h-4 mr-1 mt-0.5 shrink-0 text-gray-400" />
+                          <span className="break-all">{[item.city, item.address].filter(Boolean).join(' ')}</span>
+                        </div>
+                      )}
+                      {!isOpen && (
+                        <div className="text-xs mt-2 flex items-center gap-2 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded font-bold ${isAllDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            材料 {doneMat}/{totalMat}
+                          </span>
+                          {shortCount > 0 && <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 font-bold">缺料 {shortCount} 項</span>}
+                          {unassignedCount > 0 && <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700">未指派 {unassignedCount}</span>}
+                          {item.prepData.note && <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 truncate max-w-[16rem]">📝 {item.prepData.note}</span>}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right flex flex-col items-end gap-1">
-                    <div className="text-2xl font-bold text-gray-300">{progress}%</div>
+                  <div className="text-right flex flex-col items-end gap-1 shrink-0 ml-2">
+                    <div className={`font-bold ${isOpen ? 'text-2xl text-gray-300' : 'text-xl text-gray-300'}`}>{progress}%</div>
                     {item.bom && (
                       item.prepData.packedAt ? (
                         <span className="text-xs bg-green-100 text-green-700 border border-green-300 rounded-full px-2 py-0.5 font-bold">📦 已裝箱 {item.prepData.packedAt.slice(5)}</span>
                       ) : (
                         <button
-                          onClick={() => handlePackOut(item)}
+                          onClick={(e) => { e.stopPropagation(); handlePackOut(item); }}
                           className="text-xs bg-gray-800 hover:bg-black text-white rounded-full px-3 py-1 font-bold"
                           title="全部備好後按此：自動扣庫存並標記已裝箱"
                         >
@@ -3452,7 +3500,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                     )}
                   </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-4"><div className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} /></div>
+                <div className={`w-full bg-gray-200 rounded-full h-2 ${isOpen ? 'mt-4 mb-4' : 'mt-3'}`}><div className={`h-2 rounded-full transition-all duration-500 ${isAllDone ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${progress}%` }} /></div>
+                {isOpen && (<>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {item.standardMaterials.map(mat => {
                         const matState = item.prepData[mat] || { done: false, staff: '' };
@@ -3499,6 +3548,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                     <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center"><MessageSquare className="w-3 h-3 mr-1"/> 交接備註事項：</label>
                     <NoteInput value={item.prepData.note || ''} onSave={(newValue) => handleNoteUpdate(item.quoteId, item.itemIdx, newValue)} />
                 </div>
+                </>)}
               </div>
             );
           })
