@@ -1243,6 +1243,13 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
     onClose();
   };
 
+  // ★ 按 Esc 也能關閉（避免視窗太長時找不到叉叉）
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   // ★ 刷卡連結
   const [payAmount, setPayAmount] = useState('');
   const [payLoading, setPayLoading] = useState(false);
@@ -1270,22 +1277,27 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-        <div className="bg-orange-500 p-4 flex justify-between items-center text-white">
-          <h3 className="font-bold text-lg flex items-center">
-            <Wallet className="w-5 h-5 mr-2" />
-            款項管理 - {quote.clientInfo.companyName}
+    <div
+      className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* ★ 修正跑版：整體限制在畫面內，標題列與底部按鈕固定，中間才捲動 */}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+        <div className="bg-orange-500 p-4 flex justify-between items-center text-white shrink-0">
+          <h3 className="font-bold text-lg flex items-center min-w-0">
+            <Wallet className="w-5 h-5 mr-2 shrink-0" />
+            <span className="truncate">款項管理 - {quote.clientInfo.companyName}</span>
           </h3>
           <button
             onClick={onClose}
-            className="hover:bg-orange-600 p-1 rounded"
+            className="hover:bg-orange-600 p-1 rounded shrink-0 ml-2"
+            title="關閉 (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto grow">
           <div className="flex justify-between items-center border-b pb-4">
             <span className="text-gray-500 font-medium">報價總額</span>
             <span className="text-2xl font-bold text-gray-800">
@@ -1431,7 +1443,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
           </div>
         </div>
 
-        <div className="p-4 bg-gray-100 flex justify-end gap-2">
+        <div className="p-4 bg-gray-100 flex justify-end gap-2 shrink-0 border-t border-gray-200">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
@@ -3931,7 +3943,7 @@ const CalendarView = ({
       {viewMode === 'day' && renderDayView()}
       {showAddModal && !publicMode && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="text-xl font-bold text-gray-800 flex items-center"><Calendar className="w-5 h-5 mr-2" /> {isEditingRegular ? '編輯常態課' : '新增常態課'} (老師排課)</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X /></button>
