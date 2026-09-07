@@ -131,6 +131,21 @@ const formatDate = (val) => {
   }
 };
 
+// 報價日期（YYYY-MM-DD，用本地時區，避免 toISOString 在台灣早上 8 點前變成昨天）
+const todayYmd = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+// 顯示用：優先用報價單自己存的 quoteDate（每次編輯儲存都會更新），沒有才退回建立時間
+const quoteDateDisplay = (quote) => {
+  const qd = quote?.quoteDate;
+  if (typeof qd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(qd)) {
+    const [y, m, d] = qd.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('zh-TW');
+  }
+  return formatDate(quote?.createdAt || new Date());
+};
+
 const formatDateWithDay = (dateStr) => {
   if (!dateStr) return '';
   try {
@@ -1468,7 +1483,7 @@ const PaymentModal = ({ quote, onClose, onSave }) => {
 
 const PreviewModal = ({ quote, onClose }) => {
   const [isSigned, setIsSigned] = useState(false);
-  const displayDateStr = formatDate(quote.createdAt || new Date());
+  const displayDateStr = quoteDateDisplay(quote);
 
   const [pdfBusy, setPdfBusy] = useState(false);
 
@@ -1956,6 +1971,8 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
   );
   const [status] = useState(initialData?.status || 'draft');
   const [internalNote, setInternalNote] = useState(initialData?.internalNote || '');
+  // 報價日期：新增或編輯都預設「今天」（編輯舊單＝重新開單），可手動改
+  const [quoteDate, setQuoteDate] = useState(todayYmd());
   const [isSigned, setIsSigned] = useState(false);
 
   // 初始化 items
@@ -2213,6 +2230,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
       totalAmount,
       status,
       internalNote,
+      quoteDate: quoteDate || todayYmd(),
     });
   };
 
@@ -2247,6 +2265,16 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
                   setClientInfo((prev) => ({ ...prev, taxId: e.target.value }))
                 }
               />
+            </div>
+            <div>
+              <label className={LABEL_CLASS}>報價日期</label>
+              <input
+                type="date"
+                className={INPUT_CLASS}
+                value={quoteDate}
+                onChange={(e) => setQuoteDate(e.target.value)}
+              />
+              <p className="text-xs text-gray-400 mt-1">預設為今天（編輯舊單也會更新成今天），儲存後 PDF／Excel 都用這個日期</p>
             </div>
             <div>
               <label className={LABEL_CLASS}>聯絡人</label>
@@ -2616,7 +2644,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
         </div>
 
         <div className="border shadow-2xl mx-auto print:shadow-none print:border-none overflow-hidden">
-          <QuotePreview idName="creator-preview-area" clientInfo={clientInfo} items={calculatedItems} totalAmount={totalAmount} dateStr={new Date().toISOString().slice(0, 10)} isSigned={isSigned} stampUrl={STAMP_URL} />
+          <QuotePreview idName="creator-preview-area" clientInfo={clientInfo} items={calculatedItems} totalAmount={totalAmount} dateStr={quoteDateDisplay({ quoteDate })} isSigned={isSigned} stampUrl={STAMP_URL} />
         </div>
       </div>
     </div>
