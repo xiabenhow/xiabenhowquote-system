@@ -3429,6 +3429,25 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     return list.sort((a, b) => (a.date > b.date ? 1 : -1));
   }, [validQuotes, filterDate, currentRegion, bomList, matIndex]);
 
+  // ★ 被「截止日期」擋掉／沒填日期 的未來課程數（避免以為備課表漏掉）
+  const hiddenInfo = useMemo(() => {
+    const todayStr = fmtDate(new Date());
+    let beyond = 0; let noDate = 0; let latest = '';
+    validQuotes.forEach((q) => (q.items || []).forEach((item) => {
+      const itemRegion = item.outingRegion || item.regionType || 'North';
+      let r = itemRegion;
+      if (item.city) {
+        if (item.city.includes('台中') || item.city.includes('彰化') || item.city.includes('南投')) r = 'Central';
+        if (item.city.includes('高雄') || item.city.includes('台南') || item.city.includes('屏東')) r = 'South';
+      }
+      if (r !== currentRegion) return;
+      if (!item.eventDate) { noDate++; return; }
+      if (item.eventDate > filterDate) { beyond++; if (item.eventDate > latest) latest = item.eventDate; }
+      else if (item.eventDate < todayStr) { /* 已過 */ }
+    }));
+    return { beyond, noDate, latest };
+  }, [validQuotes, filterDate, currentRegion]);
+
   const handleMaterialUpdate = (quoteId, itemIdx, matName, field, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
@@ -3576,6 +3595,21 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             </button>
             <label className="text-sm font-bold text-gray-700">截止日期：</label>
             <input type="date" className={INPUT_CLASS} value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
+            {hiddenInfo.beyond > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterDate(hiddenInfo.latest)}
+                className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-3 py-2 rounded font-bold whitespace-nowrap hover:bg-amber-200"
+                title="截止日期之後還有課，點一下把截止日期拉到最後一堂"
+              >
+                還有 {hiddenInfo.beyond} 堂在截止日之後 → 顯示全部
+              </button>
+            )}
+            {hiddenInfo.noDate > 0 && (
+              <span className="text-xs text-gray-400 whitespace-nowrap" title="報價單上這幾項沒填活動日期，備課表無法排入；到報價單補日期就會出現">
+                {hiddenInfo.noDate} 項沒填日期
+              </span>
+            )}
           </div>
         </div>
       </div>
