@@ -835,7 +835,7 @@ const AdminLock = ({ onUnlock }) => {
     <div className="min-h-screen flex items-center justify-center bg-[#2b1f14] px-4 py-6">
       <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
         <img src="/lock.jpg" alt="" className="w-full rounded-lg mb-4 object-cover max-h-[380px]" draggable={false} />
-        <h2 className="text-xl font-bold text-gray-800 mb-1">請問女主角叫什麼？</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-1">猜猜我是誰</h2>
         <p className="text-gray-500 mb-4 text-sm">答對才能進入內部系統</p>
 
         <form onSubmit={handleLogin} className="space-y-3">
