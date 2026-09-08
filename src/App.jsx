@@ -3154,18 +3154,17 @@ const buildChecklistHtml = (items) => {
     const d = String(it.date || ''); const md = d.length >= 10 ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d;
     const title = `${md}${it.time ? ' ' + it.time : ''} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
     const cells = mats.map((m) => `<td>${escapeHtml(m)}</td>`);
-    while (cells.length % 4) cells.push('<td></td>');
-    const rows = []; for (let r = 0; r < cells.length; r += 4) rows.push(`<tr>${r === 0 ? `<th rowspan="${Math.ceil(cells.length / 4)}">${escapeHtml(it.courseName)}：</th>` : ''}${cells.slice(r, r + 4).join('')}</tr>`);
+    while (cells.length % 5) cells.push('<td></td>');
+    const rows = []; for (let r = 0; r < cells.length; r += 5) rows.push(`<tr>${cells.slice(r, r + 5).join('')}</tr>`);
     const note = it.prepData?.note ? `<div class="note">📝 ${escapeHtml(it.prepData.note)}</div>` : '';
     return `<section class="card"><div class="hd" style="background:${color}">${escapeHtml(title)}</div><table>${rows.join('')}</table>${note}</section>`;
   }).join('');
   return `<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>出課核對表</title><style>
   @page{size:A4;margin:10mm}
-  body{margin:0;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{margin:0;padding:0 10px;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .card{break-inside:avoid;page-break-inside:avoid;margin:0 0 9mm;border-bottom:1px dashed #999;padding-bottom:5mm}
   .hd{font-size:20px;font-weight:800;text-align:center;padding:6px 8px;border:1.5px solid #333;border-bottom:none;letter-spacing:.5px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
-  th{width:22%;border:1.5px solid #333;color:#1a56db;font-weight:700;font-size:14px;text-align:center;padding:4px;background:#fff}
   td{border:1px solid #333;padding:5px 6px;font-size:13.5px;line-height:1.35;word-break:break-all;vertical-align:top}
   .note{margin-top:4px;font-size:13px;color:#7a4b00}
   .toolbar{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ddd;margin-bottom:10px;font-size:14px}
