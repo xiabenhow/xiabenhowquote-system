@@ -3078,12 +3078,13 @@ const ProductManager = ({ currentData, onSave, onClose }) => {
 
 // ★★★ 第六部份 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
-const PeopleInput = ({ value, placeholder, onSave }) => {
+const PeopleInput = ({ value, placeholder, onSave, onDone, autoFocus }) => {
   const [local, setLocal] = useState(value === undefined || value === null ? '' : String(value));
   useEffect(() => { setLocal(value === undefined || value === null ? '' : String(value)); }, [value]);
-  const commit = () => { if (String(local) !== String(value ?? '')) onSave(local); };
+  const commit = () => { if (String(local) !== String(value ?? '')) onSave(local); else if (onDone) onDone(); };
   return (
     <input
+      autoFocus={!!autoFocus}
       type="number" min="1" inputMode="numeric"
       className="w-24 text-sm border border-orange-300 rounded px-2 py-1 bg-orange-50 focus:outline-none focus:border-orange-500 font-bold text-orange-800"
       placeholder={placeholder}
@@ -3220,6 +3221,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   useEffect(() => { try { localStorage.setItem('xbh_print_sel', JSON.stringify(printSel)); } catch { /* ignore */ } }, [printSel]);
   const togglePrint = (key) => setPrintSel((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   const [syncing, setSyncing] = useState(false);
+  const [editingPeople, setEditingPeople] = useState(null);   // 正在改人數的卡片 key
 
   // ★ 備課引擎：課程配方(bom) + 材料庫存(materials)
   const [bomList, setBomList] = useState([]);
@@ -3648,9 +3650,20 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                       <div className="text-sm text-gray-600 mt-1 flex items-center gap-4 flex-wrap">
                         <span className="flex items-center"><User className="w-4 h-4 mr-1" />{item.clientName}</span>
                         <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" />{item.date} {item.time}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.people !== item.quotePeople ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`} title={item.people !== item.quotePeople ? `報價單原本 ${item.quotePeople} 人，備課表改為 ${item.people} 人` : ''}>
-                          {item.people} 人{item.people !== item.quotePeople ? `（報價 ${item.quotePeople}）` : ''}
-                        </span>
+                        {canEditStaff && editingPeople === uniqueKey ? (
+                          <span onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                            <PeopleInput autoFocus value={item.prepData.people || ''} placeholder={String(item.quotePeople || '')} onSave={(v) => { handlePeopleUpdate(item.quoteId, item.itemIdx, v); setEditingPeople(null); }} onDone={() => setEditingPeople(null)} />
+                            <span className="text-xs text-gray-400">人（報價 {item.quotePeople}；清空＝用報價單人數）</span>
+                          </span>
+                        ) : (
+                          <span
+                            onClick={(e) => { if (!canEditStaff) return; e.stopPropagation(); setEditingPeople(uniqueKey); }}
+                            className={`px-2 py-0.5 rounded text-xs font-bold ${canEditStaff ? 'cursor-pointer hover:ring-2 hover:ring-orange-300' : ''} ${item.people !== item.quotePeople ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}
+                            title={canEditStaff ? '點一下改實際出課人數（不會動到報價單）' : ''}
+                          >
+                            {item.people} 人{item.people !== item.quotePeople ? `（報價 ${item.quotePeople}）` : ''}{canEditStaff ? ' ✎' : ''}
+                          </span>
+                        )}
                       </div>
                       {(item.city || item.address) && (
                         <div className="text-sm text-gray-600 mt-1 flex items-start">
