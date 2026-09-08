@@ -3352,6 +3352,10 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
 
           if (effectiveRegion !== currentRegion) return;
 
+          const savedData = q.prepData?.[idx] || {};
+          // ★ 實際人數：備課表可直接改（存 prepData[idx].people），沒改就用報價單人數
+          const effPeople = Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount;
+
           // ★ 備課引擎：優先用 bom 配方（自動算量＋庫存燈號），沒有配方才退回舊的固定清單
           const bom = matchBom(bomList, item.courseName);
           const bomInfo = {};
@@ -3359,7 +3363,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           if (bom && Array.isArray(bom.materials) && bom.materials.length > 0) {
             standardMaterials = bom.materials.map((m) => m.t);
             bom.materials.forEach((m) => {
-              const qty = calcQty(m, Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount);
+              const qty = calcQty(m, effPeople);
               const mat = linkMat(matIndex, m.t);
               bomInfo[m.t] = {
                 qty,
@@ -3370,9 +3374,6 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           } else {
             standardMaterials = COURSE_MATERIALS[item.courseName] || [];
           }
-          const savedData = q.prepData?.[idx] || {};
-          // ★ 實際人數：備課表可直接改（存 prepData[idx].people），沒改就用報價單人數
-          const effPeople = Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount;
           const customMaterials = Object.keys(savedData).filter(key => key !== 'note' && key !== 'packedAt' && key !== 'packedBy' && key !== 'people' && !standardMaterials.includes(key));
 
           list.push({
