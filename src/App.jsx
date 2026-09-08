@@ -815,15 +815,16 @@ const StatusSelector = ({ status, onChange }) => {
 
 // ========== 後台鎖定畫面 (AdminLock) ==========
 const AdminLock = ({ onUnlock }) => {
-  const [passcode, setPasscode] = useState('');
+  const [answer, setAnswer] = useState('');
   const [error, setError] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // ★ 雙密碼：9999 = 老闆全開；8888 = 員工版（看不到今日看板 / LINE待辦）
-    if (passcode === '9999') {
+    const a = answer.replace(/\s+/g, '').trim();
+    // ★ 圖片問答驗證：答對 → 員工版；9999 仍保留給老闆全開（今日看板 / LINE待辦）
+    if (a === '9999') {
       onUnlock('boss');
-    } else if (passcode === '8888') {
+    } else if (a === '俏俏') {
       onUnlock('staff');
     } else {
       setError(true);
@@ -831,36 +832,34 @@ const AdminLock = ({ onUnlock }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#2b1f14] px-4">
-      <div className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
-        <div className="mx-auto bg-[#fdeedc] w-16 h-16 rounded-full flex items-center justify-center mb-6">
-          <Lock className="w-8 h-8 text-[#fb8e28]" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">後台管理鎖定</h2>
-        <p className="text-gray-500 mb-6 text-sm">請輸入通行碼以存取內部資料</p>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#2b1f14] px-4 py-6">
+      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
+        <img src="/lock.jpg" alt="" className="w-full rounded-lg mb-4 object-cover max-h-[380px]" draggable={false} />
+        <h2 className="text-xl font-bold text-gray-800 mb-1">請問女主角叫什麼？</h2>
+        <p className="text-gray-500 mb-4 text-sm">答對才能進入內部系統</p>
+
+        <form onSubmit={handleLogin} className="space-y-3">
           <input
-            type="password"
-            className={`w-full text-center text-2xl tracking-widest border-2 rounded-lg p-3 outline-none transition-colors ${error ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#fb8e28]'}`}
-            placeholder="••••"
-            maxLength={4}
-            value={passcode}
+            type="text"
+            autoComplete="off"
+            className={`w-full text-center text-xl border-2 rounded-lg p-3 outline-none transition-colors ${error ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#fb8e28]'}`}
+            placeholder="請輸入答案"
+            value={answer}
             onChange={(e) => {
-              setPasscode(e.target.value);
+              setAnswer(e.target.value);
               setError(false);
             }}
             autoFocus
           />
-          {error && <p className="text-red-500 text-sm font-bold">通行碼錯誤</p>}
+          {error && <p className="text-red-500 text-sm font-bold">答錯了，再想想～</p>}
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
+            className="w-full bg-[#fb8e28] text-white font-bold py-3 rounded-lg hover:bg-[#e67e1e] transition-colors shadow-lg"
           >
-            解鎖進入
+            進入
           </button>
         </form>
-        <p className="mt-6 text-xs text-gray-400">下班隨手作內部系統 v4.0</p>
+        <p className="mt-5 text-xs text-gray-400">下班隨手作內部系統 v4.0</p>
       </div>
     </div>
   );
