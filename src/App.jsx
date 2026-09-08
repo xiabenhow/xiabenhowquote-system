@@ -50,7 +50,7 @@ import { saveAs } from 'file-saver';
 import InventoryView from './InventoryView';
 import LineTodosView from './LineTodosView';
 import DashboardView from './DashboardView';
-import { buildMatIndex, matchBom, calcQty, matLabel, linkMat, fmtDate } from './opsUtils';
+import { buildMatIndex, matchBom, calcQty, matLabel, linkMat, fmtDate, syncBomFromPrep } from './opsUtils';
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -66,6 +66,7 @@ import {
   serverTimestamp,
   setDoc,
   increment,
+  writeBatch,
 } from 'firebase/firestore';
 
 // ★★★ 印章圖片路徑 ★★★
@@ -3129,6 +3130,52 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
+// ========== 出課核對表（列印）==========
+// 卡片配色依系列輪替（跟老闆手工版一樣：多肉綠、水晶紫、畫畫藍…）
+const CHECK_COLORS = {
+  '多肉系列': '#d9ead3', '花藝系列': '#fce5cd', '畫畫系列': '#cfe2f3', '蠟燭系列': '#fff2cc', '水晶系列': '#d9d2e9',
+  '環氧樹脂系列': '#d0e0e3', '法式調香': '#ead1dc', '沐浴精/滾珠瓶': '#e6f0ff', '花藥鹽香包': '#eeeeee', '手工皂系列': '#f4cccc',
+};
+const CHECK_FALLBACK = ['#d9ead3', '#d9d2e9', '#cfe2f3', '#fce5cd', '#fff2cc', '#ead1dc'];
+const PREP_JSON_URL = 'https://firestore.googleapis.com/v1/projects/xiabenhowdata/databases/(default)/documents/content/prep?key=AIzaSyB99DpIA1dNr-e2NUfXzAkk-lVoi_yxbvg';
+// 地點簡寫：地址裡的「XX區」→ 區名；沒有就用縣市；都沒有 → 店內
+const shortPlace = (item) => {
+  const addr = String(item.address || '').replace(/\s+/g, '').replace(/^(台灣|臺灣)?[一-龥]{2,3}[縣市]/, '');
+  const m = addr.match(/^([一-龥]{1,3})[區鄉鎮]/);
+  if (m && m[1]) return m[1];
+  if (item.city) return String(item.city).replace(/[縣市]$/, '');
+  return '店內';
+};
+const escapeHtml = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const buildChecklistHtml = (items) => {
+  const cards = items.map((it, i) => {
+    const mats = [...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...it.customMaterials];
+    const color = CHECK_COLORS[it.bom?.category] || CHECK_FALLBACK[i % CHECK_FALLBACK.length];
+    const d = String(it.date || ''); const md = d.length >= 10 ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d;
+    const title = `${md} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
+    const cells = mats.map((m) => `<td>${escapeHtml(m)}</td>`);
+    while (cells.length % 4) cells.push('<td></td>');
+    const rows = []; for (let r = 0; r < cells.length; r += 4) rows.push(`<tr>${r === 0 ? `<th rowspan="${Math.ceil(cells.length / 4)}">${escapeHtml(it.courseName)}：</th>` : ''}${cells.slice(r, r + 4).join('')}</tr>`);
+    const note = it.prepData?.note ? `<div class="note">📝 ${escapeHtml(it.prepData.note)}</div>` : '';
+    const time = it.time ? `<span class="time">${escapeHtml(it.time)}</span>` : '';
+    return `<section class="card"><div class="hd" style="background:${color}">${escapeHtml(title)}${time}</div><table>${rows.join('')}</table>${note}</section>`;
+  }).join('');
+  return `<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>出課核對表</title><style>
+  @page{size:A4;margin:10mm}
+  body{margin:0;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .card{break-inside:avoid;page-break-inside:avoid;margin:0 0 9mm;border-bottom:1px dashed #999;padding-bottom:5mm}
+  .hd{font-size:20px;font-weight:800;text-align:center;padding:6px 8px;border:1.5px solid #333;border-bottom:none;letter-spacing:.5px;position:relative}
+  .hd .time{position:absolute;right:8px;top:9px;font-size:12px;font-weight:600;color:#444}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  th{width:22%;border:1.5px solid #333;color:#1a56db;font-weight:700;font-size:14px;text-align:center;padding:4px;background:#fff}
+  td{border:1px solid #333;padding:5px 6px;font-size:13.5px;line-height:1.35;word-break:break-all;vertical-align:top}
+  .note{margin-top:4px;font-size:13px;color:#7a4b00}
+  .toolbar{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ddd;margin-bottom:10px;font-size:14px}
+  .toolbar button{font-size:14px;padding:6px 14px;margin-right:8px}
+  @media print{.toolbar{display:none}}
+  </style></head><body><div class="toolbar"><button onclick="window.print()">🖨 列印</button><button onclick="window.close()">關閉</button> 共 ${items.length} 堂・沿虛線裁剪</div>${cards}</body></html>`;
+};
+
 // ========== 備課表 View (修正版：修復人員新增Bug, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   const validQuotes = quotes.filter(
@@ -3155,6 +3202,12 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     });
   };
 
+  // ★ 出課核對表：勾選要印的課（記在瀏覽器，換頁不會掉）
+  const [printSel, setPrintSel] = useState(() => { try { return JSON.parse(localStorage.getItem('xbh_print_sel') || '[]'); } catch { return []; } });
+  useEffect(() => { try { localStorage.setItem('xbh_print_sel', JSON.stringify(printSel)); } catch { /* ignore */ } }, [printSel]);
+  const togglePrint = (key) => setPrintSel((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  const [syncing, setSyncing] = useState(false);
+
   // ★ 備課引擎：課程配方(bom) + 材料庫存(materials)
   const [bomList, setBomList] = useState([]);
   const [materialsList, setMaterialsList] = useState([]);
@@ -3165,6 +3218,41 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     return () => { u1(); u2(); };
   }, []);
   const matIndex = useMemo(() => buildMatIndex(materialsList.filter((m) => m.active !== false)), [materialsList]);
+
+  // ★ 從「內部大補帖 → 企業備課表」同步材料清單（大補帖為準；保留原本的每人/固定份數設定）
+  const handleSyncFromPrep = async () => {
+    if (!db || syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(PREP_JSON_URL);
+      const json = await res.json();
+      const series = JSON.parse(json.fields.json.stringValue);
+      const r = syncBomFromPrep(bomList, series);
+      const changed = r.mapping.filter((m) => m.changed);
+      const msg = `大補帖共 ${r.mapping.length} 堂課：更新 ${r.updates.length} 筆、新增 ${r.creates.length} 筆` +
+        (r.unclaimed.length ? `\n備課表裡有、但大補帖沒有的（不動）：${r.unclaimed.map((b) => b.course).join('、')}` : '') +
+        (changed.length ? `\n\n材料有變動的：${changed.map((m) => m.course).slice(0, 30).join('、')}${changed.length > 30 ? '…' : ''}` : '\n\n材料沒有變動。') +
+        '\n\n確定要同步嗎？';
+      if (!window.confirm(msg)) { setSyncing(false); return; }
+      let batch = writeBatch(db); let n = 0;
+      const flush = async () => { if (n) { await batch.commit(); batch = writeBatch(db); n = 0; } };
+      for (const u of r.updates) { batch.update(doc(db, 'bom', u.id), { ...u.data, updatedAt: serverTimestamp() }); if (++n >= 400) await flush(); }
+      for (const c of r.creates) { batch.set(doc(collection(db, 'bom')), { ...c, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }); if (++n >= 400) await flush(); }
+      await flush();
+      alert('同步完成 ✓');
+    } catch (err) {
+      console.error(err); alert('同步失敗：' + (err.message || err));
+    }
+    setSyncing(false);
+  };
+
+  // ★ 列印出課核對表（另開視窗 → 列印 → 沿虛線裁剪）
+  const openChecklist = (items) => {
+    if (!items.length) { alert('還沒有勾選要印的課'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { alert('瀏覽器擋了新視窗，請允許彈出視窗後再試'); return; }
+    w.document.open(); w.document.write(buildChecklistHtml(items)); w.document.close();
+  };
 
   useEffect(() => {
     if (!db) return;
@@ -3408,6 +3496,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                       <button onClick={() => handleCopyPrepLink('South')} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-200 hover:bg-green-200 flex items-center">
                         <LinkIcon className="w-3 h-3 mr-1"/> 南部連結
                       </button>
+                      <button onClick={handleSyncFromPrep} disabled={syncing} className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-200 hover:bg-purple-100 flex items-center disabled:opacity-50" title="材料清單以「內部大補帖 → 企業備課表」為準，一鍵同步進備課表">
+                        🔄 {syncing ? '同步中…' : '從大補帖同步材料'}
+                      </button>
                 </div>
             ) : (
                 <div className="flex gap-2 items-center">
@@ -3471,6 +3562,33 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
         </div>
       </div>
 
+      {printSel.length > 0 && (
+        <div className="sticky top-2 z-30 mb-4 bg-orange-50 border border-orange-300 rounded-lg shadow px-4 py-2 flex items-center gap-3 flex-wrap">
+          <span className="font-bold text-orange-800">🖨 出課核對表：已加入 {printSel.length} 堂</span>
+          <span className="text-xs text-orange-700 hidden md:inline">（可跨區域、跨日期一直加，最後一起印）</span>
+          <div className="flex-1" />
+          <button
+            onClick={() => {
+              const all = []; validQuotes.forEach((q) => (q.items || []).forEach((it, idx) => all.push({ q, it, idx })));
+              const picked = printSel.map((k) => {
+                const found = prepItems.find((i) => `${i.quoteId}_${i.itemIdx}` === k);
+                if (found) return found;
+                const raw = all.find((x) => `${x.q.id}_${x.idx}` === k);
+                if (!raw) return null;
+                const bom = matchBom(bomList, raw.it.courseName);
+                const std = bom && bom.materials?.length ? bom.materials.map((m) => m.t) : (COURSE_MATERIALS[raw.it.courseName] || []);
+                const bomInfo = {}; if (bom) bom.materials.forEach((m) => { bomInfo[m.t] = true; });
+                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo };
+              }).filter(Boolean).sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
+              openChecklist(picked);
+            }}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2 rounded shadow text-sm"
+          >
+            🖨 列印核對表
+          </button>
+          <button onClick={() => { if (window.confirm('清空已加入的核對表？')) setPrintSel([]); }} className="text-sm text-gray-600 border border-gray-300 bg-white px-3 py-2 rounded hover:bg-gray-50">清空</button>
+        </div>
+      )}
       <div className="space-y-6">
         {prepItems.length === 0 ? (
           <div className="text-center py-10 text-gray-400">該區域 ({currentRegion === 'North' ? '北部' : currentRegion === 'Central' ? '中部' : '南部'}) 目前無符合條件的備課項目</div>
@@ -3525,6 +3643,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                   </div>
                   <div className="text-right flex flex-col items-end gap-1 shrink-0 ml-2">
                     <div className={`font-bold ${isOpen ? 'text-2xl text-gray-300' : 'text-xl text-gray-300'}`}>{progress}%</div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); togglePrint(uniqueKey); }}
+                      className={`text-xs rounded-full px-3 py-1 font-bold border ${printSel.includes(uniqueKey) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-600 border-orange-300 hover:bg-orange-50'}`}
+                      title="加入出課核對表（列印用）"
+                    >
+                      {printSel.includes(uniqueKey) ? '✓ 已加入核對表' : '＋ 加入核對表'}
+                    </button>
                     {item.bom && (
                       item.prepData.packedAt ? (
                         <span className="text-xs bg-green-100 text-green-700 border border-green-300 rounded-full px-2 py-0.5 font-bold">📦 已裝箱 {item.prepData.packedAt.slice(5)}</span>

@@ -157,3 +157,57 @@ export function expandClassNeeds(quotes, bomList, matIndex, fromDate, toDate) {
     });
   return rows.sort((a, b) => (a.date > b.date ? 1 : -1));
 }
+
+// ===== 從「內部大補帖」企業備課表同步 BOM（材料清單以大補帖為準）=====
+// prepSeries: [{name, groups:[{name, materials:[string]}]}]（xiabenhowdata content/prep 的 json）
+// 回傳 { updates:[{id, data}], creates:[data], unclaimed:[bom], mapping:[{course, bomCourse|null}] }
+export const PREP_MANUAL_ALIAS = { '雙流體熊圓形布畫': '流體雙熊' };
+export function guessMode(t) {
+  return /直接帶|直接裝|一組|一桌|共用|一大把|一盒|一包|幾件|老師|幾個|一支|一把|一台|一捲|一瓶|一罐|一袋/.test(String(t)) ? 'fixed' : 'pp';
+}
+export function syncBomFromPrep(bomList, prepSeries) {
+  const courses = [];
+  (prepSeries || []).forEach((s) => (s.groups || []).forEach((g) => {
+    if (g && g.name) courses.push({ series: s.name, name: String(g.name).trim(), materials: (g.materials || []).map((m) => String(m).trim()).filter(Boolean) });
+  }));
+  const claimed = {}; const map = {};
+  const namesOf = (b) => [normCourse(b.course), ...(b.aliases || []).map(normCourse)].filter(Boolean);
+  // 1) 全等／別名全等（含手動對照表）
+  courses.forEach((c) => {
+    const k = normCourse(c.name); const manual = PREP_MANUAL_ALIAS[c.name] ? normCourse(PREP_MANUAL_ALIAS[c.name]) : null;
+    for (const b of bomList) {
+      if (claimed[b.id]) continue;
+      const ns = namesOf(b);
+      if (ns.includes(k) || (manual && ns.includes(manual))) { claimed[b.id] = c.name; map[c.name] = b; break; }
+    }
+  });
+  // 2) 互相包含（只給還沒被認領的）
+  courses.forEach((c) => {
+    if (map[c.name]) return;
+    const k = normCourse(c.name);
+    for (const b of bomList) {
+      if (claimed[b.id]) continue;
+      if (namesOf(b).some((x) => x.length >= 3 && (k.includes(x) || x.includes(k)))) { claimed[b.id] = c.name; map[c.name] = b; break; }
+    }
+  });
+  const updates = []; const creates = []; const mapping = [];
+  courses.forEach((c) => {
+    const b = map[c.name];
+    const oldMats = (b && Array.isArray(b.materials)) ? b.materials : [];
+    const oldIdx = {}; oldMats.forEach((m) => { const k = normMat(m.t); if (k && !oldIdx[k]) oldIdx[k] = m; });
+    const materials = c.materials.map((t) => {
+      const o = oldIdx[normMat(t)];
+      return o ? { t, mode: o.mode || 'pp', n: Number(o.n) || 1, m2: Number(o.m2) || 0 } : { t, mode: guessMode(t), n: 1, m2: 0 };
+    });
+    if (b) {
+      const aliases = Array.from(new Set([...(b.aliases || []), b.course].filter((a) => a && normCourse(a) !== normCourse(c.name))));
+      updates.push({ id: b.id, data: { course: c.name, category: c.series, aliases, materials, syncedFromPrep: true } });
+      mapping.push({ course: c.name, bomCourse: b.course, changed: JSON.stringify(oldMats.map((m) => m.t)) !== JSON.stringify(materials.map((m) => m.t)) });
+    } else {
+      creates.push({ course: c.name, category: c.series, aliases: [], materials, syncedFromPrep: true });
+      mapping.push({ course: c.name, bomCourse: null, changed: true });
+    }
+  });
+  const unclaimed = bomList.filter((b) => !claimed[b.id]);
+  return { updates, creates, unclaimed, mapping };
+}
