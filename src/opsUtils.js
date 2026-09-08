@@ -26,15 +26,18 @@ export function matchBom(bomList, courseName) {
   for (const b of bomList) {
     if ((b.aliases || []).some((a) => normCourse(a) === key)) return b;
   }
+  // 互相包含：挑「對到的字最長」的那筆（例：大盆招財水晶樹 → 大水晶樹 而不是 alias「水晶樹」的小水晶樹）
+  let best = null; let bestLen = 0;
   for (const b of bomList) {
-    const bk = normCourse(b.course);
-    if (bk.length >= 3 && (key.includes(bk) || bk.includes(key))) return b;
-    if ((b.aliases || []).some((a) => {
-      const ak = normCourse(a);
-      return ak.length >= 3 && (key.includes(ak) || ak.includes(key));
-    })) return b;
+    const names = [normCourse(b.course), ...(b.aliases || []).map(normCourse)];
+    for (const nk of names) {
+      if (nk.length >= 3 && (key.includes(nk) || nk.includes(key))) {
+        const score = Math.min(nk.length, key.length) * 100 + nk.length;
+        if (score > bestLen) { bestLen = score; best = b; }
+      }
+    }
   }
-  return null;
+  return best;
 }
 
 // 材料名稱正規化（用來對庫存主檔）

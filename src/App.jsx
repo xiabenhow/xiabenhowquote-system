@@ -3147,6 +3147,15 @@ const AddMaterialRow = ({ onAdd }) => {
   );
 };
 
+// ========== 課程名含「A/B」「A＋B」（一張單兩種課）→ 拆開各自對配方 ==========
+const splitCourseNames = (name) => String(name || '').split(/\s*[\/／＋+、]\s*/).map((x) => x.trim()).filter(Boolean);
+// 回傳 [{name, bom}]：每個子課程對到的配方（對不到的 bom 為 null）
+const resolveBomGroups = (bomList, courseName) => {
+  const parts = splitCourseNames(courseName);
+  if (parts.length <= 1) return [{ name: courseName, bom: matchBom(bomList, courseName) }];
+  return parts.map((n) => ({ name: n, bom: matchBom(bomList, n) }));
+};
+
 // ========== 出課核對表（列印）==========
 // 卡片配色依系列輪替（跟老闆手工版一樣：多肉綠、水晶紫、畫畫藍…）
 const CHECK_COLORS = {
@@ -3157,7 +3166,7 @@ const CHECK_FALLBACK = ['#d9ead3', '#d9d2e9', '#cfe2f3', '#fce5cd', '#fff2cc', '
 const PREP_JSON_URL = 'https://firestore.googleapis.com/v1/projects/xiabenhowdata/databases/(default)/documents/content/prep?key=AIzaSyB99DpIA1dNr-e2NUfXzAkk-lVoi_yxbvg';
 // 地點簡寫：地址裡的「XX區」→ 區名；沒有就用縣市；都沒有 → 店內
 const shortPlace = (item) => {
-  const addr = String(item.address || '').replace(/\s+/g, '').replace(/^(台灣|臺灣)?[一-龥]{2,3}[縣市]/, '');
+  const addr = String(item.address || '').replace(/\s+/g, '').replace(/^\d{3,6}/, '').replace(/臺/g, '台').replace(/^(台灣)?[一-龥]{2,3}[縣市]/, '');
   const m = addr.match(/^([一-龥]{1,3})[區鄉鎮]/);
   if (m && m[1]) return m[1];
   if (item.city) return String(item.city).replace(/[縣市]$/, '');
@@ -3166,13 +3175,25 @@ const shortPlace = (item) => {
 const escapeHtml = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const buildChecklistHtml = (items) => {
   const cards = items.map((it, i) => {
-    const mats = [...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...it.customMaterials];
     const color = CHECK_COLORS[it.bom?.category] || CHECK_FALLBACK[i % CHECK_FALLBACK.length];
+    const toRows = (list, label) => {
+      const cells = list.map((m) => `<td>${escapeHtml(m)}</td>`);
+      while (cells.length % 5) cells.push('<td></td>');
+      const out = [];
+      if (label) out.push(`<tr><td class="grp" colspan="5">${escapeHtml(label)}</td></tr>`);
+      for (let r = 0; r < cells.length; r += 5) out.push(`<tr>${cells.slice(r, r + 5).join('')}</tr>`);
+      return out;
+    };
+    let rows;
+    if (it.matGroups && it.matGroups.length > 1) {
+      rows = [];
+      it.matGroups.forEach((g) => { rows.push(...toRows(g.mats.map((m) => matLabel(m)), `▸ ${g.name}`)); });
+      if (it.customMaterials.length) rows.push(...toRows(it.customMaterials, '▸ 自訂材料'));
+    } else {
+      rows = toRows([...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...it.customMaterials]);
+    }
     const d = String(it.date || ''); const md = d.length >= 10 ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d;
     const title = `${md}${it.time ? ' ' + it.time : ''} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
-    const cells = mats.map((m) => `<td>${escapeHtml(m)}</td>`);
-    while (cells.length % 5) cells.push('<td></td>');
-    const rows = []; for (let r = 0; r < cells.length; r += 5) rows.push(`<tr>${cells.slice(r, r + 5).join('')}</tr>`);
     const note = it.prepData?.note ? `<div class="note">📝 ${escapeHtml(it.prepData.note)}</div>` : '';
     return `<section class="card"><div class="hd" style="background:${color}">${escapeHtml(title)}</div><table>${rows.join('')}</table>${note}</section>`;
   }).join('');
@@ -3183,6 +3204,7 @@ const buildChecklistHtml = (items) => {
   .hd{font-size:20px;font-weight:800;text-align:center;padding:6px 8px;border:1.5px solid #333;border-bottom:none;letter-spacing:.5px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   td{border:1px solid #333;padding:5px 6px;font-size:13.5px;line-height:1.35;word-break:break-all;vertical-align:top}
+  td.grp{background:#f3f3f3;font-weight:800;color:#1a56db;font-size:14px;padding:4px 8px}
   .note{margin-top:4px;font-size:13px;color:#7a4b00}
   .toolbar{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ddd;margin-bottom:10px;font-size:14px}
   .toolbar button{font-size:14px;padding:6px 14px;margin-right:8px}
@@ -3359,19 +3381,24 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           const effPeople = Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount;
 
           // ★ 備課引擎：優先用 bom 配方（自動算量＋庫存燈號），沒有配方才退回舊的固定清單
-          const bom = matchBom(bomList, item.courseName);
+          // ★ 課名「A/B」代表一張單兩種課 → 兩套配方都要備（材料聯集、分組顯示）
+          const groups = resolveBomGroups(bomList, item.courseName).filter((g) => g.bom && Array.isArray(g.bom.materials) && g.bom.materials.length > 0);
+          const bom = groups.length ? groups[0].bom : null;
           const bomInfo = {};
           let standardMaterials;
-          if (bom && Array.isArray(bom.materials) && bom.materials.length > 0) {
-            standardMaterials = bom.materials.map((m) => m.t);
-            bom.materials.forEach((m) => {
-              const qty = calcQty(m, effPeople);
-              const mat = linkMat(matIndex, m.t);
-              bomInfo[m.t] = {
-                qty,
-                mat,
-                enough: mat ? Number(mat.stock || 0) >= qty : null,
-              };
+          const matGroups = [];
+          if (groups.length) {
+            standardMaterials = [];
+            groups.forEach((g) => {
+              const mats = [];
+              g.bom.materials.forEach((m) => {
+                if (!standardMaterials.includes(m.t)) standardMaterials.push(m.t);
+                mats.push(m.t);
+                const qty = calcQty(m, effPeople);
+                const mat = linkMat(matIndex, m.t);
+                bomInfo[m.t] = { qty, mat, enough: mat ? Number(mat.stock || 0) >= qty : null };
+              });
+              matGroups.push({ name: g.name, mats });
             });
           } else {
             standardMaterials = COURSE_MATERIALS[item.courseName] || [];
@@ -3395,6 +3422,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             prepData: savedData,
             bom,
             bomInfo,
+            matGroups,
           });
         }
       });
@@ -3603,11 +3631,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                 if (found) return found;
                 const raw = all.find((x) => `${x.q.id}_${x.idx}` === k);
                 if (!raw) return null;
-                const bom = matchBom(bomList, raw.it.courseName);
-                const std = bom && bom.materials?.length ? bom.materials.map((m) => m.t) : (COURSE_MATERIALS[raw.it.courseName] || []);
-                const bomInfo = {}; if (bom) bom.materials.forEach((m) => { bomInfo[m.t] = true; });
+                const groups = resolveBomGroups(bomList, raw.it.courseName).filter((g) => g.bom && g.bom.materials?.length);
+                const bom = groups.length ? groups[0].bom : null;
+                const std = []; const bomInfo = {}; const matGroups = [];
+                groups.forEach((g) => { const mats = []; g.bom.materials.forEach((m) => { if (!std.includes(m.t)) std.push(m.t); mats.push(m.t); bomInfo[m.t] = true; }); matGroups.push({ name: g.name, mats }); });
+                if (!groups.length) (COURSE_MATERIALS[raw.it.courseName] || []).forEach((m) => std.push(m));
                 const pd = raw.q.prepData?.[raw.idx] || {};
-                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: Number(pd.people) > 0 ? Number(pd.people) : raw.it.peopleCount, quotePeople: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo };
+                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: Number(pd.people) > 0 ? Number(pd.people) : raw.it.peopleCount, quotePeople: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo, matGroups };
               }).filter(Boolean).sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
               openChecklist(picked);
             }}
