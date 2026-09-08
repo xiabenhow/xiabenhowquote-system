@@ -3078,6 +3078,22 @@ const ProductManager = ({ currentData, onSave, onClose }) => {
 
 // ★★★ 第六部份 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
 // ★★★ 新增：專門處理備註輸入的小元件 (解決注音輸入問題 & 修復語法錯誤) ★★★
+const PeopleInput = ({ value, placeholder, onSave }) => {
+  const [local, setLocal] = useState(value === undefined || value === null ? '' : String(value));
+  useEffect(() => { setLocal(value === undefined || value === null ? '' : String(value)); }, [value]);
+  const commit = () => { if (String(local) !== String(value ?? '')) onSave(local); };
+  return (
+    <input
+      type="number" min="1" inputMode="numeric"
+      className="w-24 text-sm border border-orange-300 rounded px-2 py-1 bg-orange-50 focus:outline-none focus:border-orange-500 font-bold text-orange-800"
+      placeholder={placeholder}
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+    />
+  );
+};
 const NoteInput = ({ value, onSave }) => {
   const [localValue, setLocalValue] = useState(value || '');
 
@@ -3343,7 +3359,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           if (bom && Array.isArray(bom.materials) && bom.materials.length > 0) {
             standardMaterials = bom.materials.map((m) => m.t);
             bom.materials.forEach((m) => {
-              const qty = calcQty(m, item.peopleCount);
+              const qty = calcQty(m, Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount);
               const mat = linkMat(matIndex, m.t);
               bomInfo[m.t] = {
                 qty,
@@ -3355,7 +3371,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             standardMaterials = COURSE_MATERIALS[item.courseName] || [];
           }
           const savedData = q.prepData?.[idx] || {};
-          const customMaterials = Object.keys(savedData).filter(key => key !== 'note' && key !== 'packedAt' && key !== 'packedBy' && !standardMaterials.includes(key));
+          // ★ 實際人數：備課表可直接改（存 prepData[idx].people），沒改就用報價單人數
+          const effPeople = Number(savedData.people) > 0 ? Number(savedData.people) : item.peopleCount;
+          const customMaterials = Object.keys(savedData).filter(key => key !== 'note' && key !== 'packedAt' && key !== 'packedBy' && key !== 'people' && !standardMaterials.includes(key));
 
           list.push({
             quoteId: q.id,
@@ -3364,7 +3382,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             courseName: item.courseName,
             date: item.eventDate,
             time: item.timeRange || item.startTime || '',
-            people: item.peopleCount,
+            people: effPeople,
+            quotePeople: item.peopleCount,
             // ★ 地點：報價單上的縣市＋地址（外送才有；店內課通常空白）
             city: item.city || '',
             address: item.address || '',
@@ -3417,6 +3436,15 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
       onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
+  const handlePeopleUpdate = (quoteId, itemIdx, value) => {
+    const quote = quotes.find((q) => q.id === quoteId);
+    if (!quote) return;
+    const newPrepData = { ...(quote.prepData || {}) };
+    if (!newPrepData[itemIdx]) newPrepData[itemIdx] = {}; else newPrepData[itemIdx] = { ...newPrepData[itemIdx] };
+    const n = Number(value);
+    if (n > 0) newPrepData[itemIdx].people = n; else delete newPrepData[itemIdx].people;   // 清空＝回到報價單人數
+    onUpdateQuote(quoteId, { prepData: newPrepData });
+  };
   const handleNoteUpdate = (quoteId, itemIdx, value) => {
     const quote = quotes.find((q) => q.id === quoteId);
     if (!quote) return;
@@ -3575,7 +3603,8 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                 const bom = matchBom(bomList, raw.it.courseName);
                 const std = bom && bom.materials?.length ? bom.materials.map((m) => m.t) : (COURSE_MATERIALS[raw.it.courseName] || []);
                 const bomInfo = {}; if (bom) bom.materials.forEach((m) => { bomInfo[m.t] = true; });
-                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo };
+                const pd = raw.q.prepData?.[raw.idx] || {};
+                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: Number(pd.people) > 0 ? Number(pd.people) : raw.it.peopleCount, quotePeople: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo };
               }).filter(Boolean).sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
               openChecklist(picked);
             }}
@@ -3618,7 +3647,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                       <div className="text-sm text-gray-600 mt-1 flex items-center gap-4 flex-wrap">
                         <span className="flex items-center"><User className="w-4 h-4 mr-1" />{item.clientName}</span>
                         <span className="flex items-center"><Calendar className="w-4 h-4 mr-1" />{item.date} {item.time}</span>
-                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{item.people} 人</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${item.people !== item.quotePeople ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`} title={item.people !== item.quotePeople ? `報價單原本 ${item.quotePeople} 人，備課表改為 ${item.people} 人` : ''}>
+                          {item.people} 人{item.people !== item.quotePeople ? `（報價 ${item.quotePeople}）` : ''}
+                        </span>
                       </div>
                       {(item.city || item.address) && (
                         <div className="text-sm text-gray-600 mt-1 flex items-start">
@@ -3706,6 +3737,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                     })}
                 </div>
                 <AddMaterialRow onAdd={(name) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name)} />
+                {canEditStaff && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+                    <label className="text-xs font-bold text-gray-500 flex items-center"><Users className="w-3 h-3 mr-1"/> 實際出課人數：</label>
+                    <PeopleInput value={item.prepData.people || ''} placeholder={String(item.quotePeople || '')} onSave={(v) => handlePeopleUpdate(item.quoteId, item.itemIdx, v)} />
+                    <span className="text-xs text-gray-400">報價單 {item.quotePeople} 人；這裡改只影響備課算量與核對表，不會動到報價單。清空＝用報價單人數</span>
+                  </div>
+                )}
                 <div className="mt-4 pt-3 border-t border-gray-100">
                     <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center"><MessageSquare className="w-3 h-3 mr-1"/> 交接備註事項：</label>
                     <NoteInput value={item.prepData.note || ''} onSave={(newValue) => handleNoteUpdate(item.quoteId, item.itemIdx, newValue)} />
