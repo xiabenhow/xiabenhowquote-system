@@ -3152,20 +3152,18 @@ const buildChecklistHtml = (items) => {
     const mats = [...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...it.customMaterials];
     const color = CHECK_COLORS[it.bom?.category] || CHECK_FALLBACK[i % CHECK_FALLBACK.length];
     const d = String(it.date || ''); const md = d.length >= 10 ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d;
-    const title = `${md} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
+    const title = `${md}${it.time ? ' ' + it.time : ''} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
     const cells = mats.map((m) => `<td>${escapeHtml(m)}</td>`);
     while (cells.length % 4) cells.push('<td></td>');
     const rows = []; for (let r = 0; r < cells.length; r += 4) rows.push(`<tr>${r === 0 ? `<th rowspan="${Math.ceil(cells.length / 4)}">${escapeHtml(it.courseName)}：</th>` : ''}${cells.slice(r, r + 4).join('')}</tr>`);
     const note = it.prepData?.note ? `<div class="note">📝 ${escapeHtml(it.prepData.note)}</div>` : '';
-    const time = it.time ? `<span class="time">${escapeHtml(it.time)}</span>` : '';
-    return `<section class="card"><div class="hd" style="background:${color}">${escapeHtml(title)}${time}</div><table>${rows.join('')}</table>${note}</section>`;
+    return `<section class="card"><div class="hd" style="background:${color}">${escapeHtml(title)}</div><table>${rows.join('')}</table>${note}</section>`;
   }).join('');
   return `<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>出課核對表</title><style>
   @page{size:A4;margin:10mm}
   body{margin:0;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .card{break-inside:avoid;page-break-inside:avoid;margin:0 0 9mm;border-bottom:1px dashed #999;padding-bottom:5mm}
-  .hd{font-size:20px;font-weight:800;text-align:center;padding:6px 8px;border:1.5px solid #333;border-bottom:none;letter-spacing:.5px;position:relative}
-  .hd .time{position:absolute;right:8px;top:9px;font-size:12px;font-weight:600;color:#444}
+  .hd{font-size:20px;font-weight:800;text-align:center;padding:6px 8px;border:1.5px solid #333;border-bottom:none;letter-spacing:.5px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   th{width:22%;border:1.5px solid #333;color:#1a56db;font-weight:700;font-size:14px;text-align:center;padding:4px;background:#fff}
   td{border:1px solid #333;padding:5px 6px;font-size:13.5px;line-height:1.35;word-break:break-all;vertical-align:top}
