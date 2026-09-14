@@ -1204,31 +1204,180 @@ const QuotePreview = ({
   );
 };
 
-// ========== PayLinkModal（客戶自填金額刷卡連結）==========
+// ========== PayLinkModal（刷卡連結：產生指定金額連結 ＋ 已付款狀態一覽 ＋ 老闆刷退）==========
+// ★ 2026-09-14 重建（8/28 版曾因未進版控被蓋掉，這次進 git）。
 const XBH_OPEN_PAY_URL = 'https://www.xiabenhow.com/?xbh_pay_open=kq8f3vzh';
-const PayLinkModal = ({ onClose }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(XBH_OPEN_PAY_URL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(() => prompt('請手動複製：', XBH_OPEN_PAY_URL));
+const XBH_PAY_API = 'https://www.xiabenhow.com/wp-json/xbh-quote/v1';
+const XBH_REFUND_KEY = 'xbhrf2026';
+const PAY_KIND_LABEL = { deposit: '訂金', final: '尾款', open: '客戶自填', manual: '手動' };
+const tsToDate = (v) => (v && typeof v.toDate === 'function') ? v.toDate() : (v ? new Date(v) : null);
+const fmtDT = (v) => {
+  const d = tsToDate(v);
+  if (!d || isNaN(d)) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const PayLinkModal = ({ onClose, isBoss }) => {
+  const [company, setCompany] = useState('');
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [link, setLink] = useState('');
+  const [copiedKey, setCopiedKey] = useState('');
+  const [intents, setIntents] = useState([]);
+  const [payments, setPayments] = useState({});
+  const [showOpen, setShowOpen] = useState(false);
+  const [refunding, setRefunding] = useState('');
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // 連結一覽（quote_pay_intents）＋ 付款紀錄（quote_payments）即時監聽
+  useEffect(() => {
+    if (!db) return;
+    const u1 = onSnapshot(query(collection(db, 'quote_pay_intents'), orderBy('createdAt', 'desc')), (snap) => {
+      setIntents(snap.docs.map((d) => ({ tradeno: d.id, ...d.data() })));
+    }, (e) => console.error('quote_pay_intents', e));
+    const u2 = onSnapshot(collection(db, 'quote_payments'), (snap) => {
+      const m = {};
+      snap.docs.forEach((d) => { const x = d.data(); if (x.tradeno) m[x.tradeno] = { id: d.id, ...x }; });
+      setPayments(m);
+    }, (e) => console.error('quote_payments', e));
+    return () => { u1(); u2(); };
+  }, []);
+
+  const copyText = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => { setCopiedKey(key); setTimeout(() => setCopiedKey(''), 2000); })
+      .catch(() => prompt('請手動複製：', text));
   };
+
+  const genLink = async () => {
+    const amt = parseInt(String(amount).replace(/[^0-9]/g, ''), 10) || 0;
+    if (!company.trim()) { alert('請填客戶名稱（會顯示在列表，方便對帳）'); return; }
+    if (amt < 1 || amt > 200000) { alert('金額請填 1～200,000'); return; }
+    setLoading(true); setLink('');
+    try {
+      const r = await fetch(`${XBH_PAY_API}/paylink`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt, quoteId: '', company: company.trim(), kind: 'manual' }),
+      });
+      const j = await r.json();
+      if (j.ok && j.pay_url) { setLink(j.pay_url); copyText(j.pay_url, 'new'); }
+      else alert('產生連結失敗：' + (j.message || j.msg || '請稍後再試'));
+    } catch (e) { alert('連線失敗，請確認網路'); }
+    setLoading(false);
+  };
+
+  const doRefund = async (it) => {
+    const pay = payments[it.tradeno];
+    if (!pay) return;
+    if (!confirm(`確定要把「${it.company || '(未填)'}」NT$${Number(it.amount).toLocaleString()} 整筆刷退回原卡？\n此動作無法復原。`)) return;
+    setRefunding(it.tradeno);
+    try {
+      const r = await fetch(`${XBH_PAY_API}/refund`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeno: it.tradeno, key: XBH_REFUND_KEY }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        await updateDoc(doc(db, 'quote_payments', pay.id), { refunded: true, refundedAt: serverTimestamp(), refundMsg: j.msg || '' });
+        alert('刷退成功：' + (j.msg || ''));
+      } else alert('刷退失敗：' + (j.msg || '請稍後再試'));
+    } catch (e) { alert('連線失敗，請稍後再試'); }
+    setRefunding('');
+  };
+
+  const rows = intents.filter((it) => !/^測試/.test(it.company || '')).slice(0, 80);
+  const paidCount = rows.filter((it) => payments[it.tradeno] && !payments[it.tradeno].refunded).length;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
-          <h3 className="font-bold text-lg flex items-center"><CreditCard className="w-5 h-5 mr-2" /> 刷卡連結（客戶自填金額）</h3>
-          <button onClick={onClose} className="hover:bg-blue-700 p-1 rounded"><X className="w-5 h-5" /></button>
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-fade-in">
+        <div className="bg-[#fb8e28] p-4 flex justify-between items-center text-white shrink-0">
+          <h3 className="font-bold text-lg flex items-center"><CreditCard className="w-5 h-5 mr-2" /> 刷卡連結</h3>
+          <button onClick={onClose} className="hover:bg-orange-600 p-1 rounded" title="關閉 (Esc)"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-6">
-          <p className="text-sm text-gray-600 mb-3">把這條連結貼給客戶，客戶自己填「公司名＋金額」就能刷卡。付款成功會自動記錄。</p>
-          <div className="flex gap-2 items-center mb-3">
-            <input readOnly value={XBH_OPEN_PAY_URL} onFocus={(e) => e.target.select()} className="w-full border rounded p-2 text-xs bg-gray-50" />
-            <button onClick={copy} className={`whitespace-nowrap px-4 py-2 rounded font-bold text-sm ${copied ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{copied ? '已複製' : '複製'}</button>
+
+        <div className="p-5 overflow-y-auto grow space-y-5">
+          {/* 產生連結 */}
+          <div className="bg-[#fffaf3] border border-[#f3dcc2] rounded-lg p-4">
+            <div className="font-bold text-[#8a6d55] mb-2">① 填金額 → 產生連結 → 貼給客戶</div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="客戶名稱（例：台灣科高）" className="border rounded p-2 text-sm grow min-w-[160px]" />
+              <div className="flex items-center border rounded bg-white">
+                <span className="px-2 text-gray-500 font-bold">$</span>
+                <input value={amount} onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') genLink(); }} placeholder="金額" inputMode="numeric" className="p-2 text-sm w-28 outline-none" />
+              </div>
+              <button onClick={genLink} disabled={loading} className="bg-[#fb8e28] hover:bg-orange-600 text-white font-bold px-4 py-2 rounded text-sm disabled:opacity-50">{loading ? '產生中…' : '產生連結'}</button>
+            </div>
+            {link && (
+              <div className="mt-3 flex gap-2 items-center">
+                <input readOnly value={link} onFocus={(e) => e.target.select()} className="w-full border rounded p-2 text-xs bg-white" />
+                <button onClick={() => copyText(link, 'new')} className={`whitespace-nowrap px-4 py-2 rounded font-bold text-sm text-white ${copiedKey === 'new' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}>{copiedKey === 'new' ? '已複製' : '複製'}</button>
+              </div>
+            )}
+            <div className="text-xs text-gray-400 mt-2">客戶點連結會直接進綠界刷卡；付款成功會即時出現在下面的列表。同一條連結重複開啟不會撞單。</div>
+            <button onClick={() => setShowOpen(!showOpen)} className="text-xs text-blue-600 mt-2 underline">{showOpen ? '收起' : '客戶自填金額的固定連結'}</button>
+            {showOpen && (
+              <div className="mt-2 flex gap-2 items-center">
+                <input readOnly value={XBH_OPEN_PAY_URL} onFocus={(e) => e.target.select()} className="w-full border rounded p-2 text-xs bg-white" />
+                <button onClick={() => copyText(XBH_OPEN_PAY_URL, 'open')} className={`whitespace-nowrap px-3 py-2 rounded font-bold text-xs text-white ${copiedKey === 'open' ? 'bg-green-600' : 'bg-gray-500 hover:bg-gray-600'}`}>{copiedKey === 'open' ? '已複製' : '複製'}</button>
+              </div>
+            )}
           </div>
-          <div className="text-xs text-gray-400 leading-relaxed">
-            ・金額限制 $100～$150,000<br/>
-            ・請只透過 LINE 私訊給客戶，不要公開張貼<br/>
-            ・指定金額的刷卡單請用各報價單的「款項管理」開
+
+          {/* 列表 */}
+          <div>
+            <div className="font-bold text-[#8a6d55] mb-2 flex items-center justify-between">
+              <span>② 連結狀態（即時）</span>
+              <span className="text-xs font-normal text-gray-500">已付款 {paidCount} 筆／最近 {rows.length} 條</span>
+            </div>
+            <div className="border rounded-lg overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 text-xs">
+                  <tr>
+                    <th className="text-left p-2 whitespace-nowrap">建立</th>
+                    <th className="text-left p-2">客戶</th>
+                    <th className="text-right p-2 whitespace-nowrap">金額</th>
+                    <th className="text-left p-2 whitespace-nowrap">類別</th>
+                    <th className="text-left p-2 whitespace-nowrap">狀態</th>
+                    <th className="text-right p-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-gray-400">還沒有任何連結</td></tr>}
+                  {rows.map((it) => {
+                    const pay = payments[it.tradeno];
+                    const url = `https://www.xiabenhow.com/?xbh_pay=${it.tradeno}`;
+                    return (
+                      <tr key={it.tradeno} className={`border-t ${pay ? (pay.refunded ? 'bg-gray-50' : 'bg-green-50') : ''}`}>
+                        <td className="p-2 text-xs text-gray-500 whitespace-nowrap">{fmtDT(it.createdAt)}</td>
+                        <td className="p-2 max-w-[220px] truncate" title={it.company}>{it.company || <span className="text-gray-400">(未填)</span>}</td>
+                        <td className="p-2 text-right font-bold whitespace-nowrap">${Number(it.amount || 0).toLocaleString()}</td>
+                        <td className="p-2 text-xs text-gray-500 whitespace-nowrap">{PAY_KIND_LABEL[it.kind] || it.kind || ''}</td>
+                        <td className="p-2 whitespace-nowrap">
+                          {pay ? (
+                            pay.refunded
+                              ? <span className="text-gray-500 text-xs font-bold">↩ 已刷退 {fmtDT(pay.refundedAt)}</span>
+                              : <span className="text-green-700 text-xs font-bold">✅ 已付款 {fmtDT(pay.paidAt)}{pay.test ? '（測試）' : ''}</span>
+                          ) : <span className="text-orange-500 text-xs font-bold">⏳ 未付款</span>}
+                        </td>
+                        <td className="p-2 text-right whitespace-nowrap">
+                          {!pay && <button onClick={() => copyText(url, it.tradeno)} className={`text-xs px-2 py-1 rounded border ${copiedKey === it.tradeno ? 'bg-green-600 text-white border-green-600' : 'text-blue-600 border-blue-300 hover:bg-blue-50'}`}>{copiedKey === it.tradeno ? '已複製' : '複製連結'}</button>}
+                          {pay && !pay.refunded && isBoss && (
+                            <button onClick={() => doRefund(it)} disabled={refunding === it.tradeno} className="text-xs px-2 py-1 rounded border text-red-600 border-red-300 hover:bg-red-50 disabled:opacity-50">{refunding === it.tradeno ? '刷退中…' : '刷退'}</button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-xs text-gray-400 mt-2">「未付款」的連結可直接再複製給客戶；刷卡失敗時客戶點同一條就能重刷。{isBoss ? '刷退＝整筆退回原卡（只有老闆看得到）。' : ''}</div>
           </div>
         </div>
       </div>
@@ -4922,7 +5071,7 @@ const App = () => {
             <button
               onClick={() => setShowPayLink(true)}
               className="px-3 py-1 rounded-full text-[#8a6d55] hover:bg-[#faf0e4] hover:text-[#c47d24] flex items-center gap-1"
-              title="客戶自填金額的刷卡連結"
+              title="產生刷卡連結、查看付款狀態"
             >
               <CreditCard className="w-4 h-4" /> 刷卡連結
             </button>
@@ -4997,7 +5146,7 @@ const App = () => {
       
       {paymentQuote && <PaymentModal quote={paymentQuote} onClose={() => setPaymentQuote(null)} onSave={handleSavePayment} />}
 
-      {showPayLink && <PayLinkModal onClose={() => setShowPayLink(false)} />}
+      {showPayLink && <PayLinkModal onClose={() => setShowPayLink(false)} isBoss={isBoss} />}
       
       {/* ★ 新增：商品管理視窗 */}
       {showProductManager && (
