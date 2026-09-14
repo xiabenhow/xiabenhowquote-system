@@ -1290,8 +1290,24 @@ const PayLinkModal = ({ onClose, isBoss }) => {
     setRefunding('');
   };
 
-  const rows = intents.filter((it) => !/^測試/.test(it.company || '')).slice(0, 80);
-  const paidCount = rows.filter((it) => payments[it.tradeno] && !payments[it.tradeno].refunded).length;
+  // 月份／狀態篩選（預設本月）
+  const ymOf = (v) => { const d = tsToDate(v); return (d && !isNaN(d)) ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}` : ''; };
+  const nowYm = ymOf(new Date());
+  const [month, setMonth] = useState(nowYm);
+  const [statusFilter, setStatusFilter] = useState('all'); // all | paid | unpaid
+  const allRows = intents.filter((it) => !/^測試/.test(it.company || ''));
+  const months = Array.from(new Set(allRows.map((it) => ymOf(it.createdAt)).filter(Boolean)));
+  if (!months.includes(nowYm)) months.unshift(nowYm);
+  const monthRows = allRows.filter((it) => month === 'all' || ymOf(it.createdAt) === month);
+  const rows = monthRows.filter((it) => {
+    const pay = payments[it.tradeno];
+    if (statusFilter === 'paid') return pay && !pay.refunded;
+    if (statusFilter === 'unpaid') return !pay;
+    return true;
+  });
+  const paidCount = monthRows.filter((it) => payments[it.tradeno] && !payments[it.tradeno].refunded).length;
+  const paidSum = monthRows.reduce((s, it) => (payments[it.tradeno] && !payments[it.tradeno].refunded) ? s + Number(it.amount || 0) : s, 0);
+  const unpaidCount = monthRows.filter((it) => !payments[it.tradeno]).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -1331,10 +1347,21 @@ const PayLinkModal = ({ onClose, isBoss }) => {
 
           {/* 列表 */}
           <div>
-            <div className="font-bold text-[#8a6d55] mb-2 flex items-center justify-between">
+            <div className="font-bold text-[#8a6d55] mb-2 flex items-center justify-between flex-wrap gap-2">
               <span>② 連結狀態（即時）</span>
-              <span className="text-xs font-normal text-gray-500">已付款 {paidCount} 筆／最近 {rows.length} 條</span>
+              <div className="flex items-center gap-2 text-xs font-normal">
+                <select value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1 bg-white text-sm">
+                  {months.map((m) => <option key={m} value={m}>{m}{m === nowYm ? '（本月）' : ''}</option>)}
+                  <option value="all">全部月份</option>
+                </select>
+                <div className="flex rounded-full border overflow-hidden">
+                  {[['all', '全部'], ['unpaid', '未付款'], ['paid', '已付款']].map(([k, label]) => (
+                    <button key={k} onClick={() => setStatusFilter(k)} className={`px-3 py-1 ${statusFilter === k ? 'bg-[#fb8e28] text-white' : 'text-[#8a6d55] hover:bg-[#faf0e4]'}`}>{label}</button>
+                  ))}
+                </div>
+              </div>
             </div>
+            <div className="text-xs text-gray-500 mb-2">{month === 'all' ? '全部' : month}：已付款 <b className="text-green-700">{paidCount}</b> 筆、合計 <b className="text-green-700">${paidSum.toLocaleString()}</b>；未付款 <b className="text-orange-500">{unpaidCount}</b> 筆</div>
             <div className="border rounded-lg overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600 text-xs">
@@ -1348,7 +1375,7 @@ const PayLinkModal = ({ onClose, isBoss }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-gray-400">還沒有任何連結</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-gray-400">{month === 'all' ? '還沒有任何連結' : '這個月沒有符合的連結'}</td></tr>}
                   {rows.map((it) => {
                     const pay = payments[it.tradeno];
                     const url = `https://www.xiabenhow.com/?xbh_pay=${it.tradeno}`;
