@@ -50,7 +50,7 @@ import { saveAs } from 'file-saver';
 import InventoryView from './InventoryView';
 import LineTodosView from './LineTodosView';
 import DashboardView from './DashboardView';
-import { buildMatIndex, matchBom, calcQty, matLabel, linkMat, fmtDate, syncBomFromPrep } from './opsUtils';
+import { buildMatIndex, matchBom, calcQty, matLabel, linkMat, fmtDate, syncBomFromPrep, normCourse, guessMode } from './opsUtils';
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -3307,7 +3307,7 @@ const AddMaterialRow = ({ onAdd }) => {
       <input 
         type="text"
         className="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-400"
-        placeholder="新增額外準備項目 (例如: 延長線)..."
+        placeholder="只加這一場要額外準備的東西（例：延長線、客戶要的 LOGO 貼紙）…"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleAdd(e)}
@@ -3389,6 +3389,129 @@ const buildChecklistHtml = (items) => {
 };
 
 // ========== 備課表 View (修正版：修復人員新增Bug, 日期+2個月, 刪除功能, 複製連結, 互相跳轉) ==========
+// ========== 課程配方編輯（bom）：改了會影響這堂課所有場次；可同步回大補帖 ==========
+const PREP_DOC_BASE = 'https://firestore.googleapis.com/v1/projects/xiabenhowdata/databases/(default)/documents';
+const PREP_KEY = 'AIzaSyB99DpIA1dNr-e2NUfXzAkk-lVoi_yxbvg';
+const MODE_LABEL = { pp: '每人 ×', shared: '每幾人共 1 份', fixed: '固定數量' };
+const BomEditModal = ({ item, bom, onClose }) => {
+  const [rows, setRows] = useState(() => (bom?.materials || []).map((m) => ({ t: m.t || '', mode: m.mode || 'pp', n: Number(m.n) || 1, m2: Number(m.m2) || 0 })));
+  const [newName, setNewName] = useState('');
+  const [syncPrep, setSyncPrep] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const courseName = bom?.course || item.courseName;
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const upd = (i, patch) => { setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...patch } : r))); setDirty(true); };
+  const del = (i) => { setRows((rs) => rs.filter((_, k) => k !== i)); setDirty(true); };
+  const move = (i, d) => { setRows((rs) => { const a = [...rs]; const j = i + d; if (j < 0 || j >= a.length) return a; [a[i], a[j]] = [a[j], a[i]]; return a; }); setDirty(true); };
+  const addRows = () => {
+    const names = newName.split(/\n|、|，|,/).map((s) => s.trim()).filter(Boolean);
+    if (!names.length) return;
+    setRows((rs) => [...rs, ...names.map((t) => ({ t, mode: guessMode(t), n: 1, m2: 0 }))]);
+    setNewName(''); setDirty(true);
+  };
+
+  // 同步回大補帖（xiabenhowdata content/prep）：找同名課程，把材料清單換成這裡的順序與名稱
+  const pushToPrep = async (mats) => {
+    const res = await fetch(`${PREP_DOC_BASE}/content/prep?key=${PREP_KEY}`);
+    const json = await res.json();
+    const series = JSON.parse(json.fields.json.stringValue);
+    const target = normCourse(courseName);
+    let hit = null;
+    for (const s of series) {
+      if (bom?.category && s.name !== bom.category) continue;
+      for (const g of (s.groups || [])) { if (normCourse(g.name) === target) { hit = g; break; } }
+      if (hit) break;
+    }
+    if (!hit) { for (const s of series) { for (const g of (s.groups || [])) { if (normCourse(g.name) === target) { hit = g; break; } } if (hit) break; } }
+    if (!hit) return false;
+    hit.materials = mats.map((m) => m.t);
+    const jsonStr = JSON.stringify(series);
+    const now = new Date().toISOString();
+    const by = '報價系統備課表';
+    const items = series.reduce((a, s) => a + (s.groups || []).reduce((b, g) => b + (g.materials || []).length, 0), 0);
+    const courses = series.reduce((a, s) => a + (s.groups || []).length, 0);
+    await fetch(`${PREP_DOC_BASE}/history?key=${PREP_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { json: { stringValue: jsonStr }, by: { stringValue: by }, note: { stringValue: `備課表改配方：${courseName}` }, at: { timestampValue: now }, categories: { integerValue: String(series.length) }, courses: { integerValue: String(courses) }, items: { integerValue: String(items) } } }) });
+    const r = await fetch(`${PREP_DOC_BASE}/content/prep?updateMask.fieldPaths=json&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=updatedBy&key=${PREP_KEY}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { json: { stringValue: jsonStr }, updatedAt: { timestampValue: now }, updatedBy: { stringValue: by } } }) });
+    if (!r.ok) throw new Error('大補帖寫入失敗 ' + r.status);
+    return true;
+  };
+
+  const save = async () => {
+    if (!db) return;
+    const mats = rows.map((r) => ({ t: String(r.t).trim(), mode: r.mode || 'pp', n: Number(r.n) || 1, m2: Number(r.m2) || 0 })).filter((r) => r.t);
+    if (!mats.length && !window.confirm('材料清單是空的，確定要存？')) return;
+    setSaving(true);
+    try {
+      if (bom) await updateDoc(doc(db, 'bom', bom.id), { materials: mats, updatedAt: serverTimestamp(), editedBy: '備課表' });
+      else await addDoc(collection(db, 'bom'), { course: item.courseName, category: '', aliases: [], materials: mats, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), editedBy: '備課表' });
+      let prepMsg = '';
+      if (syncPrep && bom) {
+        try { const ok = await pushToPrep(mats); prepMsg = ok ? '\n大補帖同名課程的材料也一起更新了 ✓' : '\n（大補帖找不到同名課程，只更新了備課表配方）'; }
+        catch (e) { prepMsg = '\n⚠ 大補帖沒更新成功：' + (e.message || e); }
+      }
+      alert(`「${courseName}」配方已儲存，共 ${mats.length} 項。之後這堂課的每一場都會用新配方。` + prepMsg);
+      onClose();
+    } catch (e) { console.error(e); alert('儲存失敗：' + (e.message || e)); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-fade-in">
+        <div className="bg-[#fb8e28] p-4 flex justify-between items-center text-white shrink-0">
+          <div className="min-w-0">
+            <h3 className="font-bold text-lg truncate">✎ 編輯課程配方：{courseName}</h3>
+            <div className="text-xs text-orange-100 mt-0.5">{bom ? `${bom.category ? bom.category + '｜' : ''}改了會套用到這堂課「所有場次」` : '這堂課還沒有配方，存檔後會建立一份'}</div>
+          </div>
+          <button onClick={onClose} className="hover:bg-orange-600 p-1 rounded shrink-0" title="關閉 (Esc)"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-4 overflow-y-auto grow">
+          <div className="text-xs text-gray-500 mb-3 bg-gray-50 border rounded p-2">「每人 ×」＝每位學員 n 份；「每幾人共 1 份」＝n 人共用一份；「固定數量」＝不管幾人都帶 n 個。只是這一場要多帶的東西，不用改這裡，用卡片下面的「只加這一場」。</div>
+          {rows.length === 0 && <div className="text-center text-gray-400 py-6 text-sm">還沒有材料，下面新增</div>}
+          <div className="space-y-1.5">
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5 bg-white border rounded px-2 py-1.5">
+                <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i + 1}</span>
+                <input value={r.t} onChange={(e) => upd(i, { t: e.target.value })} className="border rounded px-2 py-1 text-sm grow min-w-0" placeholder="材料名稱" />
+                <select value={r.mode} onChange={(e) => upd(i, { mode: e.target.value })} className="border rounded px-1 py-1 text-xs bg-white shrink-0">
+                  {Object.entries(MODE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                <input type="number" min="0" step="0.5" value={r.n} onChange={(e) => upd(i, { n: e.target.value })} className="border rounded px-1 py-1 text-sm w-16 text-center shrink-0" />
+                <button onClick={() => move(i, -1)} className="text-gray-400 hover:text-gray-700 px-1 text-xs" title="上移">▲</button>
+                <button onClick={() => move(i, 1)} className="text-gray-400 hover:text-gray-700 px-1 text-xs" title="下移">▼</button>
+                <button onClick={() => del(i)} className="text-gray-400 hover:text-red-500 p-1" title="刪除"><X className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 p-2 bg-blue-50 border border-dashed border-blue-300 rounded">
+            <div className="text-xs font-bold text-blue-800 mb-1">新增材料（一行一項，或用「、」分隔可一次加多項）</div>
+            <div className="flex gap-2 items-start">
+              <textarea value={newName} onChange={(e) => setNewName(e.target.value)} rows={2} className="border rounded px-2 py-1 text-sm grow" placeholder="例：熱熔膠條、延長線" onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addRows(); }} />
+              <button onClick={addRows} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-3 py-2 rounded shrink-0">加入</button>
+            </div>
+          </div>
+        </div>
+        <div className="p-3 border-t bg-gray-50 flex items-center justify-between gap-2 flex-wrap shrink-0">
+          <label className={`text-xs flex items-center gap-1 ${bom ? 'text-gray-600' : 'text-gray-300'}`}>
+            <input type="checkbox" checked={syncPrep} onChange={(e) => setSyncPrep(e.target.checked)} disabled={!bom} /> 同時更新內部大補帖的同名課程（建議勾，兩邊才一致）
+          </label>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded text-sm border bg-white hover:bg-gray-100">取消</button>
+            <button onClick={save} disabled={saving || !dirty} className="px-4 py-2 rounded text-sm font-bold text-white bg-[#fb8e28] hover:bg-orange-600 disabled:opacity-50">{saving ? '儲存中…' : '儲存配方'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegion = null }) => {
   const validQuotes = quotes.filter(
     (q) => q.status === 'confirmed' || q.status === 'paid',
@@ -3419,6 +3542,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
   useEffect(() => { try { localStorage.setItem('xbh_print_sel', JSON.stringify(printSel)); } catch { /* ignore */ } }, [printSel]);
   const togglePrint = (key) => setPrintSel((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   const [syncing, setSyncing] = useState(false);
+  const [bomEdit, setBomEdit] = useState(null); // ★ 編輯課程配方視窗 {item, bom}
   const [editingPeople, setEditingPeople] = useState(null);   // 正在改人數的卡片 key
 
   // ★ 備課引擎：課程配方(bom) + 材料庫存(materials)
@@ -3932,6 +4056,15 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                     >
                       {printSel.includes(uniqueKey) ? '✓ 已加入核對表' : '＋ 加入核對表'}
                     </button>
+                    {canEditStaff && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setBomEdit({ item, bom: item.bom }); }}
+                        className="text-xs rounded-full px-3 py-1 font-bold border bg-white text-purple-700 border-purple-300 hover:bg-purple-50"
+                        title={item.bom ? '編輯這堂課的配方（所有場次都會套用）' : '這堂課還沒有配方，建立一份'}
+                      >
+                        {item.bom ? '✎ 編輯配方' : '＋ 建立配方'}
+                      </button>
+                    )}
                     {item.bom && (
                       item.prepData.packedAt ? (
                         <span className="text-xs bg-green-100 text-green-700 border border-green-300 rounded-full px-2 py-0.5 font-bold">📦 已裝箱 {item.prepData.packedAt.slice(5)}</span>
@@ -3990,6 +4123,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                         )
                     })}
                 </div>
+                <div className="mt-3 text-xs text-gray-400">藍色框＝只有這一場才要備的東西；要改這堂課每場都要帶的材料，按右上「✎ 編輯配方」。</div>
                 <AddMaterialRow onAdd={(name) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name)} />
                 {canEditStaff && (
                   <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
@@ -4008,6 +4142,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
           })
         )}
       </div>
+      {bomEdit && <BomEditModal item={bomEdit.item} bom={bomEdit.bom} onClose={() => setBomEdit(null)} />}
     </div>
   );
 };
