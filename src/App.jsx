@@ -3293,12 +3293,15 @@ const NoteInput = ({ value, onSave }) => {
 // ★★★ 新增：新增材料的輸入元件 (修正按鈕類型) ★★★
 const AddMaterialRow = ({ onAdd }) => {
   const [name, setName] = useState('');
+  const [qty, setQty] = useState('');
   
   const handleAdd = (e) => {
     if (e) e.preventDefault(); 
     if (!name.trim()) return;
-    onAdd(name.trim());
+    const n = Math.max(1, Math.round(Number(qty) || 1));
+    onAdd(name.trim(), n);
     setName('');
+    setQty('');
   };
 
   return (
@@ -3306,10 +3309,19 @@ const AddMaterialRow = ({ onAdd }) => {
       <Plus className="w-4 h-4 text-gray-400" />
       <input 
         type="text"
-        className="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-400"
+        className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none placeholder-gray-400"
         placeholder="只加這一場要額外準備的東西（例：延長線、客戶要的 LOGO 貼紙）…"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleAdd(e)}
+      />
+      <span className="text-xs text-gray-400 whitespace-nowrap">數量</span>
+      <input
+        type="number" min="1" inputMode="numeric"
+        className="w-16 text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-500 text-center"
+        placeholder="1"
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleAdd(e)}
       />
       <button 
@@ -3360,13 +3372,15 @@ const buildChecklistHtml = (items) => {
       for (let r = 0; r < cells.length; r += 5) out.push(`<tr>${cells.slice(r, r + 5).join('')}</tr>`);
       return out;
     };
+    const customLabel = (m) => { const q = Number(it.prepData?.[m]?.qty); return q > 1 ? `${m} ×${q}` : m; };   // 單場加項的數量
+    const customs = it.customMaterials.map(customLabel);
     let rows;
     if (it.matGroups && it.matGroups.length > 1) {
       rows = [];
       it.matGroups.forEach((g) => { rows.push(...toRows(g.mats.map((m) => matLabel(m)), `▸ ${g.name}`)); });
-      if (it.customMaterials.length) rows.push(...toRows(it.customMaterials, '▸ 自訂材料'));
+      if (customs.length) rows.push(...toRows(customs, '▸ 自訂材料'));
     } else {
-      rows = toRows([...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...it.customMaterials]);
+      rows = toRows([...it.standardMaterials.map((m) => (it.bomInfo[m] ? matLabel(m) : m)), ...customs]);
     }
     const d = String(it.date || ''); const md = d.length >= 10 ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : d;
     const title = `${md}${it.time ? ' ' + it.time : ''} ${it.clientName} ${it.courseName}${it.people ? it.people + '人' : ''}（${shortPlace(it)}）`;
@@ -3770,8 +3784,15 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
     onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
-  const handleAddCustomMaterial = (quoteId, itemIdx, matName) => {
-      handleMaterialUpdate(quoteId, itemIdx, matName, 'done', false);
+  const handleAddCustomMaterial = (quoteId, itemIdx, matName, qty) => {
+    const quote = quotes.find((q) => q.id === quoteId);
+    if (!quote) return;
+    const newPrepData = { ...(quote.prepData || {}) };
+    newPrepData[itemIdx] = { ...(newPrepData[itemIdx] || {}) };
+    const prev = newPrepData[itemIdx][matName] || {};
+    const n = Math.max(1, Math.round(Number(qty) || 1));
+    newPrepData[itemIdx][matName] = { done: false, staff: '', ...prev, qty: n };   // 同名再加一次＝改數量
+    onUpdateQuote(quoteId, { prepData: newPrepData });
   };
 
   const handleRemoveCustomMaterial = (quoteId, itemIdx, matName) => {
@@ -4113,6 +4134,13 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                                     <span className={`text-sm ${matState.done ? 'text-gray-400 line-through' : 'text-blue-800 font-medium'}`}>{mat}</span>
                                 </label>
                                 <div className="flex items-center">
+                                    <span className="text-xs font-bold text-blue-600 mr-0.5">×</span>
+                                    <input
+                                      type="number" min="1" inputMode="numeric" title="數量"
+                                      className="w-14 text-xs font-bold text-blue-700 border border-blue-200 rounded px-1 py-1 bg-white text-center focus:outline-none focus:border-blue-500 mr-1"
+                                      value={matState.qty === undefined || matState.qty === null ? 1 : matState.qty}
+                                      onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'qty', Math.max(1, Math.round(Number(e.target.value) || 1)))}
+                                    />
                                     <select className="text-xs border rounded p-1 bg-white focus:outline-none focus:border-blue-500 mr-1" value={matState.staff} onChange={(e) => handleMaterialUpdate(item.quoteId, item.itemIdx, mat, 'staff', e.target.value)}>
                                         <option value="">未指派</option>
                                         {(staffData[currentRegion] || []).map(s => (<option key={s} value={s}>{s}</option>))}
@@ -4124,7 +4152,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                     })}
                 </div>
                 <div className="mt-3 text-xs text-gray-400">藍色框＝只有這一場才要備的東西；要改這堂課每場都要帶的材料，按右上「✎ 編輯配方」。</div>
-                <AddMaterialRow onAdd={(name) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name)} />
+                <AddMaterialRow onAdd={(name, qty) => handleAddCustomMaterial(item.quoteId, item.itemIdx, name, qty)} />
                 {canEditStaff && (
                   <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
                     <label className="text-xs font-bold text-gray-500 flex items-center"><Users className="w-3 h-3 mr-1"/> 實際出課人數：</label>
