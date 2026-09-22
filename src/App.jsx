@@ -1066,7 +1066,7 @@ const QuotePreview = ({
                         className="bg-green-50 text-[10px] text-green-900 break-inside-avoid"
                       >
                         <td colSpan={3} className="p-1 pl-2 text-right">
-                          額外加購 ({fee.description || '未說明'})含稅
+                          額外加價 ({fee.description || '未說明'})含稅
                         </td>
                         <td className="p-1 text-right font-bold">
                           +${parseInt(fee.amount || 0).toLocaleString()}
@@ -1906,10 +1906,10 @@ const PreviewModal = ({ quote, onClose }) => {
           addFeeRow('師資費（含稅）', item.calc.teacherFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
         }
 
-        // 額外加購（綠底，含稅）
+        // 額外加價（綠底，含稅）
         if (item.extraFees) {
           item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-            addFeeRow(`額外加購 (${fee.description || '未說明'})含稅`, parseInt(fee.amount || 0), 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+            addFeeRow(`額外加價 (${fee.description || '未說明'})含稅`, parseInt(fee.amount || 0), 'FFF0FDF4', 'FF166534', '+"$"#,##0');
           });
         }
 
