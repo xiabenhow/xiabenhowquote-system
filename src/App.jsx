@@ -1022,11 +1022,23 @@ const QuotePreview = ({
                   </tr>
                 )}
 
+                {/* 營業稅（只算課程）先列，含稅的加購項目再列於其下 */}
+                {item.hasInvoice && (
+                  <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
+                    <td colSpan={3} className="p-1 pl-2 text-right">
+                      營業稅 (5%)
+                    </td>
+                    <td className="p-1 text-right font-bold">
+                      +${item.calc.tax.toLocaleString()}
+                    </td>
+                  </tr>
+                )}
+
                 {item.calc.transportFee > 0 && (
                   <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
                     <td colSpan={3} className="p-1 pl-2 text-right">
                       車馬費 ({item.city.replace(/\(.*\)/, '')}
-                      {item.area}){item.hasInvoice ? '（含稅）' : ''}
+                      {item.area})含稅
                     </td>
                     <td className="p-1 text-right font-bold">
                       +${item.calc.transportFee.toLocaleString()}
@@ -1037,7 +1049,7 @@ const QuotePreview = ({
                 {item.calc.teacherFee > 0 && (
                   <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
                     <td colSpan={3} className="p-1 pl-2 text-right">
-                      師資費
+                      師資費（含稅）
                     </td>
                     <td className="p-1 text-right font-bold">
                       +${item.calc.teacherFee.toLocaleString()}
@@ -1054,24 +1066,13 @@ const QuotePreview = ({
                         className="bg-green-50 text-[10px] text-green-900 break-inside-avoid"
                       >
                         <td colSpan={3} className="p-1 pl-2 text-right">
-                          額外加價 ({fee.description || '未說明'})
+                          額外加購 ({fee.description || '未說明'})含稅
                         </td>
                         <td className="p-1 text-right font-bold">
                           +${parseInt(fee.amount || 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}
-
-                {item.hasInvoice && (
-                  <tr className="bg-green-50 text-[10px] text-green-900 break-inside-avoid">
-                    <td colSpan={3} className="p-1 pl-2 text-right">
-                      營業稅 (5%)
-                    </td>
-                    <td className="p-1 text-right font-bold">
-                      +${item.calc.tax.toLocaleString()}
-                    </td>
-                  </tr>
-                )}
 
                 <tr className="bg-gray-100 font-bold text-gray-900 border-b-2 border-gray-300 break-inside-avoid text-xs">
                   <td colSpan={3} className="p-1.5 text-right">
@@ -1091,7 +1092,7 @@ const QuotePreview = ({
       <div className="flex justify-end mt-2 break-inside-avoid">
         <div className="w-1/2 bg-gray-50 p-2 rounded border border-gray-200">
           <div className="flex justify-between items-center text-xl font-bold text-blue-900">
-            <span>總金額{items.some((it) => it.hasInvoice) ? '（含稅）' : ''}</span>
+            <span>總金額</span>
             <span>${totalAmount.toLocaleString()}</span>
           </div>
           <p className="text-right text-[10px] text-gray-500 mt-1">
@@ -1099,11 +1100,6 @@ const QuotePreview = ({
           </p>
         </div>
       </div>
-      {items.some((it) => it.hasInvoice) && (
-        <p className="text-right text-[10px] text-gray-600 mt-1 break-inside-avoid">
-          ※ 車馬費與總金額均已含營業稅（5%），無需另加稅金。
-        </p>
-      )}
 
       {/* 注意事項 */}
       <div className="mt-2 pt-2 border-t-2 border-gray-800 text-[10px] text-gray-700 leading-relaxed break-inside-avoid">
@@ -1895,26 +1891,26 @@ const PreviewModal = ({ quote, onClose }) => {
           addFeeRow(discLabel, -discountAmount, 'FFFFF1F2', 'FFDC2626', '-"$"#,##0');
         }
 
-        // 車馬費（綠底）
-        if (item.calc.transportFee > 0) {
-          addFeeRow(`車馬費 (${item.city}${item.area})${item.hasInvoice ? '（含稅）' : ''}`, item.calc.transportFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
-        }
-
-        // 師資費（綠底）— ★ 補齊 PDF 有但舊版 Excel 遺漏的欄位
-        if (item.calc.teacherFee > 0) {
-          addFeeRow('師資費', item.calc.teacherFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
-        }
-
-        // 額外費用（綠底）
-        if (item.extraFees) {
-          item.extraFees.filter(f => f.isEnabled).forEach(fee => {
-            addFeeRow(`額外加價 (${fee.description || '未說明'})`, parseInt(fee.amount || 0), 'FFF0FDF4', 'FF166534', '+"$"#,##0');
-          });
-        }
-
-        // 營業稅（綠底）
+        // 營業稅（只算課程，先列）
         if (item.hasInvoice) {
           addFeeRow('營業稅 (5%)', item.calc.tax, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+        }
+
+        // 車馬費（綠底，含稅，列於營業稅下方）
+        if (item.calc.transportFee > 0) {
+          addFeeRow(`車馬費 (${item.city}${item.area})含稅`, item.calc.transportFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+        }
+
+        // 師資費（綠底，含稅）
+        if (item.calc.teacherFee > 0) {
+          addFeeRow('師資費（含稅）', item.calc.teacherFee, 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+        }
+
+        // 額外加購（綠底，含稅）
+        if (item.extraFees) {
+          item.extraFees.filter(f => f.isEnabled).forEach(fee => {
+            addFeeRow(`額外加購 (${fee.description || '未說明'})含稅`, parseInt(fee.amount || 0), 'FFF0FDF4', 'FF166534', '+"$"#,##0');
+          });
         }
 
         // 項目總計（合併 A:C 右對齊，底線）— 對齊 PDF 的 bg-gray-100 font-bold border-b-2
@@ -1939,8 +1935,7 @@ const PreviewModal = ({ quote, onClose }) => {
       spacer3.height = 4;
 
       // 8. 總金額（對齊 PDF 的右側方框樣式）
-      const anyInvoice = (quote.items || []).some((it) => it.hasInvoice);
-      const totalRow = sheet.addRow(['', '', '總金額' + (anyInvoice ? '（含稅）' : ''), quote.totalAmount]);
+      const totalRow = sheet.addRow(['', '', '總金額', quote.totalAmount]);
       totalRow.height = 30;
       const totalLabelCell = totalRow.getCell(3);
       totalLabelCell.font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' }, name: msjh };
@@ -1967,17 +1962,6 @@ const PreviewModal = ({ quote, onClose }) => {
       totalSubRow.height = 14;
       totalSubRow.getCell(4).font = { size: 8, color: { argb: 'FF9CA3AF' }, name: msjh };
       totalSubRow.getCell(4).alignment = { horizontal: 'right' };
-
-      // 含稅註解（對齊 PDF 的 ※ 車馬費與總金額均已含營業稅）
-      if (anyInvoice) {
-        const taxNoteRow = sheet.addRow(['', '', '', '※ 車馬費與總金額均已含營業稅（5%），無需另加稅金。']);
-        taxNoteRow.height = 14;
-        sheet.mergeCells(`A${taxNoteRow.number}:D${taxNoteRow.number}`);
-        const tnc = taxNoteRow.getCell(1);
-        tnc.value = '※ 車馬費與總金額均已含營業稅（5%），無需另加稅金。';
-        tnc.font = { size: 9, color: { argb: 'FF4B5563' }, name: msjh };
-        tnc.alignment = { horizontal: 'right' };
-      }
 
       const spacer4 = sheet.addRow([]);
       spacer4.height = 6;
