@@ -1096,7 +1096,7 @@ const QuotePreview = ({
             <span>${totalAmount.toLocaleString()}</span>
           </div>
           <p className="text-right text-[10px] text-gray-500 mt-1">
-            總金額
+            總金額{items.some((it) => it.hasInvoice) ? '（含稅）' : ''}
           </p>
         </div>
       </div>
@@ -1958,7 +1958,7 @@ const PreviewModal = ({ quote, onClose }) => {
       };
 
       // 總金額副標（對齊 PDF 的小字 "總金額"）
-      const totalSubRow = sheet.addRow(['', '', '', '總金額']);
+      const totalSubRow = sheet.addRow(['', '', '', '總金額' + ((quote.items || []).some((it) => it.hasInvoice) ? '（含稅）' : '')]);
       totalSubRow.height = 14;
       totalSubRow.getCell(4).font = { size: 8, color: { argb: 'FF9CA3AF' }, name: msjh };
       totalSubRow.getCell(4).alignment = { horizontal: 'right' };
