@@ -2137,7 +2137,7 @@ const PreviewModal = ({ quote, onClose }) => {
 
 // ========== QuoteCreator ==========
 
-const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
+const QuoteCreator = ({ initialData, onSave, onCancel, courseData = COURSE_DATA }) => {
   const [clientInfo, setClientInfo] = useState(
     initialData?.clientInfo || {
       companyName: '',
@@ -2242,12 +2242,12 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
     // 課程選單連動單價 (僅在非自訂且非手動模式生效)
     if (!item.isCustom) {
         if (field === 'courseName') {
-            const series = COURSE_DATA[item.courseSeries];
+            const series = courseData[item.courseSeries];
             const course = series?.find((c) => c.name === value);
             if (course) item.price = course.price;
         }
         if (field === 'courseSeries') {
-            const series = COURSE_DATA[value];
+            const series = courseData[value];
             if (series && series.length > 0) {
                 item.courseName = series[0].name;
                 item.price = series[0].price;
@@ -2281,7 +2281,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
           // 變回選單
           current.isCustom = false;
           current.courseSeries = '水晶系列'; 
-          const series = COURSE_DATA['水晶系列'];
+          const series = courseData['水晶系列'];
           if(series) {
               current.courseName = series[0].name;
               current.price = series[0].price;
@@ -2309,7 +2309,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
           current.eventDate = '';
           current.timeRange = '';
           
-          const series = COURSE_DATA['材料包系列'];
+          const series = courseData['材料包系列'];
           if(series) {
               current.courseName = series[0].name;
               current.price = series[0].price;
@@ -2321,7 +2321,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
           current.locationMode = 'store'; // 預設回店內
           current.city = '台北市'; // 重置預設值
           
-          const series = COURSE_DATA['水晶系列'];
+          const series = courseData['水晶系列'];
           if(series) {
               current.courseName = series[0].name;
               current.price = series[0].price;
@@ -2569,7 +2569,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
                         <div className="md:col-span-2">
                           <label className={LABEL_CLASS}>商品名稱 （單價: ${item.price}）</label>
                           <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
-                            {COURSE_DATA['材料包系列']?.map((c) => (
+                            {courseData['材料包系列']?.map((c) => (
                               <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
                             ))}
                           </select>
@@ -2583,7 +2583,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
                         <div>
                           <label className={LABEL_CLASS}>課程系列</label>
                           <select className={INPUT_CLASS} value={item.courseSeries} onChange={(e) => updateItem(idx, 'courseSeries', e.target.value)}>
-                            {Object.keys(COURSE_DATA).filter(k => k !== '材料包系列').map((s) => (
+                            {Object.keys(courseData).filter(k => k !== '材料包系列').map((s) => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
@@ -2591,7 +2591,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData }) => {
                         <div className="md:col-span-2">
                           <label className={LABEL_CLASS}>課程名稱 （單價: ${item.price}）</label>
                           <select className={INPUT_CLASS} value={item.courseName} onChange={(e) => updateItem(idx, 'courseName', e.target.value)}>
-                            {COURSE_DATA[item.courseSeries]?.map((c) => (
+                            {courseData[item.courseSeries]?.map((c) => (
                               <option key={c.name} value={c.name}>{c.name} (${c.price})</option>
                             ))}
                           </select>
