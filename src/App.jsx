@@ -429,6 +429,9 @@ const COURSE_MATERIALS = {
 
 // ========== 車馬費表 (完整版) ==========
 
+// 下拉選單顯示用名稱（存檔的值不變，舊報價單不受影響）
+const ZONE_LABELS = { 陽明山: '士林區－陽明山' };
+
 const TRANSPORT_FEES = {
   台北市: {
     default: 0,
@@ -442,10 +445,10 @@ const TRANSPORT_FEES = {
       文山區: 800,
       松山區: 800,
       士林區: 800,
+      陽明山: 1000, // 屬士林區但路程遠，車馬費另計；下拉顯示「士林區－陽明山」
       北投區: 800,
       南港區: 1000,
       內湖區: 1000,
-      陽明山: 1000,
     },
   },
   新北市: {
@@ -2724,7 +2727,7 @@ const QuoteCreator = ({ initialData, onSave, onCancel, courseData = COURSE_DATA 
                               <select className={INPUT_CLASS} value={item.area} onChange={(e) => updateItem(idx, 'area', e.target.value)}>
                                 <option value="">選擇區域...</option>
                                 {Object.entries(TRANSPORT_FEES[item.city].zones).map(([zone, fee]) => (
-                                  <option key={zone} value={zone}>{zone} (+${fee})</option>
+                                  <option key={zone} value={zone}>{ZONE_LABELS[zone] || zone} (+${fee.toLocaleString()})</option>
                                 ))}
                               </select>
                             </div>
