@@ -3356,12 +3356,33 @@ const CHECK_COLORS = {
 };
 const CHECK_FALLBACK = ['#d9ead3', '#d9d2e9', '#cfe2f3', '#fce5cd', '#fff2cc', '#ead1dc'];
 const PREP_JSON_URL = 'https://firestore.googleapis.com/v1/projects/xiabenhowdata/databases/(default)/documents/content/prep?key=AIzaSyB99DpIA1dNr-e2NUfXzAkk-lVoi_yxbvg';
-// 地點簡寫：地址裡的「XX區」→ 區名；沒有就用縣市；都沒有 → 店內
+// 地點簡寫（出課核對表標題括號裡那個）
+// 店內包班：北部＝店內、南部＝高雄店、中部＝地址／備註裡的場地（沒寫＝台中）
+// 外派：詳細地址 →（地址空白時）品項備註裡的地址 → 外派選的縣市
+// 台北／新北只印區名（信義、板橋）；其他縣市印「縣市＋區」（台中北區、雲林斗六），避免「北區」被看成台北
+const PLACE_NORTH = ['台北', '新北'];
+const placeFromText = (text) => {
+  const t = String(text || '').replace(/\s+/g, '').replace(/臺/g, '台').replace(/^\d{3,6}/, '');
+  if (!t) return '';
+  const dShort = (d) => (d.length <= 2 ? d : d.replace(/[區鄉鎮市]$/, ''));
+  const m = t.match(/([一-龥]{2})[縣市]([一-龥]{1,3}?[區鄉鎮市])/);
+  if (m) return PLACE_NORTH.includes(m[1]) ? dShort(m[2]) : m[1] + dShort(m[2]);
+  const d = t.match(/^([一-龥]{1,3}?[區鄉鎮])/);   // 只寫「信義區…」沒寫縣市
+  return d ? dShort(d[1]) : '';
+};
 const shortPlace = (item) => {
-  const addr = String(item.address || '').replace(/\s+/g, '').replace(/^\d{3,6}/, '').replace(/臺/g, '台').replace(/^(台灣)?[一-龥]{2,3}[縣市]/, '');
-  const m = addr.match(/^([一-龥]{1,3})[區鄉鎮]/);
-  if (m && m[1]) return m[1];
-  if (item.city) return String(item.city).replace(/[縣市]$/, '');
+  if (item.locationMode === 'store') {   // 店內包班：北部＝店內、南部＝高雄店、中部＝備註寫的場地（例：台中北區），沒寫就「台中」
+    const r = item.regionType || 'North';
+    if (r === 'South') return '高雄店';
+    if (r === 'Central') return placeFromText(item.address) || placeFromText(item.itemNote) || '台中';
+    return '店內';
+  }
+  const fromAddr = placeFromText(item.address);
+  if (fromAddr) return fromAddr;
+  const fromNote = placeFromText(item.itemNote);
+  if (fromNote) return fromNote;
+  const city = String(item.city || '').replace(/[（(].*$/, '').replace(/臺/g, '台').replace(/[縣市]$/, '');
+  if (city) return city;
   return '店內';
 };
 const escapeHtml = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -3735,6 +3756,9 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
             // ★ 地點：報價單上的縣市＋地址（外送才有；店內課通常空白）
             city: item.city || '',
             address: item.address || '',
+            itemNote: item.itemNote || '',
+            locationMode: item.locationMode || '',
+            regionType: item.regionType || '',
             standardMaterials,
             customMaterials,
             prepData: savedData,
@@ -3996,7 +4020,7 @@ const PreparationView = ({ quotes, onUpdateQuote, publicMode = false, publicRegi
                 groups.forEach((g) => { const mats = []; g.bom.materials.forEach((m) => { if (!std.includes(m.t)) std.push(m.t); mats.push(m.t); bomInfo[m.t] = true; }); matGroups.push({ name: g.name, mats }); });
                 if (!groups.length) (COURSE_MATERIALS[raw.it.courseName] || []).forEach((m) => std.push(m));
                 const pd = raw.q.prepData?.[raw.idx] || {};
-                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: Number(pd.people) > 0 ? Number(pd.people) : raw.it.peopleCount, quotePeople: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo, matGroups };
+                return { quoteId: raw.q.id, itemIdx: raw.idx, clientName: raw.q.clientInfo?.companyName || '', courseName: raw.it.courseName, date: raw.it.eventDate, time: raw.it.timeRange || raw.it.startTime || '', people: Number(pd.people) > 0 ? Number(pd.people) : raw.it.peopleCount, quotePeople: raw.it.peopleCount, city: raw.it.city || '', address: raw.it.address || '', itemNote: raw.it.itemNote || '', locationMode: raw.it.locationMode || '', regionType: raw.it.regionType || '', standardMaterials: std, customMaterials: [], prepData: raw.q.prepData?.[raw.idx] || {}, bom, bomInfo, matGroups };
               }).filter(Boolean).sort((a, b) => (a.date > b.date ? 1 : a.date < b.date ? -1 : 0));
               openChecklist(picked);
             }}
